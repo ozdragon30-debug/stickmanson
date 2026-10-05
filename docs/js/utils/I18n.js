@@ -57,7 +57,7 @@ const I18N = {
     'hud.streak.2': 'DOUBLE KILL', 'hud.streak.3': 'TRIPLE KILL', 'hud.streak.4': 'MULTI KILL', 'hud.streak.5': 'RAMPAGE',
     'hud.reconnecting': 'Connection lost — reconnecting…',
     'hud.soundOn': 'SOUND ON', 'hud.soundOff': 'SOUND OFF', 'hud.disconnected': 'DISCONNECTED',
-    'hud.move': 'MOVE', 'hud.aim': 'AIM + FIRE',
+    'hud.move': 'MOVE', 'hud.aim': 'AIM + FIRE', 'hud.mapBy': 'by {name}',
     'hud.botsOffline': 'Offline — playing against bots', 'hud.botsWaiting': 'Waiting for players — playing against bots',
 
     'sb.title': 'SCOREBOARD', 'sb.over': 'ROUND OVER', 'sb.player': 'PLAYER', 'sb.kills': 'KILLS', 'sb.deaths': 'DEATHS', 'sb.kd': 'K/D',
@@ -116,7 +116,7 @@ const I18N = {
     'hud.streak.2': 'ÇİFT LEŞ', 'hud.streak.3': 'ÜÇLÜ LEŞ', 'hud.streak.4': 'SERİ LEŞ', 'hud.streak.5': 'KATLİAM',
     'hud.reconnecting': 'Bağlantı koptu — yeniden bağlanılıyor…',
     'hud.soundOn': 'SES AÇIK', 'hud.soundOff': 'SES KAPALI', 'hud.disconnected': 'BAĞLANTI KESİLDİ',
-    'hud.move': 'HAREKET', 'hud.aim': 'NİŞAN + ATEŞ',
+    'hud.move': 'HAREKET', 'hud.aim': 'NİŞAN + ATEŞ', 'hud.mapBy': 'yapan: {name}',
     'hud.botsOffline': 'Çevrimdışı — botlara karşı oynanıyor', 'hud.botsWaiting': 'Oyuncu bekleniyor — botlara karşı oynanıyor',
 
     'sb.title': 'SKOR TABLOSU', 'sb.over': 'TUR BİTTİ', 'sb.player': 'OYUNCU', 'sb.kills': 'LEŞ', 'sb.deaths': 'ÖLÜM', 'sb.kd': 'L/Ö',

@@ -64,9 +64,26 @@ class Menu {
     if (name && name !== settingsManager.name) settingsManager.setName(name);
     soundManager._ensureContext();
     this._hide();
+    if (typeof map !== 'undefined' && map.ready) hudManager.showMapTitle(map.name);
+    this._keepAwake();
     canvas.focus({ preventScroll: true });
     // Phones: go fullscreen + landscape on first play for a console-like feel.
     if (inputMode.mode === 'touch' && !document.fullscreenElement) toggleFullscreen();
+  }
+
+  // Screen Wake Lock: phones shouldn't dim/sleep mid-match. The lock is
+  // released automatically when the tab is hidden, so re-acquire on return.
+  async _keepAwake() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      this._wakeLock = await navigator.wakeLock.request('screen');
+    } catch (e) { return; }
+    if (!this._wakeHooked) {
+      this._wakeHooked = true;
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && !this.isOpen) this._keepAwake();
+      });
+    }
   }
 
   _hide() {

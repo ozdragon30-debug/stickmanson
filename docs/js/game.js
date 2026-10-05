@@ -308,6 +308,7 @@ botManager.init();
 let currentMapFile = null;
 function loadMap(filename) {
   return map.load('data/maps/' + filename).then(() => {
+    if (currentMapFile !== filename && !menu.isOpen) hudManager.showMapTitle(map.name);
     currentMapFile = filename;
     obstacleGrid = map.collisionMap;
     pickupManager.initFromMap(map.weaponSpawns);

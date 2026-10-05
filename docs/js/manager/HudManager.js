@@ -61,6 +61,14 @@ class HudManager {
 
   onRespawn() { this.deathInfo = null; }
 
+  // "Facility (by Someone)" → big map title with the author underneath.
+  showMapTitle(name) {
+    if (!name) return;
+    const m = /^(.*?)\s*\(by (.+)\)\s*$/.exec(name);
+    this.flash(m ? m[1] : name, m ? t('hud.mapBy', { name: m[2] }) : null, '#cfe3f7', 2600);
+    if (this.centerMsg) this.centerMsg.subColor = '#8fa6bf';
+  }
+
   flash(text, sub = null, color = '#fff', dur = 1500) {
     this.centerMsg = { text, sub, color, t: performance.now(), dur };
   }
@@ -236,7 +244,7 @@ class HudManager {
     if (m.sub) {
       ctx.font = '800 15px system-ui, sans-serif';
       ctx.strokeText(m.sub, 0, 24);
-      ctx.fillStyle = '#ff8f5a';
+      ctx.fillStyle = m.subColor || '#ff8f5a';
       ctx.fillText(m.sub, 0, 24);
     }
     ctx.restore();
