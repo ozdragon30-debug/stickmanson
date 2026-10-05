@@ -64,6 +64,7 @@ const I18N = {
     'hud.reconnecting': 'Connection lost — reconnecting…',
     'hud.soundOn': 'SOUND ON', 'hud.soundOff': 'SOUND OFF', 'hud.disconnected': 'DISCONNECTED',
     'hud.move': 'MOVE', 'hud.aim': 'AIM + FIRE', 'hud.mapBy': 'by {name}', 'hud.rotate': 'Rotate your device for a bigger view', 'chat.server': 'Server', 'tab.joined': 'Player joined',
+    'chat.quick': 'gg|hi!|nice shot|lol|wp|one more round?',
     'chat.help': '!fps – toggle FPS counter · !debug – collision overlay\n!map <name> / !next – change map (offline)\nAdmins: !next !kick !ban !weapon !debugmap · !login <password>',
     'hud.botsOffline': 'Offline — playing against bots', 'hud.botsWaiting': 'Waiting for players — playing against bots',
 
@@ -130,6 +131,7 @@ const I18N = {
     'hud.reconnecting': 'Bağlantı koptu — yeniden bağlanılıyor…',
     'hud.soundOn': 'SES AÇIK', 'hud.soundOff': 'SES KAPALI', 'hud.disconnected': 'BAĞLANTI KESİLDİ',
     'hud.move': 'HAREKET', 'hud.aim': 'NİŞAN + ATEŞ', 'hud.mapBy': 'yapan: {name}', 'hud.rotate': 'Daha büyük görüntü için cihazı yan çevir', 'chat.server': 'Sunucu', 'tab.joined': 'Oyuncu katıldı',
+    'chat.quick': 'gg|selam!|iyi atış|haha|eline sağlık|bir tur daha?',
     'chat.help': '!fps – FPS sayacı · !debug – çarpışma katmanı\n!map <ad> / !next – harita değiştir (çevrimdışı)\nYöneticiler: !next !kick !ban !weapon !debugmap · !login <şifre>',
     'hud.botsOffline': 'Çevrimdışı — botlara karşı oynanıyor', 'hud.botsWaiting': 'Oyuncu bekleniyor — botlara karşı oynanıyor',
 

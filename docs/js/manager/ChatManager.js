@@ -37,6 +37,31 @@ class ChatManager {
     el.addEventListener('blur', () => { if (this.isOpen) this.close(); });
     document.body.appendChild(el);
     this._el = el;
+
+    // Quick-chat chips (touch only): one tap sends a phrase.
+    const chips = document.createElement('div');
+    chips.className = 'quick-chat';
+    // pointerdown + preventDefault keeps the text field focused (no blur/close).
+    chips.addEventListener('pointerdown', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      e.preventDefault();
+      this.close();
+      if (typeof submitChat === 'function') submitChat(b.textContent);
+    });
+    document.body.appendChild(chips);
+    this._chips = chips;
+  }
+
+  _renderChips() {
+    const phrases = t('chat.quick').split('|');
+    this._chips.innerHTML = '';
+    for (const p of phrases) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = p;
+      this._chips.appendChild(b);
+    }
   }
 
   get input() { return this._el.value; }
@@ -46,6 +71,7 @@ class ChatManager {
     this._el.value = '';
     const touch = typeof inputMode !== 'undefined' && inputMode.mode === 'touch';
     document.body.classList.toggle('touch-chat', touch);
+    if (touch) this._renderChips();
     this._el.placeholder = touch ? '…' : '';
     if (typeof onBlurHandler === 'function') onBlurHandler(); // release held movement keys
     this._el.focus({ preventScroll: true });

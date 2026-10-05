@@ -70,6 +70,28 @@ body.touch-chat .chat-input {
   pointer-events: auto;
 }
 
+.quick-chat { display: none; }
+body.touch-chat .quick-chat {
+  position: fixed;
+  left: 50%;
+  top: calc(max(10px, env(safe-area-inset-top)) + 50px);
+  transform: translateX(-50%);
+  z-index: 950;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  width: min(520px, 92vw);
+}
+.quick-chat button {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(15, 25, 38, .92);
+  color: #dbe8f5;
+  font: 600 14px var(--font);
+}
+
 /* Visually hidden but focusable (chat input). */
 .chat-input {
   position: fixed;
