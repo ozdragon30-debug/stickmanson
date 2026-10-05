@@ -77,7 +77,17 @@
 
   <noscript><p class="noscript">Stick Arena: Reborn needs JavaScript enabled to run.</p></noscript>
 
-  <script src="/socket.io/socket.io.js" onerror="console.info('[SocketManager] socket.io unavailable — offline mode')"></script>
+  <!-- socket.io client: from this host, or from a remote game server given as
+       ?server=https://host (lets the static/GitHub Pages build play online). -->
+  <script>
+    (function () {
+      var raw = new URLSearchParams(location.search).get('server');
+      var base = '';
+      try { if (raw) { var u = new URL(raw); if (/^https?:$/.test(u.protocol)) base = u.origin; } } catch (e) {}
+      window.GAME_SERVER = base || null;
+      document.write('<script src="' + base + '/socket.io/socket.io.js" onerror="console.info(\'[SocketManager] socket.io unavailable — offline mode\')"><\/script>');
+    })();
+  </script>
 
   <script src="./js/utils/Constants.js"></script>
   <script src="./js/utils/I18n.js"></script>

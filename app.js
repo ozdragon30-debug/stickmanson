@@ -6,6 +6,9 @@ const app = express();
 const server = require("http").Server(app);
 const io = require("socket.io")(server, {
   maxHttpBufferSize: 16 * 1024,   // game messages are tiny; refuse oversized payloads
+  // Allow browsers on other origins (e.g. the GitHub Pages build opened with
+  // ?server=https://this-host) to connect. Restrict with CORS_ORIGIN=a,b.
+  cors: { origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()) : true },
   pingInterval: 10000,
   pingTimeout: 8000,
 });

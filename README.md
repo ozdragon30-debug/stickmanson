@@ -50,7 +50,7 @@ docker build -t stick-arena .
 docker run -p 1138:1138 stick-arena
 ```
 
-Players open `http://your-server:1138` and join the public room automatically. "Create private room" in the menu makes an invite link like `http://your-server:1138/?room=k3x9pq`; each room has its own map rotation, rounds and scores.
+Players open `http://your-server:1138` and join the public room automatically. The static build (e.g. GitHub Pages) can also play online against any server: `https://<user>.github.io/<repo>/?server=https://your-server.example`. "Create private room" in the menu makes an invite link like `http://your-server:1138/?room=k3x9pq`; each room has its own map rotation, rounds and scores.
 
 ### Server configuration
 
@@ -62,6 +62,7 @@ Players open `http://your-server:1138` and join the public room automatically. "
 | `MAX_PLAYERS` | `16` | Players per room |
 | `MAX_CONNECTIONS_PER_IP` | `10` | Simultaneous connections from one IP |
 | `BANS_FILE` | – | JSON file where `!ban`s are persisted across restarts |
+| `CORS_ORIGIN` | any | Comma-separated origins allowed to connect from other sites |
 | `TRUST_PROXY` | off | Set to `1` behind nginx/Render/Fly etc. so real client IPs (bans, admin) are used |
 | `ADMIN_PASSWORD` | – | Enables `!login <password>` for remote admins |
 

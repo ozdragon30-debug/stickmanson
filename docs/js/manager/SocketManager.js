@@ -27,12 +27,13 @@ class SocketManager {
     // `io` undefined.  We degrade gracefully to pure offline mode.
     if (typeof io !== 'undefined') {
       try {
-        this.socket = io({
+        const opts = {
           query: this.room ? { room: this.room, session: this.session } : { session: this.session },
           reconnectionAttempts: Infinity,
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,
-        });
+        };
+        this.socket = window.GAME_SERVER ? io(window.GAME_SERVER, opts) : io(opts);
         this.socket.on('connect', () => {
           this.isConnected = true;
           this.wasConnected = true;
