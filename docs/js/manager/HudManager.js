@@ -233,7 +233,8 @@ class HudManager {
     const age = now - m.t;
     if (age > m.dur) { this.centerMsg = null; return; }
     const a = Math.min(1, (m.dur - age) / 300);
-    const s = 1 + Math.max(0, 0.25 - age / 600);
+    // Pop-in scale, skipped for users who asked the OS to reduce motion.
+    const s = HudManager.reducedMotion ? 1 : 1 + Math.max(0, 0.25 - age / 600);
     ctx.save();
     ctx.globalAlpha = a;
     ctx.translate(VIEW_W / 2, 150);
@@ -348,5 +349,7 @@ class HudManager {
     ctx.fillText(msg, VIEW_W / 2, 89);
   }
 }
+
+HudManager.reducedMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 
 const hudManager = new HudManager();
