@@ -274,6 +274,15 @@ class BotManager {
     this._updateScoreboard();
   }
 
+  /** Move every bot to a spawn point of the current map (after a map change). */
+  respawnAll() {
+    for (const bot of Object.values(this.bots)) {
+      bot.respawnPending = false;
+      bot.player.forceRespawn(map.spawnPoints);
+      bot._resetNavigation(bot.player.body);
+    }
+  }
+
   /** Remove all bots and restore normal socket behaviour. */
   despawn() {
     for (const bot of Object.values(this.bots)) bot.remove();

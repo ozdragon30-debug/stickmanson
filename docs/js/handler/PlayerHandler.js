@@ -129,8 +129,9 @@ socketManager.on("gameState", (data) => {
   Constants._weaponsReady.then(() => loadMap(data.mapFile).then(() => {
     // Reconnected into a different map (the round changed meanwhile): our old
     // coordinates mean nothing here, so move to a spawn point.
-    if (previousMap && previousMap !== data.mapFile && playerManager.mainPlayer) {
-      playerManager.mainPlayer.forceRespawn(map.spawnPoints);
+    if (previousMap && previousMap !== data.mapFile) {
+      if (playerManager.mainPlayer) playerManager.mainPlayer.forceRespawn(map.spawnPoints);
+      if (botManager.active) botManager.respawnAll();
     }
     // Spawn bots when alone, despawn when others are present.
     botManager.considerSpawning(data.scores);
@@ -202,6 +203,8 @@ socketManager.on("roundStart", (data) => {
     for (const id in playerManager.getPlayers()) {
       playerManager.getPlayers()[id].equipWeapon(0, true);
     }
+    // Bots kept the previous map's coordinates (often inside walls / off-map).
+    if (botManager.active) botManager.respawnAll();
     // Re-evaluate bots: despawn if others joined, keep/spawn if still alone.
     botManager.considerSpawning(data.scores);
   });

@@ -36,7 +36,7 @@ class AtlasSpritesheet {
       fetch(jsonData)
         .then(r => r.json())
         .then(load)
-        .catch(err => console.error(`[Atlas] failed to load ${name}:`, err));
+        .catch(err => { this.failed = true; console.error(`[Atlas] failed to load ${name}:`, err); });
     }
   }
 

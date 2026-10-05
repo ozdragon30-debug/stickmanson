@@ -51,10 +51,19 @@ class AtlasGameObject {
     if (this.repeatTimes !== -1 && this.repeatTimes <= 0) return;
 
     const anim = this.atlas.getAnimation(this.animName);
-    if (!anim) return;
+    if (!anim) {
+      // Atlas failed to load: finish one-shot animations immediately so state
+      // machines waiting on them (e.g. death → respawn) can't get stuck.
+      if (this.atlas.failed && this.repeatTimes > 0) {
+        this.repeatTimes = 0;
+        this.dispatchEvent('animationcomplete', { name: this.animName });
+      }
+      return;
+    }
 
     const timePerFrame = 1000 / (anim.fps || 12);
-    if (Date.now() - this.lastUpdated < timePerFrame) return;
+    // Monotonic clock: a wall-clock step backwards (NTP/DST) used to freeze animations.
+    if (performance.now() - this.lastUpdated < timePerFrame) return;
 
     // Fire shotsfired when frameIndex is 0 (first displayed frame) for shooting anims.
     // Matches original GameObject behaviour (check before increment).
@@ -71,7 +80,7 @@ class AtlasGameObject {
       }
     }
 
-    this.lastUpdated = Date.now();
+    this.lastUpdated = performance.now();
   }
 
   // ── Draw helpers ──────────────────────────────────────────────────────────

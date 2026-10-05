@@ -275,7 +275,10 @@ class Player {
     const shootSounds = weapon.shootSounds ?? [weapon.name + '_shoot'];
     soundManager.playRandom(shootSounds, this._soundPos());
     this.canShoot = false;
-    setTimeout(() => { this.canShoot = true; }, weapon.fireCooldown);
+    // Keep the handle: a cooldown from a previous life/round must not cut a
+    // later weapon's cooldown short (same cooldown lengths as before).
+    clearTimeout(this._cooldownTimer);
+    this._cooldownTimer = setTimeout(() => { this.canShoot = true; }, weapon.fireCooldown);
     const shootAnim = weapon.shootAnims[Math.floor(Math.random() * weapon.shootAnims.length)];
     this.body.isShootingAnimation = true;
     this.body.setAnimation(shootAnim, 1);
@@ -299,6 +302,7 @@ class Player {
   }
 
   death() {
+    clearTimeout(this._cooldownTimer);
     this.health = 0;
     this.isRespawning = true;
     this.canShoot = false;
@@ -336,6 +340,7 @@ class Player {
     const pts = spawnPoints.length ? spawnPoints : [{ x: 400, y: 300 }];
     const { x, y } = pts[Math.floor(Math.random() * pts.length)];
 
+    clearTimeout(this._cooldownTimer);
     this.health = 100;
     this.isRespawning = false;
     this.canShoot = true;

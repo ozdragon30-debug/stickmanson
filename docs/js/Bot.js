@@ -601,6 +601,20 @@ class Bot {
     const sp = pts[Math.floor(Math.random() * pts.length)];
     this.player.body.setPosition(sp.x, sp.y);
     this.player.legs.setPosition(sp.x, sp.y);
+    this._resetNavigation(sp);
+  }
+
+  /** Forget paths planned from the old position (after respawn / map change). */
+  _resetNavigation(pos) {
+    this._path = [];
+    this._pathIndex = 0;
+    this._currentTarget = null;
+    this._targetPath = [];
+    this._targetPathIndex = 0;
+    this._targetPathRefreshTimer = 0;
+    this._roamTimer = this._roamInterval; // re-plan on the next tick
+    this._stuckTimer = 0;
+    this._lastPos = { x: pos.x, y: pos.y };
   }
 
   _dist(a, b) {

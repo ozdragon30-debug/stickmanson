@@ -74,6 +74,9 @@ class PickupManager {
     this.pickups.forEach(p => p.update());
 
     if (!playerManager.mainPlayer) return;
+    // A dead player's body stays where they died during the death animation;
+    // it must not collect pickups (bots already skip this while respawning).
+    if (playerManager.mainPlayer.isRespawning) return;
     const px = playerManager.mainPlayer.body.x;
     const py = playerManager.mainPlayer.body.y;
     for (let i = 0; i < this.pickups.length; i++) {
