@@ -347,23 +347,40 @@ class BotManager {
       chatManager.addMessage('Server', `Round over! Next round starting in ${BotManager.ROUND_END_MS / 1000} seconds...`, null);
       this._nextRoundAt = now + BotManager.ROUND_END_MS;
     } else if (this._roundPhase === 'roundEnd' && now >= this._nextRoundAt) {
-      this._roundPhase = 'loading';
-      const file = BotManager.randomMap(this._currentMap);
-      loadMap(file).then((ok) => {
-        if (!ok) { this._roundPhase = 'roundEnd'; this._nextRoundAt = Date.now() + 1000; return; }
-        this._currentMap = file;
-        scoreboardManager.hideRoundEnd();
-        // Fresh bots sized for the new map; scores reset like a server round.
-        const status = this.status;
-        this.despawn();
-        this.status = status;
-        const pts = (map.ready && map.spawnPoints.length) ? map.spawnPoints : [{ x: 400, y: 300 }];
-        if (playerManager.mainPlayer) playerManager.mainPlayer.forceRespawn(pts);
-        this.spawn(pts, BotManager.getBotCount(map));
-        this._beginOfflineRound();
-        chatManager.addMessage('Server', `Round started on ${map.name || file}!`, null);
-      }).catch(() => { this._roundPhase = 'roundEnd'; this._nextRoundAt = Date.now() + 2000; });
+      this.startOfflineRound(this.preferredMap || BotManager.randomMap(this._currentMap));
     }
+  }
+
+  /**
+   * Load `file` and start a fresh offline round on it: new bots sized for the
+   * map, everyone respawned, scores reset (same as a server round change).
+   */
+  startOfflineRound(file) {
+    this._roundPhase = 'loading';
+    return loadMap(file).then((ok) => {
+      if (!ok) { this._roundPhase = 'roundEnd'; this._nextRoundAt = Date.now() + 1000; return false; }
+      this._currentMap = file;
+      scoreboardManager.hideRoundEnd();
+      const status = this.status;
+      this.despawn();
+      this.status = status;
+      const pts = (map.ready && map.spawnPoints.length) ? map.spawnPoints : [{ x: 400, y: 300 }];
+      if (playerManager.mainPlayer) {
+        playerManager.mainPlayer.kills = 0;
+        playerManager.mainPlayer.deaths = 0;
+        playerManager.mainPlayer.forceRespawn(pts);
+      }
+      this.spawn(pts, BotManager.getBotCount(map));
+      this._beginOfflineRound();
+      chatManager.addMessage('Server', `Round started on ${map.name || file}!`, null);
+      return true;
+    });
+  }
+
+  // "feature/abandonedcity.dat" → "Abandoned City"-ish display label.
+  static mapLabel(file) {
+    const base = file.replace(/^.*\//, '').replace(/\.dat$/, '');
+    return base.charAt(0).toUpperCase() + base.slice(1);
   }
 
   // ── Damage handling ───────────────────────────────────────────────────────────

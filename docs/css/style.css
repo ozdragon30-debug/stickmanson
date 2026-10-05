@@ -225,7 +225,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   border: 1px dashed var(--line);
   border-radius: 8px;
 }
-.menu-room[hidden] { display: none; }
+.menu-room[hidden], .menu-map[hidden] { display: none; }
+.menu-map { margin: -4px 0 12px; }
 .menu-room b { color: #fff; font-family: var(--mono); letter-spacing: .05em; }
 .menu-btn-sm { flex: 0 0 auto; min-width: 0; padding: 6px 10px; font-size: 12px; }
 .menu-btn {

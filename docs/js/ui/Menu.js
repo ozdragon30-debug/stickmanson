@@ -40,6 +40,10 @@ class Menu {
       install.hidden = true;
     });
 
+    this.mapEl = document.getElementById('menu-map');
+    this.mapSelect = document.getElementById('menu-map-select');
+    this._buildMapPicker();
+
     this.roomEl = document.getElementById('menu-room');
     this.roomLabel = document.getElementById('menu-room-label');
     this.roomBtn = document.getElementById('menu-room-btn');
@@ -68,8 +72,41 @@ class Menu {
     if (this.isOpen && inputMode.mode !== 'touch') this.playBtn.focus({ preventScroll: true });
   }
 
+  // Offline only: pick the map for the next round (or keep the random rotation).
+  _buildMapPicker() {
+    const groups = { '': [], 'feature/': [], 'ballistick/': [] };
+    for (const f of BotManager.OFFLINE_MAPS) {
+      if (f === 'debug.dat') continue;
+      const g = f.startsWith('feature/') ? 'feature/' : f.startsWith('ballistick/') ? 'ballistick/' : '';
+      groups[g].push(f);
+    }
+    const sel = this.mapSelect;
+    const random = document.createElement('option');
+    random.value = '';
+    random.dataset.i18n = 'menu.map.random';
+    sel.appendChild(random);
+    for (const [g, files] of Object.entries(groups)) {
+      const og = document.createElement('optgroup');
+      og.label = g === '' ? 'Stick Arena' : g === 'feature/' ? 'Featured' : 'Ballistick';
+      for (const f of files.sort()) {
+        const o = document.createElement('option');
+        o.value = f;
+        o.textContent = BotManager.mapLabel(f);
+        og.appendChild(o);
+      }
+      sel.appendChild(og);
+    }
+    sel.addEventListener('keydown', e => e.stopPropagation());
+  }
+
   play() {
     if (!this._ready) return;
+    // Offline map choice: start a fresh round on the picked map.
+    const picked = this.mapSelect && !this.mapEl.hidden ? this.mapSelect.value : '';
+    botManager.preferredMap = picked || null;
+    if (picked && picked !== botManager._currentMap && botManager.active && !socketManager.isConnected) {
+      botManager.startOfflineRound(picked);
+    }
     const name = this.nameEl.value.trim();
     if (name && name !== settingsManager.name) settingsManager.setName(name);
     soundManager._ensureContext();
@@ -173,6 +210,7 @@ class Menu {
   _tick() {
     if (this.isOpen) {
       this._renderRoom();
+      this.mapEl.hidden = socketManager.isConnected || !botManager.active;
       const html = this._statusHtml();
       if (this.status.innerHTML !== html) this.status.innerHTML = html;
       if (!this._ready) {
