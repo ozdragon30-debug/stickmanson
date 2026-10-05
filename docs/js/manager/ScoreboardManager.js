@@ -76,9 +76,7 @@ class ScoreboardManager {
 
     // Bot status line under the timer/rank (kept clear of the chat box).
     if (typeof botManager !== 'undefined' && botManager.status !== 'none' && !this.isVisible) {
-      const msg = botManager.status === 'no-server'
-        ? 'Offline — playing against bots'
-        : 'Waiting for players — playing against bots';
+      const msg = botManager.status === 'no-server' ? t('hud.botsOffline') : t('hud.botsWaiting');
       ctx.font = '11px ui-monospace, monospace';
       const tw = ctx.measureText(msg).width;
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
@@ -121,7 +119,7 @@ class ScoreboardManager {
     ctx.textAlign = 'center';
     ctx.fillStyle = this.roundEndActive ? '#ff6b6b' : '#ffffff';
     ctx.font = '900 24px system-ui, sans-serif';
-    ctx.fillText(this.roundEndActive ? 'ROUND OVER' : 'SCOREBOARD', VIEW_W / 2, py + 38);
+    ctx.fillText(this.roundEndActive ? t('sb.over') : t('sb.title'), VIEW_W / 2, py + 38);
 
     const mapName = (typeof map !== 'undefined' && map.ready && map.name) ? map.name : '';
     const remaining = this.getRemainingTime();
@@ -129,9 +127,9 @@ class ScoreboardManager {
     let sub = mapName;
     if (this.roundEndActive && sorted.length) {
       const [winId, win] = sorted[0];
-      sub = (winId === myId ? 'You win!' : `${win.name} wins!`) + (mapName ? `  ·  ${mapName}` : '');
+      sub = (winId === myId ? t('sb.youWin') : t('sb.wins', { name: win.name })) + (mapName ? `  ·  ${mapName}` : '');
     } else if (this.roundEndsAt) {
-      sub += (sub ? '  ·  ' : '') + timeTxt + ' left';
+      sub += (sub ? '  ·  ' : '') + t('sb.left', { t: timeTxt });
     }
     ctx.font = '600 13px system-ui, sans-serif';
     ctx.fillStyle = '#8fa6bf';
@@ -148,12 +146,12 @@ class ScoreboardManager {
     ctx.fillStyle = '#6f86a0';
     ctx.font = '700 11px system-ui, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('PLAYER', colName, startY);
+    ctx.fillText(t('sb.player'), colName, startY);
     ctx.textAlign = 'center';
     ctx.fillText('#', colRank, startY);
-    ctx.fillText('KILLS', colKills, startY);
-    ctx.fillText('DEATHS', colDeaths, startY);
-    ctx.fillText('K/D', colKd, startY);
+    ctx.fillText(t('sb.kills'), colKills, startY);
+    ctx.fillText(t('sb.deaths'), colDeaths, startY);
+    ctx.fillText(t('sb.kd'), colKd, startY);
 
     ctx.strokeStyle = '#2a3b52';
     ctx.lineWidth = 1;
@@ -166,7 +164,7 @@ class ScoreboardManager {
     sorted.slice(0, maxRows).forEach(([id, data], i) => {
       const y    = startY + rowH * (i + 1);
       const isMe = id === myId;
-      const displayName = isMe ? `${data.name} (you)` : data.name;
+      const displayName = isMe ? `${data.name} ${t('sb.you')}` : data.name;
 
       if (isMe) {
         ctx.fillStyle = 'rgba(74,158,255,0.16)';
@@ -200,7 +198,7 @@ class ScoreboardManager {
       ctx.fillStyle = '#6f86a0';
       ctx.font = '12px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`+${sorted.length - maxRows} more`, VIEW_W / 2, py + panelH - 10);
+      ctx.fillText(t('sb.more', { n: sorted.length - maxRows }), VIEW_W / 2, py + panelH - 10);
     }
   }
 }

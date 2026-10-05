@@ -154,8 +154,8 @@ class TouchInput {
       ctx.beginPath(); ctx.arc(130, VIEW_H - 140, R, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath(); ctx.arc(VIEW_W - 130, VIEW_H - 140, R, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 0.45; ctx.fillStyle = '#fff'; ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('MOVE', 130, VIEW_H - 136);
-      ctx.fillText('AIM + FIRE', VIEW_W - 130, VIEW_H - 136);
+      ctx.fillText(t('hud.move'), 130, VIEW_H - 136);
+      ctx.fillText(t('hud.aim'), VIEW_W - 130, VIEW_H - 136);
     }
     ctx.restore();
   }

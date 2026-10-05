@@ -49,7 +49,7 @@ class Menu {
     if (this._ready) return;
     this._ready = true;
     this.playBtn.disabled = false;
-    this.playBtn.textContent = 'Play';
+    this.playBtn.textContent = t('menu.play');
     if (this.isOpen && inputMode.mode !== 'touch') this.playBtn.focus({ preventScroll: true });
   }
 
@@ -81,12 +81,12 @@ class Menu {
     if (socketManager.isConnected) {
       const n = Object.keys(scoreboardManager.scores || {}).filter(id => !botManager.isBot(id)).length;
       const others = Math.max(0, n - 1);
-      const who = others === 0 ? 'no other players yet — bots will keep you company'
-                               : `${others} other player${others === 1 ? '' : 's'} online`;
-      return `<span class="dot online"></span>Server online · ${who}`;
+      const msg = others === 0 ? t('menu.status.online0')
+                : others === 1 ? t('menu.status.online1') : t('menu.status.onlineN', { n: others });
+      return `<span class="dot online"></span>${msg}`;
     }
-    if (socketManager.socket && !botManager.active) return '<span class="dot"></span>Connecting to server…';
-    return '<span class="dot offline"></span>Offline mode — play against bots';
+    if (socketManager.socket && !botManager.active) return `<span class="dot"></span>${t('menu.status.connecting')}`;
+    return `<span class="dot offline"></span>${t('menu.status.offline')}`;
   }
 
   _tick() {
@@ -96,7 +96,7 @@ class Menu {
       if (!this._ready) {
         const atlases = [playerAtlas, mapAtlas, deathAtlas, pickupAtlas, bloodAtlas, particleAtlas, indicatorAtlas, cursorAtlas, heartbeatAtlas];
         const done = atlases.filter(a => a.ready && a.image.complete).length;
-        this.playBtn.textContent = `Loading… ${Math.round(done / atlases.length * 100)}%`;
+        this.playBtn.textContent = t('menu.loading', { p: Math.round(done / atlases.length * 100) });
       }
     }
     setTimeout(() => this._tick(), 500);

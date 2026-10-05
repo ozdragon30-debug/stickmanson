@@ -194,7 +194,7 @@ socketManager.on("playerNameChanged", (data) => {
 
 socketManager.on("kicked", (data) => {
   chatManager.addMessage('Server', data.reason || 'You have been removed from the server.', null);
-  hudManager.flash('DISCONNECTED', data.reason || 'You have been removed from the server.', '#ff6b6b', 8000);
+  hudManager.flash(t('hud.disconnected'), i18n.chat(data.reason || 'You have been removed from the server.'), '#ff6b6b', 8000);
   socketManager.socket.io.opts.reconnection = false;
   socketManager.kicked = true;
   socketManager.socket.disconnect();

@@ -21,17 +21,16 @@ class HudManager {
   onKill({ killerName, killerHue, victimName, victimHue, weaponId, killerIsMe, victimIsMe }) {
     if (settingsManager.get('killFeed')) {
       this.killFeed.push({
-        killer: killerIsMe ? 'You' : (killerName || '?'), killerHue,
-        victim: victimIsMe ? 'You' : (victimName || '?'), victimHue,
+        killer: killerIsMe ? t('hud.you') : (killerName || '?'), killerHue,
+        victim: victimIsMe ? t('hud.you') : (victimName || '?'), victimHue,
         weaponId, t: performance.now(), mine: killerIsMe || victimIsMe,
       });
       if (this.killFeed.length > 5) this.killFeed.shift();
     }
     if (killerIsMe && !victimIsMe) {
       this.streak++;
-      const names = { 2: 'DOUBLE KILL', 3: 'TRIPLE KILL', 4: 'MULTI KILL', 5: 'RAMPAGE' };
-      const sub = this.streak >= 2 ? (names[Math.min(this.streak, 5)] || 'RAMPAGE') : null;
-      this.flash(`ELIMINATED ${victimName || ''}`.trim(), sub, '#ffd166', 1600);
+      const sub = this.streak >= 2 ? t('hud.streak.' + Math.min(this.streak, 5)) : null;
+      this.flash(t('hud.eliminated', { name: victimName || '' }).trim(), sub, '#ffd166', 1600);
     }
     if (victimIsMe) {
       this.streak = 0;
@@ -255,13 +254,13 @@ class HudManager {
     ctx.font = '900 30px system-ui, sans-serif';
     ctx.lineWidth = 5;
     ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-    ctx.strokeText('YOU DIED', VIEW_W / 2, VIEW_H / 2 - 70);
+    ctx.strokeText(t('hud.died'), VIEW_W / 2, VIEW_H / 2 - 70);
     ctx.fillStyle = '#ff6b6b';
-    ctx.fillText('YOU DIED', VIEW_W / 2, VIEW_H / 2 - 70);
+    ctx.fillText(t('hud.died'), VIEW_W / 2, VIEW_H / 2 - 70);
     const killer = this.deathInfo && this.deathInfo.killer;
     ctx.font = '600 15px system-ui, sans-serif';
     ctx.lineWidth = 3;
-    const sub = killer ? `Killed by ${killer} — respawning…` : 'Respawning…';
+    const sub = killer ? t('hud.killedBy', { name: killer }) : t('hud.respawning');
     ctx.strokeText(sub, VIEW_W / 2, VIEW_H / 2 - 44);
     ctx.fillStyle = '#eee';
     ctx.fillText(sub, VIEW_W / 2, VIEW_H / 2 - 44);
@@ -327,7 +326,7 @@ class HudManager {
 
   _drawConnection(ctx) {
     if (!socketManager.wasConnected || socketManager.isConnected || socketManager.kicked) return;
-    const msg = 'Connection lost — reconnecting…';
+    const msg = t('hud.reconnecting');
     ctx.font = 'bold 13px system-ui, sans-serif';
     ctx.textAlign = 'center';
     const tw = ctx.measureText(msg).width;

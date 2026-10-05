@@ -259,7 +259,7 @@ document.addEventListener("keydown", e => {
   if (document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
   if (e.code === 'KeyM' && !Object.values(settingsManager.settings.keybinds).includes('KeyM')) {
     settingsManager.set('muted', !settingsManager.get('muted'));
-    hudManager.flash(settingsManager.get('muted') ? 'SOUND OFF' : 'SOUND ON', null, '#cfe3f7', 900);
+    hudManager.flash(settingsManager.get('muted') ? t('hud.soundOff') : t('hud.soundOn'), null, '#cfe3f7', 900);
   }
 });
 
@@ -271,6 +271,11 @@ settingsManager.onChange((key, value) => {
   else if (key === 'renderQuality') display.setQuality(value);
   else if (key === 'pixelArt') document.body.classList.toggle('pixel-art', !!value);
   else if (key === 'touchControls') updateTouchControls();
+  else if (key === 'language') {
+    i18n.setLanguage(value);
+    if (menu._ready) menu.playBtn.textContent = t('menu.play');
+    if (settingsManager.isOpen()) settingsManager._refresh();
+  }
 });
 
 function updateTouchControls() {

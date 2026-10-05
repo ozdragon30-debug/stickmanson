@@ -24,6 +24,7 @@ const DEFAULT_SETTINGS = {
   killFeed:          true,
   // Controls
   touchControls:     'auto',   // auto | on | off
+  language:          'auto',   // auto | en | tr
   keybinds: {
     up:     'KeyW',
     left:   'KeyA',
@@ -215,32 +216,40 @@ class SettingsManager {
     panel.className = 'sar-panel';
     panel.innerHTML = `
       <div class="sar-head">
-        <span class="sar-title">Settings <kbd>Esc</kbd></span>
+        <span class="sar-title"><span data-i18n="set.title">Settings</span> <kbd>Esc</kbd></span>
         <button id="sar-close" class="sar-x" aria-label="Close settings">✕</button>
       </div>
       <nav class="sar-tabs" role="tablist">
-        <button data-tab="profile">Profile</button>
-        <button data-tab="controls">Controls</button>
-        <button data-tab="audio">Audio</button>
-        <button data-tab="video">Video</button>
-        <button data-tab="hud">HUD</button>
+        <button data-tab="profile" data-i18n="set.tab.profile">Profile</button>
+        <button data-tab="controls" data-i18n="set.tab.controls">Controls</button>
+        <button data-tab="audio" data-i18n="set.tab.audio">Audio</button>
+        <button data-tab="video" data-i18n="set.tab.video">Video</button>
+        <button data-tab="hud" data-i18n="set.tab.hud">HUD</button>
       </nav>
 
       <section data-pane="profile">
         <div class="sar-sec">
-          <label class="sar-lbl" for="sar-name">Player Name</label>
+          <label class="sar-lbl" for="sar-name" data-i18n="set.name">Player Name</label>
           <input id="sar-name" type="text" maxlength="20" autocomplete="nickname" class="sar-text">
         </div>
         <div class="sar-sec">
-          <div class="sar-lbl">Cursor</div>
+          <label class="sar-lbl" for="sar-lang" data-i18n="set.language">Language</label>
+          <select id="sar-lang" class="sar-select" data-setting="language">
+            <option value="auto" data-i18n="set.lang.auto">Auto (browser)</option>
+            <option value="en">English</option>
+            <option value="tr">Türkçe</option>
+          </select>
+        </div>
+        <div class="sar-sec">
+          <div class="sar-lbl" data-i18n="set.cursor">Cursor</div>
           <div id="sar-cursor-grid" class="sar-grid"></div>
         </div>
         <div class="sar-sec">
-          <div class="sar-lbl">Spinner Shape</div>
+          <div class="sar-lbl" data-i18n="set.spinner">Spinner Shape</div>
           <div id="sar-spin-grid" class="sar-grid sar-scroll"></div>
         </div>
         <div class="sar-sec">
-          <label class="sar-lbl" for="sar-hue">Spinner Color — <span id="sar-hue-lbl"></span></label>
+          <label class="sar-lbl" for="sar-hue"><span data-i18n="set.color">Spinner Color</span> — <span id="sar-hue-lbl"></span></label>
           <input id="sar-hue" type="range" min="0" max="360" class="sar-range">
           <div class="sar-hue-bar"></div>
         </div>
@@ -248,61 +257,61 @@ class SettingsManager {
 
       <section data-pane="controls">
         <div class="sar-sec">
-          <div class="sar-lbl">Keybinds <span class="sar-hint">(arrow keys always move too)</span></div>
+          <div class="sar-lbl"><span data-i18n="set.keybinds">Keybinds</span> <span class="sar-hint" data-i18n="set.arrows">(arrow keys always move too)</span></div>
           <div id="sar-keybinds"></div>
         </div>
         <div class="sar-sec">
-          <div class="sar-lbl">Touch Controls</div>
+          <label class="sar-lbl" for="sar-touch" data-i18n="set.touch">Touch Controls</label>
           <select id="sar-touch" class="sar-select" data-setting="touchControls">
-            <option value="auto">Auto (touch screens)</option>
-            <option value="on">Always on</option>
-            <option value="off">Off</option>
+            <option value="auto" data-i18n="set.touch.auto">Auto (touch screens)</option>
+            <option value="on" data-i18n="set.touch.on">Always on</option>
+            <option value="off" data-i18n="set.touch.off">Off</option>
           </select>
         </div>
         <div class="sar-sec sar-help">
-          <div class="sar-lbl">Gamepad</div>
-          Left stick / D-pad: move · Right stick: aim · RT / A: attack · Back/View: scoreboard · Start: settings
+          <div class="sar-lbl" data-i18n="set.gamepad">Gamepad</div>
+          <span data-i18n="set.gamepad.help">Left stick / D-pad: move · Right stick: aim · RT / A: attack · Back/View: scoreboard · Start: settings</span>
           <div id="sar-pad-status" class="sar-hint"></div>
         </div>
       </section>
 
       <section data-pane="audio">
         <div class="sar-sec">
-          <label class="sar-lbl" for="sar-volume">Volume — <span id="sar-vol-lbl"></span></label>
+          <label class="sar-lbl" for="sar-volume"><span data-i18n="set.volume">Volume</span> — <span id="sar-vol-lbl"></span></label>
           <input id="sar-volume" type="range" min="0" max="100" class="sar-range">
         </div>
-        <label class="sar-check"><input type="checkbox" data-setting="muted"> Mute all sounds <kbd>M</kbd></label>
-        <label class="sar-check"><input type="checkbox" data-setting="spatialAudio"> Positional audio
-          <span class="sar-hint">— pan &amp; soften other players' sounds by distance</span></label>
+        <label class="sar-check"><input type="checkbox" data-setting="muted"> <span data-i18n="set.mute">Mute all sounds</span> <kbd>M</kbd></label>
+        <label class="sar-check"><input type="checkbox" data-setting="spatialAudio"> <span data-i18n="set.spatial">Positional audio</span>
+          <span class="sar-hint" data-i18n="set.spatial.hint">— pan &amp; soften other players' sounds by distance</span></label>
       </section>
 
       <section data-pane="video">
         <div class="sar-sec">
-          <div class="sar-lbl">Render Resolution</div>
-          <select class="sar-select" data-setting="renderQuality">
-            <option value="auto">Auto (sharp, up to 2×)</option>
-            <option value="high">High (native, up to 3×)</option>
-            <option value="low">Low (1× – fastest)</option>
+          <label class="sar-lbl" for="sar-res" data-i18n="set.res">Render Resolution</label>
+          <select id="sar-res" class="sar-select" data-setting="renderQuality">
+            <option value="auto" data-i18n="set.res.auto">Auto (sharp, up to 2×)</option>
+            <option value="high" data-i18n="set.res.high">High (native, up to 3×)</option>
+            <option value="low" data-i18n="set.res.low">Low (1× – fastest)</option>
           </select>
         </div>
-        <label class="sar-check"><input type="checkbox" data-setting="pixelArt"> Pixel-art scaling
-          <span class="sar-hint">— crisp nearest-neighbour sprites</span></label>
-        <label class="sar-check"><input type="checkbox" data-setting="showFps"> Show FPS</label>
-        <label class="sar-check"><input type="checkbox" data-setting="showPing"> Show ping</label>
+        <label class="sar-check"><input type="checkbox" data-setting="pixelArt"> <span data-i18n="set.pixel">Pixel-art scaling</span>
+          <span class="sar-hint" data-i18n="set.pixel.hint">— crisp nearest-neighbour sprites</span></label>
+        <label class="sar-check"><input type="checkbox" data-setting="showFps"> <span data-i18n="set.fps">Show FPS</span></label>
+        <label class="sar-check"><input type="checkbox" data-setting="showPing"> <span data-i18n="set.ping">Show ping</span></label>
         <div class="sar-sec" style="margin-top:14px">
-          <button id="sar-fullscreen" class="sar-btn">Toggle Fullscreen <kbd>F11</kbd></button>
+          <button id="sar-fullscreen" class="sar-btn"><span data-i18n="set.fullscreen">Toggle Fullscreen</span> <kbd>F11</kbd></button>
         </div>
       </section>
 
       <section data-pane="hud">
-        <label class="sar-check"><input type="checkbox" data-setting="killFeed"> Kill feed</label>
-        <label class="sar-check"><input type="checkbox" data-setting="hitMarkers"> Hit markers</label>
-        <label class="sar-check"><input type="checkbox" data-setting="damageFlash"> Damage flash</label>
+        <label class="sar-check"><input type="checkbox" data-setting="killFeed"> <span data-i18n="set.killfeed">Kill feed</span></label>
+        <label class="sar-check"><input type="checkbox" data-setting="hitMarkers"> <span data-i18n="set.hitmarkers">Hit markers</span></label>
+        <label class="sar-check"><input type="checkbox" data-setting="damageFlash"> <span data-i18n="set.damageflash">Damage flash</span></label>
       </section>
 
       <div class="sar-foot">
-        <button id="sar-reset" class="sar-btn sar-btn-ghost">Reset to defaults</button>
-        <button id="sar-done" class="sar-btn">Done</button>
+        <button id="sar-reset" class="sar-btn sar-btn-ghost" data-i18n="set.reset">Reset to defaults</button>
+        <button id="sar-done" class="sar-btn" data-i18n="set.done">Done</button>
       </div>
     `;
 
@@ -337,6 +346,7 @@ class SettingsManager {
 
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
+    i18n.applyDom(panel);
     this._overlay = overlay;
     this._panel   = panel;
 
@@ -355,6 +365,7 @@ class SettingsManager {
 
   // ── Refresh ───────────────────────────────────────────────────────────────
   _refresh() {
+    i18n.applyDom(this._panel);
     this._panel.querySelector('#sar-name').value = this.settings.name;
     this._panel.querySelector('#sar-hue').value  = this.settings.spinnerHue;
     this._refreshHueLbl();
@@ -376,7 +387,7 @@ class SettingsManager {
     const padEl = this._panel.querySelector('#sar-pad-status');
     if (padEl) {
       const pad = typeof gamepadInput !== 'undefined' ? gamepadInput.connectedName : null;
-      padEl.textContent = pad ? `Connected: ${pad}` : 'No gamepad detected — press any button on it.';
+      padEl.textContent = pad ? t('set.gamepad.on', { name: pad }) : t('set.gamepad.none');
     }
   }
 
@@ -463,11 +474,11 @@ class SettingsManager {
     const container = this._panel.querySelector('#sar-keybinds');
     container.innerHTML = '';
     const labels = {
-      up:     'Move Up',
-      left:   'Move Left',
-      down:   'Move Down',
-      right:  'Move Right',
-      shoot:  'Attack',
+      up:     t('set.bind.up'),
+      left:   t('set.bind.left'),
+      down:   t('set.bind.down'),
+      right:  t('set.bind.right'),
+      shoot:  t('set.bind.shoot'),
     };
     for (const [action, label] of Object.entries(labels)) {
       const current = this.settings.keybinds[action] ?? '';
@@ -476,7 +487,7 @@ class SettingsManager {
       const btn = document.createElement('button');
       btn.className = 'sar-key' + (this._rebinding === action ? ' listening' : '');
       btn.dataset.action = action;
-      btn.textContent = this._rebinding === action ? 'Press a key…' : keyLabel(current);
+      btn.textContent = this._rebinding === action ? t('set.press') : keyLabel(current);
       btn.onclick = () => {
         this._rebinding = this._rebinding === action ? null : action;
         this._buildKeybinds();
@@ -490,7 +501,7 @@ class SettingsManager {
     const extra = document.createElement('div');
     extra.className = 'sar-hint';
     extra.style.marginTop = '8px';
-    extra.textContent = 'Mouse: aim & attack · Enter: chat · Tab / Shift: scoreboard · M: mute';
+    extra.textContent = t('set.keys.extra');
     container.appendChild(extra);
   }
 }

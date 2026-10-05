@@ -32,38 +32,33 @@
     <div class="menu-card">
       <h1 id="menu-title" class="logo">STICK ARENA<span>Reborn</span></h1>
 
-      <label class="menu-label" for="menu-name">Your name</label>
+      <label class="menu-label" for="menu-name" data-i18n="menu.name">Your name</label>
       <input id="menu-name" class="menu-input" type="text" maxlength="20" autocomplete="nickname" spellcheck="false">
 
       <button id="menu-play" class="menu-play" disabled>Loading…</button>
       <div id="menu-status" class="menu-status" aria-live="polite">Connecting…</div>
 
       <div class="menu-row">
-        <button id="menu-settings" class="menu-btn">⚙ Settings</button>
-        <button id="menu-fullscreen" class="menu-btn">⛶ Fullscreen</button>
-        <button id="menu-install" class="menu-btn" hidden>⬇ Install</button>
+        <button id="menu-settings" class="menu-btn" data-i18n="menu.settings">⚙ Settings</button>
+        <button id="menu-fullscreen" class="menu-btn" data-i18n="menu.fullscreen">⛶ Fullscreen</button>
+        <button id="menu-install" class="menu-btn" hidden data-i18n="menu.install">⬇ Install</button>
       </div>
 
       <details class="menu-help">
-        <summary>Controls</summary>
+        <summary data-i18n="menu.controls">Controls</summary>
         <ul>
-          <li><b>WASD / Arrows</b> move · <b>Mouse</b> aim · <b>Click / Space</b> attack</li>
-          <li><b>Enter</b> chat · <b>Tab / Shift</b> scoreboard · <b>Esc</b> settings · <b>M</b> mute</li>
-          <li><b>Gamepad</b>: left stick move, right stick aim, RT attack</li>
-          <li><b>Touch</b>: left thumb move, right thumb aim &amp; attack</li>
-          <li>Walk over weapons to pick them up. Most kills when the timer ends wins.</li>
+          <li data-i18n-html="menu.help.1"><b>WASD / Arrows</b> move · <b>Mouse</b> aim · <b>Click / Space</b> attack</li>
+          <li data-i18n-html="menu.help.2"><b>Enter</b> chat · <b>Tab / Shift</b> scoreboard · <b>Esc</b> settings · <b>M</b> mute</li>
+          <li data-i18n-html="menu.help.3"><b>Gamepad</b>: left stick move, right stick aim, RT attack</li>
+          <li data-i18n-html="menu.help.4"><b>Touch</b>: left thumb move, right thumb aim &amp; attack</li>
+          <li data-i18n-html="menu.help.5">Walk over weapons to pick them up. Most kills when the timer ends wins.</li>
         </ul>
       </details>
 
       <details class="menu-help">
-        <summary>About</summary>
-        <p>
-          <strong>Stick Arena</strong> was a browser-based multiplayer shooter created by XGenStudios.
-          After Flash was discontinued, the official servers went offline.
-          This is an open-source <strong>HTML5 reimplementation</strong> with all original maps, weapons and sprites.
-          Play offline against bots right here, or host your own server for multiplayer.
-        </p>
-        <p class="menu-legal">Game assets &copy; XGenStudios — non-commercial use only (CC BY-NC-SA 4.0).</p>
+        <summary data-i18n="menu.about">About</summary>
+        <p data-i18n-html="menu.about.text"><strong>Stick Arena</strong> was a browser-based multiplayer shooter created by XGenStudios. After Flash was discontinued, the official servers went offline. This is an open-source <strong>HTML5 reimplementation</strong> with all original maps, weapons and sprites. Play offline against bots right here, or host your own server for multiplayer.</p>
+        <p class="menu-legal" data-i18n="menu.legal">Game assets &copy; XGenStudios — non-commercial use only (CC BY-NC-SA 4.0).</p>
       </details>
     </div>
   </div>
@@ -73,6 +68,7 @@
   <script src="/socket.io/socket.io.js" onerror="console.info('[SocketManager] socket.io unavailable — offline mode')"></script>
 
   <script src="./js/utils/Constants.js"></script>
+  <script src="./js/utils/I18n.js"></script>
   <script src="./js/utils/Physics.js"></script>
   <script src="./js/utils/Pathfinder.js"></script>
   <script src="./js/utils/TintCache.js"></script>
