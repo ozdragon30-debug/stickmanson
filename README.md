@@ -84,7 +84,8 @@ Walk over weapons to pick them up. Most kills when the timer runs out wins.
 
 ```bash
 npm run dev     # server with auto-restart
-npm test        # gameplay lock + server + input tests
+npm test        # gameplay lock + server + input + i18n tests
+npm run lint    # ESLint (catches undefined globals across the script files)
 ```
 
 `test/golden.json` fingerprints every gameplay‑relevant calculation (constants, weapon stats, hit shapes, sub‑tile collision, line of sight and parsing of every map). If a change intentionally alters gameplay, regenerate it with `npm run golden:update` — otherwise a failing golden test means gameplay changed by accident.
