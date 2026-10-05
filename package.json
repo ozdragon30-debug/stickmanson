@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node app.js",
     "dev": "node --watch app.js",
-    "test": "node --test test/*.test.js",
+    "test": "node --test test/golden.test.js test/server.test.js test/input.test.js test/i18n.test.js",
     "golden:update": "node test/golden-compute.js",
     "precache": "node tools/gen-precache.js",
     "lint": "eslint .",
