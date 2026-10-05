@@ -24,6 +24,7 @@ const DEFAULT_SETTINGS = {
   killFeed:          true,
   // Controls
   touchControls:     'auto',   // auto | on | off
+  touchLeftHanded:   false,    // swap move / aim thumbs
   language:          'auto',   // auto | en | tr
   keybinds: {
     up:     'KeyW',
@@ -268,6 +269,7 @@ class SettingsManager {
             <option value="on" data-i18n="set.touch.on">Always on</option>
             <option value="off" data-i18n="set.touch.off">Off</option>
           </select>
+          <label class="sar-check"><input type="checkbox" data-setting="touchLeftHanded"> <span data-i18n="set.touch.left">Left-handed (aim with the left thumb)</span></label>
         </div>
         <div class="sar-sec sar-help">
           <div class="sar-lbl" data-i18n="set.gamepad">Gamepad</div>

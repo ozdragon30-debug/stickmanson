@@ -77,7 +77,8 @@ class TouchInput {
     if (typeof isUiBlocking === 'function' && isUiBlocking()) return;
     const p = display.toView(e.clientX, e.clientY);
     const r = this.layer.getBoundingClientRect();
-    const leftSide = (e.clientX - r.left) < r.width / 2;
+    let leftSide = (e.clientX - r.left) < r.width / 2;
+    if (settingsManager.get('touchLeftHanded')) leftSide = !leftSide; // move with the right thumb
     const s = { id: e.pointerId, ox: p.x, oy: p.y, x: p.x, y: p.y, t: performance.now() };
     if (leftSide && !this.move) this.move = s;
     else if (!leftSide && !this.aim) this.aim = s;
@@ -151,11 +152,13 @@ class TouchInput {
     if (!this.move && !this.aim) {
       ctx.globalAlpha = 0.22;
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(130, VIEW_H - 140, R, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(VIEW_W - 130, VIEW_H - 140, R, 0, Math.PI * 2); ctx.stroke();
+      const swap = settingsManager.get('touchLeftHanded');
+      const mx = swap ? VIEW_W - 130 : 130, ax = swap ? 130 : VIEW_W - 130;
+      ctx.beginPath(); ctx.arc(mx, VIEW_H - 140, R, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(ax, VIEW_H - 140, R, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 0.45; ctx.fillStyle = '#fff'; ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(t('hud.move'), 130, VIEW_H - 136);
-      ctx.fillText(t('hud.aim'), VIEW_W - 130, VIEW_H - 136);
+      ctx.fillText(t('hud.move'), mx, VIEW_H - 136);
+      ctx.fillText(t('hud.aim'), ax, VIEW_H - 136);
     }
     ctx.restore();
   }
