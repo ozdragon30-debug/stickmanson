@@ -58,6 +58,31 @@ app.get("/healthz", (req, res) => {
   res.json({ ok: true, players: total, rooms: rooms.size, map: pub.game.mapFile, phase: pub.game.phase, uptime: Math.round(process.uptime()) });
 });
 
+// Human-readable status page for server hosts. Private room codes are never
+// listed (they are the invite secret), only counted.
+const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+app.get("/status", (req, res) => {
+  const pub = rooms.get(PUBLIC_ROOM);
+  const priv = [...rooms.values()].filter(r => r.id !== PUBLIC_ROOM);
+  const left = Math.max(0, Math.round((pub.game.roundEndsAt - Date.now()) / 1000));
+  const rows = Object.values(pub.players)
+    .sort((a, b) => b.kills - a.kills)
+    .map(p => `<tr><td>${esc(p.name)}${p.afk ? ' 💤' : ''}</td><td>${p.kills}</td><td>${p.deaths}</td></tr>`).join('')
+    || '<tr><td colspan="3">No players right now</td></tr>';
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'");
+  res.send(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="10"><title>Stick Arena server status</title>
+<style>body{font:15px system-ui,sans-serif;background:#0e1621;color:#c8d8e8;max-width:640px;margin:32px auto;padding:0 16px}
+h1{color:#fff;font-size:22px}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #2d4060;text-align:left}
+th{color:#7d93aa;font-size:12px;text-transform:uppercase}.k{color:#7d93aa}</style>
+<h1>Stick Arena: Reborn — server status</h1>
+<p><span class="k">Public room:</span> ${esc(pub.game.mapFile.replace(/\.dat$/, ''))} · ${pub.game.phase === 'playing' ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} left` : 'round over'}
+ · <span class="k">Private rooms:</span> ${priv.length} (${priv.reduce((n, r) => n + r.size, 0)} players)
+ · <span class="k">Uptime:</span> ${Math.round(process.uptime() / 60)} min</p>
+<table><tr><th>Player</th><th>Kills</th><th>Deaths</th></tr>${rows}</table>`);
+});
+
 app.use(express.static(path.join(__dirname, "docs"), {
   setHeaders(res, filePath) {
     // Code must always revalidate so a deploy never mixes old and new scripts;

@@ -66,7 +66,7 @@ Players open `http://your-server:1138` and join the public room automatically. T
 | `TRUST_PROXY` | off | Set to `1` behind nginx/Render/Fly etc. so real client IPs (bans, admin) are used |
 | `ADMIN_PASSWORD` | – | Enables `!login <password>` for remote admins |
 
-Health check: `GET /healthz`.
+Health check: `GET /healthz` (JSON). Status page for hosts: `GET /status`.
 
 ### Admin chat commands
 

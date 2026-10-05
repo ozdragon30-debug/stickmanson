@@ -52,6 +52,18 @@ test('healthz reports status', async () => {
   assert.notStrictEqual(body.map, 'debug.dat');
 });
 
+test('status page escapes player names and hides private room codes', async () => {
+  const a = await connect();
+  a.emit('setName', { name: '<b>x</b>"&\'' });
+  const p = await connect({ query: { room: 'secretcode' } });
+  await new Promise(r => setTimeout(r, 150));
+  const html = await (await fetch(url + '/status')).text();
+  assert.ok(html.includes('&lt;b&gt;x&lt;/b&gt;&quot;&amp;&#39;'));
+  assert.ok(!html.includes('<b>x</b>'));
+  assert.ok(!html.includes('secretcode'));
+  p.close();
+});
+
 test('latency probe is acknowledged', async () => {
   const c = await connect();
   const ok = await new Promise(r => c.timeout(1000).emit('latency', Date.now(), err => r(!err)));
