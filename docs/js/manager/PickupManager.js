@@ -10,7 +10,19 @@ class PickupManager {
     this.pickups = [];
   }
 
+  // Respawn timers are bound to the pickup object (not its array index), so a
+  // timer started on the previous map can't make a pickup on the new map
+  // reappear early. Re-hiding a pickup restarts its timer.
+  _scheduleRespawn(pick, ms) {
+    if (pick._respawnTimer) clearTimeout(pick._respawnTimer);
+    pick._respawnTimer = setTimeout(() => {
+      pick._respawnTimer = null;
+      pick.isVisible = true;
+    }, ms);
+  }
+
   initFromMap(weaponSpawns) {
+    for (const p of this.pickups) if (p._respawnTimer) clearTimeout(p._respawnTimer);
     this.pickups = weaponSpawns.map(
       ws => new WeaponPickup(ws.x, ws.y, ws.weaponId, ws.respawnTime)
     );
@@ -24,13 +36,14 @@ class PickupManager {
       const pick = this.pickups[i];
       if (!pick) return;
       if (state.available) {
+        if (pick._respawnTimer) { clearTimeout(pick._respawnTimer); pick._respawnTimer = null; }
         pick.isVisible = true;
       } else {
         pick.isVisible = false;
         const ms = state.respawnAt
           ? Math.max(0, state.respawnAt - Date.now())
           : (pick.respawnTime || 10000);
-        setTimeout(() => { if (this.pickups[i]) this.pickups[i].isVisible = true; }, ms);
+        this._scheduleRespawn(pick, ms);
       }
     });
   }
@@ -42,8 +55,7 @@ class PickupManager {
     if (!pick || !pick.isVisible) return false;
     pick.isVisible = false;
     if (playerEntity) playerEntity.equipWeapon(pick.weaponId);
-    const ms = pick.respawnTime || 10000;
-    setTimeout(() => { if (this.pickups[index]) this.pickups[index].isVisible = true; }, ms);
+    this._scheduleRespawn(pick, pick.respawnTime || 10000);
     if (emitToServer) socketManager.emit('pickupWeapon', { spawnIndex: index });
     return true;
   }
@@ -53,8 +65,7 @@ class PickupManager {
     const pick = this.pickups[index];
     if (!pick) return;
     pick.isVisible = false;
-    const ms = pick.respawnTime || 10000;
-    setTimeout(() => { if (this.pickups[index]) this.pickups[index].isVisible = true; }, ms);
+    this._scheduleRespawn(pick, pick.respawnTime || 10000);
     const player = playerManager.getPlayer(playerId);
     if (player) player.equipWeapon(weaponId);
   }
