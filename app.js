@@ -13,7 +13,7 @@ const io = require("socket.io")(server, {
 const Player = require("./server/models/Player");
 
 // ── Configuration (environment variables) ────────────────────────────────────
-const PORT            = parseInt(process.env.PORT, 10) || 1138;
+const PORT            = process.env.PORT !== undefined && process.env.PORT !== '' ? parseInt(process.env.PORT, 10) : 1138;
 const HOST            = process.env.HOST || undefined;
 // Set TRUST_PROXY=1 when running behind a reverse proxy (nginx, Render, Fly…)
 // so client IPs are read from X-Forwarded-For. Never trust that header otherwise:
@@ -193,7 +193,7 @@ function allow(socket, key, perWindow, windowMs) {
 
 // ── Socket handlers ──────────────────────────────────────────────────────────
 io.on("connection", (socket) => {
-  console.log("a user connected: ", socket.id);
+  if (!process.env.QUIET) console.log("a user connected: ", socket.id);
 
   // Reject banned IPs immediately.
   const connIp = clientIp(socket);
@@ -231,7 +231,7 @@ io.on("connection", (socket) => {
   socket.on("latency", (_t, ack) => { if (typeof ack === 'function') ack(); });
 
   socket.on("disconnect", () => {
-    console.log("user disconnected: ", socket.id);
+    if (!process.env.QUIET) console.log("user disconnected: ", socket.id);
     const leavingName = players[socket.id]?.name ?? 'A player';
     delete players[socket.id];
     io.emit("playerDisconnected", socket.id);
@@ -458,7 +458,7 @@ server.on('error', (err) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Stick Arena: Reborn listening on http://${HOST || 'localhost'}:${server.address().port}`);
+  if (!process.env.QUIET) console.log(`Stick Arena: Reborn listening on http://${HOST || 'localhost'}:${server.address().port}`);
 });
 
 // Graceful shutdown (Docker / systemd / Ctrl+C).
@@ -469,5 +469,19 @@ function shutdown(signal) {
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 3000).unref();
 }
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
+if (require.main === module) {
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
+
+// Exposed for integration tests.
+module.exports = {
+  server, io, players, weaponsData,
+  close() {
+    if (roundEndTimeout) clearTimeout(roundEndTimeout);
+    if (roundStartTimeout) clearTimeout(roundStartTimeout);
+    for (const idx in game.pickupTimers) clearTimeout(game.pickupTimers[idx]);
+    io.close();
+    return new Promise(r => server.close(() => r()));
+  },
+};
