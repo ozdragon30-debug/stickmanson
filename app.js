@@ -73,7 +73,21 @@ app.get("/", (req, res) => {
 const mapsDir = path.join(__dirname, "docs/data/maps");
 const mapFiles = fs.readdirSync(mapsDir).filter(f => f.endsWith(".dat") && f !== DEBUG_MAP_FILE);
 
+// Bans survive restarts when BANS_FILE is set (e.g. BANS_FILE=./data/bans.json).
+const BANS_FILE = process.env.BANS_FILE || '';
 const bannedIps = new Set();
+if (BANS_FILE) {
+  try { for (const ip of JSON.parse(fs.readFileSync(BANS_FILE, 'utf8'))) bannedIps.add(String(ip)); }
+  catch (e) { if (e.code !== 'ENOENT') console.warn(`Could not read ${BANS_FILE}:`, e.message); }
+}
+function saveBans() {
+  if (!BANS_FILE) return;
+  fs.mkdir(path.dirname(path.resolve(BANS_FILE)), { recursive: true }, () => {
+    fs.writeFile(BANS_FILE, JSON.stringify([...bannedIps], null, 2), err => {
+      if (err) console.warn(`Could not write ${BANS_FILE}:`, err.message);
+    });
+  });
+}
 
 // ── Rooms ────────────────────────────────────────────────────────────────────
 // "public" always exists; private rooms (?room=code) are created on demand and
@@ -421,7 +435,7 @@ io.on("connection", (socket) => {
               const s = io.sockets.sockets.get(id);
               if (cmd === '!ban' && s) {
                 const banIp = clientIp(s);
-                if (banIp) bannedIps.add(banIp);
+                if (banIp) { bannedIps.add(banIp); saveBans(); }
               }
               io.to(id).emit('kicked', { reason: cmd === '!ban' ? 'Banned by admin.' : 'Kicked by admin.' });
               setTimeout(() => { const ss = io.sockets.sockets.get(id); if (ss) ss.disconnect(true); }, 500);

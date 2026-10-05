@@ -4,6 +4,8 @@ A modern, open-source **HTML5 reimplementation** of the Flash game [Stick Arena]
 
 ![gameplay](./gameplay.gif)
 
+> 🇹🇷 **Türkçe:** Oyun tarayıcı dili Türkçeyse otomatik olarak Türkçe açılır. Sunucu kurmak için: `npm install` ardından `npm start` → `http://localhost:1138`. Arkadaşlarınla oynamak için menüden **"Özel oda oluştur"** de ve davet linkini paylaş. Sunucu olmadan (GitHub Pages vb.) botlara karşı çevrimdışı oynanır; telefona/bilgisayara uygulama olarak da kurulabilir.
+
 ## Backstory
 
 Stick Arena was a popular browser-based multiplayer shooter that ran for over a decade on XGenStudios' servers. When Adobe Flash was discontinued at the end of 2020, the game became effectively unplayable — the official servers eventually went offline, and today it can only be accessed through a Flash emulator paired with a private server.
@@ -55,6 +57,7 @@ Players open `http://your-server:1138` and join the public room automatically. "
 | `ROUND_SECONDS` | `300` | Round length |
 | `MAX_PLAYERS` | `16` | Players per room |
 | `MAX_CONNECTIONS_PER_IP` | `10` | Simultaneous connections from one IP |
+| `BANS_FILE` | – | JSON file where `!ban`s are persisted across restarts |
 | `TRUST_PROXY` | off | Set to `1` behind nginx/Render/Fly etc. so real client IPs (bans, admin) are used |
 | `ADMIN_PASSWORD` | – | Enables `!login <password>` for remote admins |
 
