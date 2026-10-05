@@ -12,6 +12,10 @@ class SocketManager {
     this.wasConnected = false;  // connected at least once (drives the "reconnecting" banner)
     this.ping         = null;   // round-trip ms, null when unknown
     this._pingTimer   = null;
+    // Private room from the invite link (?room=code); the server falls back to
+    // the public room for anything invalid.
+    const room = new URLSearchParams(location.search).get('room');
+    this.room = room && /^[a-z0-9][a-z0-9-]{0,23}$/i.test(room) ? room.toLowerCase() : null;
 
     // socket.io is served by the Node server at /socket.io/socket.io.js.
     // On GitHub Pages or when the server is down that script 404s, leaving
@@ -19,6 +23,7 @@ class SocketManager {
     if (typeof io !== 'undefined') {
       try {
         this.socket = io({
+          query: this.room ? { room: this.room } : {},
           reconnectionAttempts: Infinity,
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,

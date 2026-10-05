@@ -15,10 +15,12 @@ This project preserves the game as a native HTML5 experience: no Flash, no plugi
 - All original maps, weapons, and sprites — **gameplay and physics identical to the original** (locked by regression tests)
 - **Offline bot mode** with 5‑minute rounds, scoreboard and map rotation — works on any static host (GitHub Pages) with no server
 - **Multiplayer** — run the Node server to host your own game; bots fill in until a second player joins
+- **Private rooms** — one click creates a room with an invite link (`?room=code`) to play with friends
 - **Plays everywhere**: fills any window at 4:3, sharp on HiDPI/4K screens, fullscreen, phones and tablets
 - **Controls**: keyboard (layout‑independent — works on Turkish/AZERTY/Dvorak), mouse, **gamepad**, and **twin‑stick touch controls**
 - **Installable PWA** — add to home screen / desktop, plays offline
 - Low‑latency **Web Audio** with volume control and optional positional sound
+- English and **Turkish** UI (auto-detected)
 - Modern HUD: kill feed, hit markers, damage direction, death screen, FPS & ping, reconnect banner
 - Hardened server: input validation, anti‑forgery for damage, chat rate limits, admin auth
 
@@ -42,7 +44,7 @@ docker build -t stick-arena .
 docker run -p 1138:1138 stick-arena
 ```
 
-Players open `http://your-server:1138` and are matched automatically.
+Players open `http://your-server:1138` and join the public room automatically. "Create private room" in the menu makes an invite link like `http://your-server:1138/?room=k3x9pq`; each room has its own map rotation, rounds and scores.
 
 ### Server configuration
 
@@ -51,6 +53,7 @@ Players open `http://your-server:1138` and are matched automatically.
 | `PORT` | `1138` | HTTP / WebSocket port |
 | `HOST` | all interfaces | Bind address |
 | `ROUND_SECONDS` | `300` | Round length |
+| `MAX_PLAYERS` | `16` | Players per room |
 | `TRUST_PROXY` | off | Set to `1` behind nginx/Render/Fly etc. so real client IPs (bans, admin) are used |
 | `ADMIN_PASSWORD` | – | Enables `!login <password>` for remote admins |
 

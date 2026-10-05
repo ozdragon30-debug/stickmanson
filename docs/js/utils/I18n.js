@@ -25,6 +25,12 @@ const I18N = {
     'menu.help.5': 'Walk over weapons to pick them up. Most kills when the timer ends wins.',
     'menu.about.text': '<strong>Stick Arena</strong> was a browser-based multiplayer shooter created by XGenStudios. After Flash was discontinued, the official servers went offline. This is an open-source <strong>HTML5 reimplementation</strong> with all original maps, weapons and sprites. Play offline against bots right here, or host your own server for multiplayer.',
     'menu.legal': 'Game assets © XGenStudios — non-commercial use only (CC BY-NC-SA 4.0).',
+    'menu.room.public': 'Public room',
+    'menu.room.private': 'Private room <b>{code}</b>',
+    'menu.room.create': 'Create private room',
+    'menu.room.copy': 'Copy invite link',
+    'menu.room.copied': 'Link copied!',
+    'menu.room.shareText': 'Join my Stick Arena room!',
 
     'set.title': 'Settings',
     'set.tab.profile': 'Profile', 'set.tab.controls': 'Controls', 'set.tab.audio': 'Audio', 'set.tab.video': 'Video', 'set.tab.hud': 'HUD',
@@ -78,6 +84,12 @@ const I18N = {
     'menu.help.5': 'Silahları almak için üzerlerinden geç. Süre bittiğinde en çok öldüren kazanır.',
     'menu.about.text': '<strong>Stick Arena</strong>, XGenStudios\'un yaptığı tarayıcı tabanlı çok oyunculu bir nişancı oyunuydu. Flash kaldırılınca resmi sunucular kapandı. Bu, tüm orijinal haritalar, silahlar ve sprite\'larla açık kaynak bir <strong>HTML5 yeniden yapımı</strong>. Burada botlara karşı çevrimdışı oyna ya da çok oyunculu için kendi sunucunu kur.',
     'menu.legal': 'Oyun varlıkları © XGenStudios — yalnızca ticari olmayan kullanım (CC BY-NC-SA 4.0).',
+    'menu.room.public': 'Genel oda',
+    'menu.room.private': 'Özel oda <b>{code}</b>',
+    'menu.room.create': 'Özel oda oluştur',
+    'menu.room.copy': 'Davet linkini kopyala',
+    'menu.room.copied': 'Link kopyalandı!',
+    'menu.room.shareText': 'Stick Arena odama gel!',
 
     'set.title': 'Ayarlar',
     'set.tab.profile': 'Profil', 'set.tab.controls': 'Kontroller', 'set.tab.audio': 'Ses', 'set.tab.video': 'Görüntü', 'set.tab.hud': 'Arayüz',
@@ -130,6 +142,9 @@ const I18N_CHAT_TR = [
   [/^Kicked by admin\.$/, 'Yönetici tarafından atıldın.'],
   [/^Banned by admin\.$/, 'Yönetici tarafından yasaklandın.'],
   [/^You are banned\.$/, 'Yasaklısın.'],
+  [/^This room is full\.$/, 'Bu oda dolu.'],
+  [/^Admin access granted\.$/, 'Yönetici erişimi verildi.'],
+  [/^Invalid admin password\.$/, 'Geçersiz yönetici şifresi.'],
 ];
 
 const i18n = {

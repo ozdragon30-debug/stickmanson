@@ -193,6 +193,22 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .menu-status .dot.offline { background: #ff9955; }
 
 .menu-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.menu-room {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -4px 0 12px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #a8bccf;
+  background: #0f1926;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
+.menu-room[hidden] { display: none; }
+.menu-room b { color: #fff; font-family: var(--mono); letter-spacing: .05em; }
+.menu-btn-sm { flex: 0 0 auto; min-width: 0; padding: 6px 10px; font-size: 12px; }
 .menu-btn {
   flex: 1 1 0;
   min-width: 110px;

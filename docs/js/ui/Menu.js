@@ -40,6 +40,11 @@ class Menu {
       install.hidden = true;
     });
 
+    this.roomEl = document.getElementById('menu-room');
+    this.roomLabel = document.getElementById('menu-room-label');
+    this.roomBtn = document.getElementById('menu-room-btn');
+    this.roomBtn.addEventListener('click', () => this._roomAction());
+
     this.el.addEventListener('mousedown', e => e.stopPropagation());
     this._tick();
   }
@@ -89,8 +94,44 @@ class Menu {
     return `<span class="dot offline"></span>${t('menu.status.offline')}`;
   }
 
+  // Public room → create a private one (new link); private room → share the link.
+  async _roomAction() {
+    if (!socketManager.room) {
+      const code = Math.random().toString(36).slice(2, 8);
+      const url = new URL(location.href);
+      url.searchParams.set('room', code);
+      location.href = url.toString();
+      return;
+    }
+    const link = location.href;
+    try {
+      if (navigator.share && inputMode.mode === 'touch') {
+        await navigator.share({ title: 'Stick Arena: Reborn', text: t('menu.room.shareText'), url: link });
+        return;
+      }
+      await navigator.clipboard.writeText(link);
+      this.roomBtn.textContent = t('menu.room.copied');
+      setTimeout(() => this._renderRoom(true), 1500);
+    } catch (e) {
+      window.prompt(t('menu.room.copy'), link);
+    }
+  }
+
+  _renderRoom(force = false) {
+    const online = socketManager.isConnected;
+    this.roomEl.hidden = !online && !socketManager.room;
+    if (this.roomEl.hidden) return;
+    const label = socketManager.room
+      ? t('menu.room.private', { code: socketManager.room })
+      : t('menu.room.public');
+    if (force || this.roomLabel.innerHTML !== label) this.roomLabel.innerHTML = label;
+    const btn = socketManager.room ? t('menu.room.copy') : t('menu.room.create');
+    if (force || (this.roomBtn.textContent !== btn && this.roomBtn.textContent !== t('menu.room.copied'))) this.roomBtn.textContent = btn;
+  }
+
   _tick() {
     if (this.isOpen) {
+      this._renderRoom();
       const html = this._statusHtml();
       if (this.status.innerHTML !== html) this.status.innerHTML = html;
       if (!this._ready) {

@@ -11,6 +11,7 @@ const io = require("socket.io")(server, {
 });
 
 const Player = require("./server/models/Player");
+const { Room, DEBUG_MAP_FILE } = require("./server/Room");
 
 // ── Configuration (environment variables) ────────────────────────────────────
 const PORT            = process.env.PORT !== undefined && process.env.PORT !== '' ? parseInt(process.env.PORT, 10) : 1138;
@@ -23,16 +24,11 @@ const TRUST_PROXY     = /^(1|true|yes)$/i.test(process.env.TRUST_PROXY || '');
 const ADMIN_PASSWORD  = process.env.ADMIN_PASSWORD || '';
 const ROUND_DURATION_MS    = (parseInt(process.env.ROUND_SECONDS, 10) || 5 * 60) * 1000; // 5 minutes
 const ROUND_END_DISPLAY_MS = 10 * 1000;    // 10 s scoreboard display
+const MAX_PLAYERS_PER_ROOM = parseInt(process.env.MAX_PLAYERS, 10) || 16;
 
 // Shared weapon definitions (same file the client uses).
 const weaponsData = JSON.parse(fs.readFileSync(path.join(__dirname, "docs/data/weapons.json"), "utf8"));
 const MAX_WEAPON_ID = weaponsData.length - 1;
-
-// Convert a map filename like 'anarchystreets.dat' to 'Anarchystreets'.
-function mapDisplayName(filename) {
-  return filename.replace(/^_+/, '').replace(/\.dat$/i, '')
-    .replace(/^./, c => c.toUpperCase());
-}
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────
 if (TRUST_PROXY) app.set('trust proxy', true);
@@ -46,7 +42,10 @@ app.use((req, res, next) => {
 });
 
 app.get("/healthz", (req, res) => {
-  res.json({ ok: true, players: Object.keys(players).length, map: game.mapFile, phase: game.phase, uptime: Math.round(process.uptime()) });
+  const pub = rooms.get(PUBLIC_ROOM);
+  let total = 0;
+  for (const r of rooms.values()) total += r.size;
+  res.json({ ok: true, players: total, rooms: rooms.size, map: pub.game.mapFile, phase: pub.game.phase, uptime: Math.round(process.uptime()) });
 });
 
 app.use(express.static(path.join(__dirname, "docs"), {
@@ -65,103 +64,47 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "docs/index.html"));
 });
 
-// Toggle debug map via the !debugmap admin command in chat.
-let debugMapEnabled = false;
-const DEBUG_MAP_FILE = 'debug.dat';
-
-// Discover all available maps at startup. The debug test map is only used when
-// explicitly enabled with !debugmap (it used to appear in the normal rotation).
+// Discover all available maps at startup (the debug map is opt-in via !debugmap).
 const mapsDir = path.join(__dirname, "docs/data/maps");
 const mapFiles = fs.readdirSync(mapsDir).filter(f => f.endsWith(".dat") && f !== DEBUG_MAP_FILE);
 
-function pickMap(previous = null) {
-  if (debugMapEnabled) return DEBUG_MAP_FILE;
-  const pool = mapFiles.length > 1 ? mapFiles.filter(f => f !== previous) : mapFiles;
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
-let players = {};
 const bannedIps = new Set();
 
-let game = {
-  mapFile:      pickMap(),
-  roundEndsAt:  Date.now() + ROUND_DURATION_MS,
-  phase:        'playing', // 'playing' | 'roundEnd'
-  pickups:      [],  // { weaponId, respawnTime, available, respawnAt }
-  pickupTimers: {}, // spawnIndex → timeout handle
-};
+// ── Rooms ────────────────────────────────────────────────────────────────────
+// "public" always exists; private rooms (?room=code) are created on demand and
+// removed when the last player leaves.
+const PUBLIC_ROOM = 'public';
+const rooms = new Map();
 
-function getScores() {
-  const scores = {};
-  for (const id in players) {
-    scores[id] = {
-      name:         players[id].name,
-      kills:        players[id].kills,
-      deaths:       players[id].deaths,
-      indicatorHue: players[id].indicatorHue ?? 0,
-    };
+function normaliseRoomId(raw) {
+  const id = String(raw ?? '').trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9-]{0,23}$/.test(id) ? id : PUBLIC_ROOM;
+}
+
+function getRoom(id) {
+  let room = rooms.get(id);
+  if (!room) {
+    room = new Room(id, { io, mapFiles, roundMs: ROUND_DURATION_MS, roundEndMs: ROUND_END_DISPLAY_MS });
+    rooms.set(id, room);
   }
-  return scores;
+  return room;
 }
 
-// ── Round lifecycle ──────────────────────────────────────────────────────────
-let roundEndTimeout   = null;
-let roundStartTimeout = null;
-
-function endRound(message) {
-  if (game.phase !== 'playing') return;
-  if (roundEndTimeout) clearTimeout(roundEndTimeout);
-  roundEndTimeout = null;
-  game.phase = 'roundEnd';
-  io.emit('roundEnd', { scores: getScores() });
-  if (message) io.emit('chatMessage', { name: 'Server', text: message });
-  if (roundStartTimeout) clearTimeout(roundStartTimeout);
-  roundStartTimeout = setTimeout(startNewRound, ROUND_END_DISPLAY_MS);
-}
-
-function scheduleRoundEnd() {
-  if (roundEndTimeout) clearTimeout(roundEndTimeout);
-  const remaining = game.roundEndsAt - Date.now();
-  roundEndTimeout = setTimeout(() => {
-    endRound(`Round over! Next round starting in ${ROUND_END_DISPLAY_MS / 1000} seconds...`);
-  }, Math.max(remaining, 0));
-}
-
-function startNewRound() {
-  roundStartTimeout = null;
-  game.mapFile     = pickMap(game.mapFile);
-  game.roundEndsAt = Date.now() + ROUND_DURATION_MS;
-  game.phase       = 'playing';
-
-  // Cancel all pending pickup respawn timers and reset state.
-  for (const idx in game.pickupTimers) clearTimeout(game.pickupTimers[idx]);
-  game.pickupTimers = {};
-  game.pickups = [];
-
-  for (const id in players) {
-    players[id].kills    = 0;
-    players[id].deaths   = 0;
-    players[id].weaponId = 0; // reset to fist on round start
+function releaseRoom(room) {
+  if (room.id !== PUBLIC_ROOM && room.size === 0) {
+    room.dispose();
+    rooms.delete(room.id);
   }
-
-  io.emit('roundStart', {
-    mapFile:     game.mapFile,
-    roundEndsAt: game.roundEndsAt,
-    scores:      getScores(),
-  });
-  io.emit('chatMessage', { name: 'Server', text: `Round started on ${mapDisplayName(game.mapFile)}!` });
-
-  scheduleRoundEnd();
 }
 
-scheduleRoundEnd();
+getRoom(PUBLIC_ROOM);
 
 // ── Validation helpers ───────────────────────────────────────────────────────
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const isPos = p => p && isNum(p.x) && isNum(p.y) && Math.abs(p.x) < 1e6 && Math.abs(p.y) < 1e6;
 const validWeaponId = id => Number.isInteger(id) && id >= 0 && id <= MAX_WEAPON_ID;
 // Strip control / bidi-override characters that could garble other players' screens.
-const cleanText = (s, max) => String(s ?? '').replace(/[\u0000-\u001f\u007f​-‏‪-‮⁦-⁩]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
+const cleanText = (s, max) => String(s ?? '').replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
 const RESERVED_NAMES = /^\s*(\[?admin\]?|server)\s*$/i;
 
 // Behind a trusted proxy the real client is the entry the proxy appended, i.e.
@@ -208,6 +151,18 @@ io.on("connection", (socket) => {
     return;
   }
 
+  const room = getRoom(normaliseRoomId(socket.handshake.query?.room));
+  if (room.size >= MAX_PLAYERS_PER_ROOM) {
+    socket.emit('kicked', { reason: 'This room is full.' });
+    socket.disconnect(true);
+    releaseRoom(room);
+    return;
+  }
+  socket.join(room.id);
+  socket.data.room = room;
+  const players = room.players;
+  const game = room.game;   // NB: room.game is mutated in place, never replaced
+
   const p = new Player();
   p.name     = 'Player ' + socket.id.slice(0, 4);
   p.position = { x: 0, y: 0 };
@@ -218,17 +173,17 @@ io.on("connection", (socket) => {
     mapFile:     game.mapFile,
     roundEndsAt: game.roundEndsAt,
     phase:       game.phase,
-    scores:      getScores(),
+    scores:      room.getScores(),
   });
-  socket.broadcast.emit("newPlayer", { playerId: socket.id, name: p.name });
-  io.emit("scoreUpdate", { scores: getScores() });
+  socket.to(room.id).emit("newPlayer", { playerId: socket.id, name: p.name });
+  room.emit("scoreUpdate", { scores: room.getScores() });
 
   // Announce the join once the client has sent its chosen name (or after a
   // short grace period), instead of announcing the placeholder "Player xxxx".
   const announceJoin = () => {
     if (socket.data.announced || !players[socket.id]) return;
     socket.data.announced = true;
-    io.emit("chatMessage", { name: 'Server', text: `${players[socket.id].name} joined the game.` });
+    room.emit("chatMessage", { name: 'Server', text: `${players[socket.id].name} joined the game.` });
   };
   setTimeout(announceJoin, 2000);
 
@@ -239,9 +194,10 @@ io.on("connection", (socket) => {
     if (!process.env.QUIET) console.log("user disconnected: ", socket.id);
     const leavingName = players[socket.id]?.name ?? 'A player';
     delete players[socket.id];
-    io.emit("playerDisconnected", socket.id);
-    io.emit("scoreUpdate", { scores: getScores() });
-    io.emit("chatMessage", { name: 'Server', text: `${leavingName} left the game.` });
+    room.emit("playerDisconnected", socket.id);
+    room.emit("scoreUpdate", { scores: room.getScores() });
+    room.emit("chatMessage", { name: 'Server', text: `${leavingName} left the game.` });
+    releaseRoom(room);
   });
 
   socket.on("playerMovement", (movementData) => {
@@ -249,19 +205,19 @@ io.on("connection", (socket) => {
     const pos = { x: movementData.x, y: movementData.y };
     if (isNum(movementData.rotation)) pos.rotation = movementData.rotation;
     players[socket.id].position = pos;
-    socket.broadcast.emit("playerMoved", {
+    socket.to(room.id).emit("playerMoved", {
       playerId:  socket.id,
       playerPos: pos,
     });
   });
 
   socket.on("playedShoot", () => {
-    socket.broadcast.emit("playShoot", { playerId: socket.id });
+    socket.to(room.id).emit("playShoot", { playerId: socket.id });
   });
 
   socket.on("playedWalkingAnimation", (walkingInfo) => {
     if (!walkingInfo || !isNum(walkingInfo.rotation)) return;
-    socket.broadcast.emit("playWalkingAnimation", {
+    socket.to(room.id).emit("playWalkingAnimation", {
       playerId: socket.id,
       rotation: walkingInfo.rotation
     });
@@ -288,7 +244,7 @@ io.on("connection", (socket) => {
     if (bk.tokens < 1) return;
     bk.tokens -= 1;
 
-    io.emit("playerGotHit", { playerId: victimId, damage: weapon.damage, weaponId, attackerId: socket.id });
+    room.emit("playerGotHit", { playerId: victimId, damage: weapon.damage, weaponId, attackerId: socket.id });
   });
 
   // Victim's own client reports death once their local HP reaches zero.
@@ -301,15 +257,15 @@ io.on("connection", (socket) => {
       ? data.killerId : null;
     const weaponId = validWeaponId(data?.weaponId) ? data.weaponId : 0;
     if (killerId) players[killerId].kills += 1;
-    io.emit("playerDied", { playerId: socket.id, killerId, weaponId });
-    io.emit("scoreUpdate", { scores: getScores() });
+    room.emit("playerDied", { playerId: socket.id, killerId, weaponId });
+    room.emit("scoreUpdate", { scores: room.getScores() });
   });
 
   socket.on("playerRespawn", (data) => {
     if (!players[socket.id] || !data || !isPos(data.position)) return;
     const pos = { x: data.position.x, y: data.position.y };
     players[socket.id].position = pos;
-    socket.broadcast.emit("playerMoved", {
+    socket.to(room.id).emit("playerMoved", {
       playerId:  socket.id,
       playerPos: pos
     });
@@ -322,7 +278,7 @@ io.on("connection", (socket) => {
     const shape = Math.max(0, Math.min(255, data.shapeIndex | 0));
     players[socket.id].indicatorHue        = hue;
     players[socket.id].indicatorShapeIndex = shape;
-    socket.broadcast.emit("playerIdentityUpdate", {
+    socket.to(room.id).emit("playerIdentityUpdate", {
       playerId:            socket.id,
       indicatorHue:        hue,
       indicatorShapeIndex: shape,
@@ -362,7 +318,7 @@ io.on("connection", (socket) => {
     players[socket.id].weaponId = pickup.weaponId;
 
     // Broadcast to others — the picking player already resolved this locally.
-    socket.broadcast.emit("pickupTaken", { spawnIndex, playerId: socket.id, weaponId: pickup.weaponId });
+    socket.to(room.id).emit("pickupTaken", { spawnIndex, playerId: socket.id, weaponId: pickup.weaponId });
 
     // Server resets availability after respawn so pickupState stays accurate for new joiners.
     const timer = setTimeout(() => {
@@ -398,7 +354,7 @@ io.on("connection", (socket) => {
       // Admin commands — LAN clients or password-authenticated admins only.
       if (isAdmin(socket)) {
         if (cmd === '!next') {
-          endRound();
+          room.endRound();
           return;
         }
 
@@ -413,7 +369,7 @@ io.on("connection", (socket) => {
               }
               io.to(id).emit('kicked', { reason: cmd === '!ban' ? 'Banned by admin.' : 'Kicked by admin.' });
               setTimeout(() => { const ss = io.sockets.sockets.get(id); if (ss) ss.disconnect(true); }, 500);
-              io.emit('chatMessage', { name: '[Admin]', text: `${players[id].name} was ${cmd === '!ban' ? 'banned' : 'kicked'}.` });
+              room.emit('chatMessage', { name: '[Admin]', text: `${players[id].name} was ${cmd === '!ban' ? 'banned' : 'kicked'}.` });
               return;
             }
           }
@@ -431,9 +387,9 @@ io.on("connection", (socket) => {
         }
 
         if (cmd === '!debugmap') {
-          debugMapEnabled = !debugMapEnabled;
-          socket.emit('chatMessage', { name: 'Server', text: `Debug map ${debugMapEnabled ? 'ON (debug.dat)' : 'OFF (random maps)'} — starting new round...` });
-          endRound();
+          room.debugMapEnabled = !room.debugMapEnabled;
+          socket.emit('chatMessage', { name: 'Server', text: `Debug map ${room.debugMapEnabled ? 'ON (debug.dat)' : 'OFF (random maps)'} — starting new round...` });
+          room.endRound();
           return;
         }
 
@@ -445,7 +401,7 @@ io.on("connection", (socket) => {
       socket.emit('chatMessage', { name: 'Server', text: 'You are sending messages too fast.' });
       return;
     }
-    io.emit("chatMessage", { name, hue, text });
+    room.emit("chatMessage", { name, hue, text });
   });
 
   socket.on("setName", (data) => {
@@ -455,8 +411,8 @@ io.on("connection", (socket) => {
     if (name === players[socket.id].name) { announceJoin(); return; }
     if (!allow(socket, 'nameBucket', 5, 10000)) return;
     players[socket.id].name = name;
-    socket.broadcast.emit("playerNameChanged", { playerId: socket.id, name });
-    io.emit("scoreUpdate", { scores: getScores() });
+    socket.to(room.id).emit("playerNameChanged", { playerId: socket.id, name });
+    room.emit("scoreUpdate", { scores: room.getScores() });
     announceJoin();
   });
 });
@@ -488,11 +444,10 @@ if (require.main === module) {
 
 // Exposed for integration tests.
 module.exports = {
-  server, io, players, weaponsData,
+  server, io, rooms, weaponsData,
+  player(id) { for (const r of rooms.values()) if (r.players[id]) return r.players[id]; return null; },
   close() {
-    if (roundEndTimeout) clearTimeout(roundEndTimeout);
-    if (roundStartTimeout) clearTimeout(roundStartTimeout);
-    for (const idx in game.pickupTimers) clearTimeout(game.pickupTimers[idx]);
+    for (const r of rooms.values()) r.dispose();
     io.close();
     return new Promise(r => server.close(() => r()));
   },
