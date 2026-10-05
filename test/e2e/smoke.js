@@ -60,6 +60,19 @@ const app = require('../../app.js');
     await phone.tap('#menu-play');
     await phone.waitForFunction(() => touchInput.enabled, null, { timeout: 5000 });
 
+    // ?server= must never become a script source or inject markup (XSS).
+    const sec = await (await browser.newContext()).newPage();
+    let dialogs = 0;
+    const foreignScripts = [];
+    sec.on('dialog', d => { dialogs++; d.dismiss(); });
+    sec.on('request', r => { if (r.resourceType() === 'script' && !r.url().startsWith(url)) foreignScripts.push(r.url()); });
+    for (const payload of ['https%3A%2F%2Fa%22onerror%3D%22alert(1)%2F%2F', 'https://evil.example', 'javascript:alert(1)']) {
+      await sec.goto(url + '?server=' + payload);
+      await sec.waitForTimeout(300);
+    }
+    assert.strictEqual(dialogs, 0, 'no script injection through ?server');
+    assert.deepStrictEqual(foreignScripts, [], 'no scripts loaded from ?server hosts');
+
     assert.deepStrictEqual(errors, []);
     console.log('e2e smoke: OK');
   } finally {

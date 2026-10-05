@@ -162,6 +162,7 @@
   "js/utils/Pathfinder.js",
   "js/utils/Physics.js",
   "js/utils/TintCache.js",
+  "js/vendor/socket.io.min.js",
   "js/viewport/Camera.js",
   "js/viewport/Display.js",
   "manifest.webmanifest",
