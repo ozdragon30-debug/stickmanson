@@ -305,8 +305,10 @@ botManager.init();
 
 // Resolves true once the map is live, false if it failed to load (callers may
 // retry with another map; e.g. offline with only some maps cached).
+let currentMapFile = null;
 function loadMap(filename) {
   return map.load('data/maps/' + filename).then(() => {
+    currentMapFile = filename;
     obstacleGrid = map.collisionMap;
     pickupManager.initFromMap(map.weaponSpawns);
     // Tell the server about this map's pickup layout so it can sync state.

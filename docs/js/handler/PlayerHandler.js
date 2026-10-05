@@ -1,4 +1,9 @@
 socketManager.on("currentPlayers", (players) => {
+  // Sent on every (re)connection: drop remote players that left while we were
+  // disconnected, otherwise they linger as frozen ghosts.
+  for (const id of Object.keys(playerManager.getPlayers())) {
+    if (!botManager.isBot(id) && !(id in players)) playerManager.removePlayer(id);
+  }
   for (const playerId in players) {
     if (playerId === socketManager.socket?.id) continue;
     const info = players[playerId];
@@ -97,11 +102,27 @@ socketManager.on("playerDied", (data) => {
   player.death();
 });
 
+// After a reconnect the server sees a brand-new player: re-send who we are.
+socketManager.on("connect", () => {
+  const me = playerManager.mainPlayer;
+  if (!me) return; // first connection: createMainPlayer() announces us
+  socketManager.emit('setName', { name: settingsManager.name });
+  socketManager.emit('playerIdentity', { hue: settingsManager.spinnerHue, shapeIndex: settingsManager.spinnerShapeIndex });
+  socketManager.emit('playerMovement', me.getPosition());
+});
+
 socketManager.on("gameState", (data) => {
   scoreboardManager.updateScores(data.scores);
   scoreboardManager.roundEndsAt = data.roundEndsAt;
   if (data.phase === 'roundEnd') scoreboardManager.showRoundEnd(data.scores);
+  else scoreboardManager.hideRoundEnd();
+  const previousMap = currentMapFile;
   Constants._weaponsReady.then(() => loadMap(data.mapFile).then(() => {
+    // Reconnected into a different map (the round changed meanwhile): our old
+    // coordinates mean nothing here, so move to a spawn point.
+    if (previousMap && previousMap !== data.mapFile && playerManager.mainPlayer) {
+      playerManager.mainPlayer.forceRespawn(map.spawnPoints);
+    }
     // Spawn bots when alone, despawn when others are present.
     botManager.considerSpawning(data.scores);
   }));
