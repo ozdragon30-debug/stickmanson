@@ -60,6 +60,11 @@ module.exports = [
     rules,
   },
   {
+    // Browser-evaluated callbacks (page.evaluate) reference game globals.
+    files: ['test/e2e/**/*.js'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser, ...clientGlobals() } },
+  },
+  {
     files: ['docs/sw.js'],
     languageOptions: { ecmaVersion: 2023, sourceType: 'script', globals: { ...globals.serviceworker } },
     rules,
