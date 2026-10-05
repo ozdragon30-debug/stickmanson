@@ -55,7 +55,6 @@ function submitChat(text) {
   if (!text) return;
   if (text === '!help') {
     for (const line of t('chat.help').split('\n')) chatManager.addMessage('?', line, null);
-    if (socketManager.isConnected) socketManager.emit('chatMessage', { text });
   } else if (text === '!debug') {
     debugTiles = !debugTiles;
   } else if (text === '!fps') {
