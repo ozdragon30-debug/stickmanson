@@ -105,7 +105,7 @@ class ChatManager {
     ctx.save();
     resetScreenTransform(ctx);
 
-    const x      = 12;
+    const x      = 50;   // aligned with the input box, clear of the ⚙ button
     const lineH  = 18;
     const msgFontSize = 13;
     const inputH = this.isOpen ? 24 : 0;

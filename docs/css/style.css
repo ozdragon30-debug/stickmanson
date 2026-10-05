@@ -418,9 +418,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background .15s, color .15s;
+  transition: background .15s, color .15s, opacity .4s;
 }
+/* Desktop: fades out while the mouse is idle so it never covers the game. */
+.sar-gear.idle { opacity: 0 !important; pointer-events: none; }
 .sar-gear:hover { background: rgba(20, 40, 60, .92); color: #8ac0e8; }
+@media (max-width: 900px), (max-height: 600px) {
+  .sar-gear { width: 32px; height: 32px; font-size: 17px; opacity: .7; }
+}
 
 /* Portrait phones: the 4:3 view is tiny, suggest landscape. */
 .rotate-hint {

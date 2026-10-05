@@ -366,6 +366,19 @@ class SettingsManager {
     gear.addEventListener('click', () => this.toggle());
     (document.getElementById('stage') || document.body).appendChild(gear);
     this._gearBtn = gear;
+
+    // Auto-hide on desktop after 2.5 s without mouse movement (Esc still works).
+    let idleTimer = null;
+    window.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      gear.classList.remove('idle');
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        const touch = typeof inputMode !== 'undefined' && inputMode.mode === 'touch';
+        if (!touch && !this._isOpen) gear.classList.add('idle');
+      }, 2500);
+    });
+    window.addEventListener('touchstart', () => gear.classList.remove('idle'), { passive: true });
   }
 
   // ── Refresh ───────────────────────────────────────────────────────────────
