@@ -188,6 +188,28 @@ test('private rooms are isolated and cleaned up when empty', async () => {
   assert.ok(!app.rooms.has('friends-42'));
 });
 
+test('reconnecting with the same session token replaces the ghost socket', async () => {
+  const session = 'tok_' + 'x'.repeat(20);
+  const watcher = await connect({ query: { room: 'ghosts' } });
+  const old = await connect({ query: { room: 'ghosts', session } });
+  await new Promise(r => setTimeout(r, 100));
+  const room = app.rooms.get('ghosts');
+  assert.strictEqual(room.size, 2);
+  const oldId = old.id;
+  const leftMsg = next(watcher, 'chatMessage', 400, m => / left the game/.test(m.text));
+  const gone = next(watcher, 'playerDisconnected', 400, id => id === oldId);
+  const fresh = await connect({ query: { room: 'ghosts', session } });
+  assert.strictEqual(await gone, oldId);
+  assert.strictEqual(await leftMsg, null);
+  assert.strictEqual(room.size, 2);
+  assert.ok(room.players[fresh.id] && !room.players[oldId]);
+
+  // A different token can't evict anyone.
+  const other = await connect({ query: { room: 'ghosts', session: 'tok_' + 'y'.repeat(20) } });
+  await new Promise(r => setTimeout(r, 100));
+  assert.ok(room.players[fresh.id] && room.players[other.id]);
+});
+
 test('admin weapon command no longer crashes the server', async () => {
   const a = await connect(); // direct localhost connection = LAN admin
   const forced = next(a, 'forceWeapon', 400);

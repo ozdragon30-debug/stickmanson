@@ -15,7 +15,12 @@ class SocketManager {
     // Private room from the invite link (?room=code); the server falls back to
     // the public room for anything invalid.
     const room = new URLSearchParams(location.search).get('room');
-    this.room = room && /^[a-z0-9][a-z0-9-]{0,23}$/i.test(room) ? room.toLowerCase() : null;
+    this.room = room && /^[a-z0-9][a-z0-9-]{0,23}$/i.test(room) && room.toLowerCase() !== 'public' ? room.toLowerCase() : null;
+    // Secret per-tab token: lets the server replace our own ghost socket when we
+    // reconnect after a silent network drop (never sent anywhere else).
+    const bytes = new Uint8Array(18);
+    (window.crypto || {}).getRandomValues ? crypto.getRandomValues(bytes) : bytes.forEach((_, i) => { bytes[i] = Math.random() * 256; });
+    this.session = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
     // socket.io is served by the Node server at /socket.io/socket.io.js.
     // On GitHub Pages or when the server is down that script 404s, leaving
@@ -23,7 +28,7 @@ class SocketManager {
     if (typeof io !== 'undefined') {
       try {
         this.socket = io({
-          query: this.room ? { room: this.room } : {},
+          query: this.room ? { room: this.room, session: this.session } : { session: this.session },
           reconnectionAttempts: Infinity,
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,

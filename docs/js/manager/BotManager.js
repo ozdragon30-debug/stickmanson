@@ -233,7 +233,9 @@ class BotManager {
       return;
     }
 
-    // Alone on the server — spawn or keep bots.
+    // Alone on the server — keep bots (re-merging them into the server's
+    // scores, e.g. after a reconnect) or spawn them.
+    if (this.active) { this._updateScoreboard(); return; }
     if (!this.active) {
       this.status = socketManager.isConnected ? 'waiting' : 'no-server';
       const pts = (typeof map !== 'undefined' && map.ready && map.spawnPoints.length)

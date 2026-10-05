@@ -85,15 +85,15 @@ class Menu {
   // released automatically when the tab is hidden, so re-acquire on return.
   async _keepAwake() {
     if (!('wakeLock' in navigator)) return;
-    try {
-      this._wakeLock = await navigator.wakeLock.request('screen');
-    } catch (e) { return; }
     if (!this._wakeHooked) {
       this._wakeHooked = true;
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && !this.isOpen) this._keepAwake();
       });
     }
+    try {
+      this._wakeLock = await navigator.wakeLock.request('screen');
+    } catch (e) { /* denied (battery saver…) — retried on next visibility change */ }
   }
 
   _hide() {
@@ -153,6 +153,7 @@ class Menu {
       this.roomBtn.textContent = t('menu.room.copied');
       setTimeout(() => this._renderRoom(true), 1500);
     } catch (e) {
+      if (e && e.name === 'AbortError') return; // user dismissed the share sheet
       window.prompt(t('menu.room.copy'), link);
     }
   }

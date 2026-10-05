@@ -152,6 +152,23 @@ io.on("connection", (socket) => {
   }
 
   const room = getRoom(normaliseRoomId(socket.handshake.query?.room));
+
+  // Reconnect after a silent drop (Wi-Fi ↔ mobile switch…): the old socket can
+  // linger for up to pingInterval + pingTimeout as a frozen ghost that also
+  // occupies a room slot. Each tab sends a secret random session token; a new
+  // connection with the same token in the same room replaces the ghost at once.
+  const session = socket.handshake.query?.session;
+  if (typeof session === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(session)) {
+    socket.data.session = session;
+    for (const [id, other] of io.sockets.sockets) {
+      if (id !== socket.id && other.data.session === session && other.data.room === room) {
+        other.data.replaced = true;
+        socket.data.announced = true; // quiet rejoin: no "joined"/"left" chat spam
+        other.disconnect(true);
+      }
+    }
+  }
+
   if (room.size >= MAX_PLAYERS_PER_ROOM) {
     socket.emit('kicked', { reason: 'This room is full.' });
     socket.disconnect(true);
@@ -196,7 +213,7 @@ io.on("connection", (socket) => {
     delete players[socket.id];
     room.emit("playerDisconnected", socket.id);
     room.emit("scoreUpdate", { scores: room.getScores() });
-    room.emit("chatMessage", { name: 'Server', text: `${leavingName} left the game.` });
+    if (!socket.data.replaced) room.emit("chatMessage", { name: 'Server', text: `${leavingName} left the game.` });
     releaseRoom(room);
   });
 
@@ -283,6 +300,7 @@ io.on("connection", (socket) => {
       indicatorHue:        hue,
       indicatorShapeIndex: shape,
     });
+    room.emit("scoreUpdate", { scores: room.getScores() }); // scoreboard name colours
   });
 
   // Client finished parsing the map — send (or initialize) pickup state.

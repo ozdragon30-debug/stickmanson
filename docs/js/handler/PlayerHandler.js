@@ -112,6 +112,9 @@ socketManager.on("playerDied", (data) => {
 socketManager.on("connect", () => {
   const me = playerManager.mainPlayer;
   if (!me) return; // first connection: createMainPlayer() announces us
+  // The server now believes we're holding fists (fresh player): match it so
+  // everyone sees the same weapon.
+  me.equipWeapon(0, true);
   socketManager.emit('setName', { name: settingsManager.name });
   socketManager.emit('playerIdentity', { hue: settingsManager.spinnerHue, shapeIndex: settingsManager.spinnerShapeIndex });
   socketManager.emit('playerMovement', me.getPosition());
@@ -145,6 +148,10 @@ let _prevMyKills = 0;
 let _prevMyRank  = null;
 
 socketManager.on("scoreUpdate", (data) => {
+  // Alone on the server with bots: the local bot match owns the scores. The
+  // server's copy has no bots and would reset our bot-match kills to 0.
+  if (botManager.active) { botManager._updateScoreboard(); return; }
+
   const myId      = socketManager.socket?.id;
   const prevKills = scoreboardManager.scores[myId]?.kills ?? 0;
   const prevRank  = _prevMyRank;
@@ -169,14 +176,21 @@ socketManager.on("scoreUpdate", (data) => {
 });
 
 socketManager.on("roundEnd", (data) => {
-  scoreboardManager.showRoundEnd(data.scores);
-  const rank = _myRank(data.scores);
+  let scores = data.scores;
+  if (botManager.active) { botManager._updateScoreboard(); scores = scoreboardManager.scores; }
+  scoreboardManager.showRoundEnd(scores);
+  const rank = _myRank(scores);
   soundManager.play(rank === 1 ? 'win' : 'lose');
   statsManager.onRoundEnd(rank === 1);
   _prevMyRank = null; // reset for next round
 });
 
 socketManager.on("roundStart", (data) => {
+  // A server round also resets a bot match played while waiting for players.
+  if (botManager.active) {
+    if (playerManager.mainPlayer) { playerManager.mainPlayer.kills = 0; playerManager.mainPlayer.deaths = 0; }
+    for (const bot of Object.values(botManager.bots)) { bot.kills = 0; bot.deaths = 0; }
+  }
   scoreboardManager.updateScores(data.scores);
   scoreboardManager.roundEndsAt = data.roundEndsAt;
   scoreboardManager.hideRoundEnd();
