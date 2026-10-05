@@ -136,6 +136,7 @@ class Menu {
   _hide() {
     this.isOpen = false;
     this.el.classList.remove('open');
+    if (typeof reportAfk === 'function') reportAfk(false);
     document.body.classList.remove('ui-open');
   }
 
@@ -145,6 +146,7 @@ class Menu {
     this.nameEl.value = settingsManager.name;
     this.el.classList.add('open');
     if (typeof onBlurHandler === 'function') onBlurHandler();
+    if (typeof reportAfk === 'function') reportAfk(true);
   }
 
   _statusHtml() {

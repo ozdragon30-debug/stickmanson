@@ -12,6 +12,7 @@ socketManager.on("currentPlayers", (players) => {
     if (info.weaponId        != null) player.equipWeapon(info.weaponId, true);
     if (info.indicatorHue        != null) player.indicatorHue        = info.indicatorHue;
     if (info.indicatorShapeIndex != null) player.indicatorShapeIndex = info.indicatorShapeIndex;
+    player.afk = !!info.afk;
     playerManager.addPlayer(playerId, player);
   }
 });
@@ -209,6 +210,24 @@ socketManager.on("roundStart", (data) => {
     botManager.considerSpawning(data.scores);
   });
 });
+
+socketManager.on("playerStatus", (data) => {
+  const player = playerManager.getPlayer(data.playerId);
+  if (player) player.afk = !!data.afk;
+});
+
+// Tell others when we're away (menu open or tab in the background).
+let _lastAfk = null;
+// menuOpen is passed by the Menu itself (it may call this while `menu` is
+// still being constructed, when even `typeof menu` would throw).
+function reportAfk(menuOpen) {
+  const afk = !!(menuOpen ?? menu.isOpen) || document.hidden;
+  if (afk === _lastAfk) return;
+  _lastAfk = afk;
+  socketManager.emit('playerStatus', { afk });
+}
+document.addEventListener('visibilitychange', () => reportAfk());
+socketManager.on('connect', () => { _lastAfk = null; setTimeout(() => reportAfk(), 500); });
 
 socketManager.on("playerIdentityUpdate", (data) => {
   const player = playerManager.getPlayer(data.playerId);

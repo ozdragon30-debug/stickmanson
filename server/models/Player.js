@@ -7,6 +7,7 @@ class Player {
     this.weaponId = 0; // fist default
     this.indicatorHue = 0;
     this.indicatorShapeIndex = 0;
+    this.afk = false; // in the menu or tab in background (display only)
   }
 }
 

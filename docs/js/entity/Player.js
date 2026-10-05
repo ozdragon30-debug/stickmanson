@@ -487,11 +487,12 @@ class Player {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       const padding = 3;
-      const tw = ctx.measureText(this.name).width;
+      const label = this.afk ? `💤 ${this.name}` : this.name;
+      const tw = ctx.measureText(label).width;
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
       ctx.fillRect(x - tw / 2 - padding, y - 48 - 13, tw + padding * 2, 13);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(this.name, x, y - 48);
+      ctx.fillStyle = this.afk ? '#9fb3c8' : '#ffffff';
+      ctx.fillText(label, x, y - 48);
       ctx.restore();
     }
   }

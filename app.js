@@ -341,6 +341,15 @@ io.on("connection", (socket) => {
     });
   });
 
+  // AFK flag (menu open / tab hidden) — purely informational for other players.
+  socket.on("playerStatus", (data) => {
+    if (!players[socket.id] || !data) return;
+    const afk = data.afk === true;
+    if (players[socket.id].afk === afk) return;
+    players[socket.id].afk = afk;
+    socket.to(room.id).emit("playerStatus", { playerId: socket.id, afk });
+  });
+
   // Client sends its spinner identity once the map has loaded.
   socket.on("playerIdentity", (data) => {
     if (!players[socket.id] || !data) return;
