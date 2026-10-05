@@ -21,6 +21,12 @@ socketManager.on("newPlayer", (data) => {
   if (data.name) player.name = data.name;
   playerManager.addPlayer(data.playerId, player);
   soundManager.play('join_lobby');
+  // Waiting in another tab? Flag it in the tab title until the player returns.
+  if (document.hidden) {
+    document.title = '● ' + t('tab.joined') + ' — Stick Arena';
+    const restore = () => { if (!document.hidden) { document.title = 'Stick Arena: Reborn'; document.removeEventListener('visibilitychange', restore); } };
+    document.addEventListener('visibilitychange', restore);
+  }
 });
 
 socketManager.on("playerDisconnected", (playerId) => {
