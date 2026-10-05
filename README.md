@@ -4,6 +4,10 @@ A modern, open-source **HTML5 reimplementation** of the Flash game [Stick Arena]
 
 ![gameplay](./gameplay.gif)
 
+| Menu | In game | Scoreboard | Phone (touch) |
+|---|---|---|---|
+| ![menu](.github/screenshots/menu.webp) | ![game](.github/screenshots/game.webp) | ![scoreboard](.github/screenshots/scoreboard.webp) | ![mobile](.github/screenshots/mobile.webp) |
+
 > 🇹🇷 **Türkçe:** Oyun tarayıcı dili Türkçeyse otomatik olarak Türkçe açılır. Sunucu kurmak için: `npm install` ardından `npm start` → `http://localhost:1138`. Arkadaşlarınla oynamak için menüden **"Özel oda oluştur"** de ve davet linkini paylaş. Sunucu olmadan (GitHub Pages vb.) botlara karşı çevrimdışı oynanır; telefona/bilgisayara uygulama olarak da kurulabilir.
 
 ## Backstory
