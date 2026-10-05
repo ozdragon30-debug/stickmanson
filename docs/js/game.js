@@ -239,6 +239,7 @@ function loop(nowMs) {
   update(dt);
   draw(nowMs);
   hudManager.tickFps(nowMs);
+  if (!menu.isOpen && !document.hidden) statsManager.tick(dt);
   requestAnimationFrame(loop);
 }
 

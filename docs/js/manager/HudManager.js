@@ -19,6 +19,10 @@ class HudManager {
 
   // ── Events ────────────────────────────────────────────────────────────────
   onKill({ killerName, killerHue, victimName, victimHue, weaponId, killerIsMe, victimIsMe }) {
+    if (typeof statsManager !== 'undefined') {
+      if (killerIsMe && !victimIsMe) statsManager.onKill(weaponId);
+      if (victimIsMe) statsManager.onDeath();
+    }
     if (settingsManager.get('killFeed')) {
       this.killFeed.push({
         killer: killerIsMe ? t('hud.you') : (killerName || '?'), killerHue,

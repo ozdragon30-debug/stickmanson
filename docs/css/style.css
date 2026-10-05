@@ -232,6 +232,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .menu-help summary { cursor: pointer; color: var(--accent-2); font-weight: 600; }
 .menu-help ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.7; }
 .menu-help p { line-height: 1.6; margin: 8px 0; }
+.menu-stats { width: 100%; margin: 8px 0; border-collapse: collapse; font-size: 13px; }
+.menu-stats td { padding: 4px 2px; border-bottom: 1px solid #1c2a3a; }
+.menu-stats td:last-child { text-align: right; color: #fff; font-weight: 600; font-family: var(--mono); text-transform: capitalize; }
 .menu-legal { font-size: 11px; color: var(--muted); }
 
 .noscript { position: fixed; inset: 0; display: grid; place-items: center; z-index: 1000; background: var(--bg); }
@@ -343,6 +346,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .sar-key.listening { border-color: #f84; color: #f84; background: #1c0e00; }
 
 .sar-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid #253545; }
+.sar-foot-right { display: flex; gap: 8px; }
 .sar-btn {
   padding: 8px 16px;
   border-radius: 6px;

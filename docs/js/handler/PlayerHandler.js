@@ -166,6 +166,7 @@ socketManager.on("roundEnd", (data) => {
   scoreboardManager.showRoundEnd(data.scores);
   const rank = _myRank(data.scores);
   soundManager.play(rank === 1 ? 'win' : 'lose');
+  statsManager.onRoundEnd(rank === 1);
   _prevMyRank = null; // reset for next round
 });
 

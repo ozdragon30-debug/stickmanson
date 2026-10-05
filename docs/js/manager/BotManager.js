@@ -330,7 +330,9 @@ class BotManager {
       scoreboardManager.showRoundEnd(scores);
       const myId = socketManager.socket?.id ?? 'local_player';
       const ranked = Object.entries(scores).sort((a, b) => b[1].kills - a[1].kills);
-      soundManager.play(ranked[0] && ranked[0][0] === myId ? 'win' : 'lose');
+      const won = !!ranked[0] && ranked[0][0] === myId;
+      soundManager.play(won ? 'win' : 'lose');
+      statsManager.onRoundEnd(won);
       chatManager.addMessage('Server', `Round over! Next round starting in ${BotManager.ROUND_END_MS / 1000} seconds...`, null);
       this._nextRoundAt = now + BotManager.ROUND_END_MS;
     } else if (this._roundPhase === 'roundEnd' && now >= this._nextRoundAt) {

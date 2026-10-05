@@ -45,7 +45,17 @@ class Menu {
     this.roomBtn = document.getElementById('menu-room-btn');
     this.roomBtn.addEventListener('click', () => this._roomAction());
 
+    const statsEl = document.getElementById('menu-stats');
+    statsEl.addEventListener('toggle', () => { if (statsEl.open) this._renderStats(); });
+    document.getElementById('menu-stats-reset').addEventListener('click', () => {
+      if (confirm(t('stats.confirmReset'))) { statsManager.reset(); this._renderStats(); }
+    });
+
     this.el.addEventListener('mousedown', e => e.stopPropagation());
+    // Esc resumes the game from the menu (settings' own Esc handling skips while the menu is open).
+    document.addEventListener('keydown', e => {
+      if (this.isOpen && e.key === 'Escape' && this._ready && !settingsManager.isOpen()) { e.preventDefault(); this.play(); }
+    });
     this._tick();
   }
 
@@ -94,6 +104,7 @@ class Menu {
 
   open() {
     this.isOpen = true;
+    if (document.getElementById('menu-stats').open) this._renderStats();
     this.nameEl.value = settingsManager.name;
     this.el.classList.add('open');
     if (typeof onBlurHandler === 'function') onBlurHandler();
@@ -109,6 +120,18 @@ class Menu {
     }
     if (socketManager.socket && !botManager.active) return `<span class="dot"></span>${t('menu.status.connecting')}`;
     return `<span class="dot offline"></span>${t('menu.status.offline')}`;
+  }
+
+  _renderStats() {
+    const table = this.el.querySelector('.menu-stats');
+    table.innerHTML = '';
+    for (const [k, v] of statsManager.rows()) {
+      const tr = document.createElement('tr');
+      const a = document.createElement('td'); a.textContent = k;
+      const b = document.createElement('td'); b.textContent = v;
+      tr.append(a, b);
+      table.appendChild(tr);
+    }
   }
 
   // Public room → create a private one (new link); private room → share the link.

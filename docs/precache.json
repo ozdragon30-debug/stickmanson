@@ -152,6 +152,7 @@
   "js/manager/SettingsManager.js",
   "js/manager/SocketManager.js",
   "js/manager/SoundManager.js",
+  "js/manager/StatsManager.js",
   "js/map/MapLoader.js",
   "js/pwa.js",
   "js/spritesheet/AtlasSpritesheet.js",

@@ -311,12 +311,16 @@ class SettingsManager {
 
       <div class="sar-foot">
         <button id="sar-reset" class="sar-btn sar-btn-ghost" data-i18n="set.reset">Reset to defaults</button>
-        <button id="sar-done" class="sar-btn" data-i18n="set.done">Done</button>
+        <span class="sar-foot-right">
+          <button id="sar-menu" class="sar-btn sar-btn-ghost" data-i18n="set.menu">Main menu</button>
+          <button id="sar-done" class="sar-btn" data-i18n="set.done">Done</button>
+        </span>
       </div>
     `;
 
     panel.querySelector('#sar-close').onclick = () => this.close();
     panel.querySelector('#sar-done').onclick  = () => this.close();
+    panel.querySelector('#sar-menu').onclick  = () => { this.close(); if (typeof menu !== 'undefined') menu.open(); };
     panel.querySelector('#sar-reset').onclick = () => this.resetDefaults();
     panel.querySelector('#sar-fullscreen').onclick = () => toggleFullscreen();
 
