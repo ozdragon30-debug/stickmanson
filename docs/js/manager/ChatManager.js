@@ -44,6 +44,9 @@ class ChatManager {
   open() {
     this.isOpen = true;
     this._el.value = '';
+    const touch = typeof inputMode !== 'undefined' && inputMode.mode === 'touch';
+    document.body.classList.toggle('touch-chat', touch);
+    this._el.placeholder = touch ? '…' : '';
     if (typeof onBlurHandler === 'function') onBlurHandler(); // release held movement keys
     this._el.focus({ preventScroll: true });
   }
@@ -54,6 +57,7 @@ class ChatManager {
     this.isOpen = false;
     this._el.value = '';
     this._el.blur();
+    document.body.classList.remove('touch-chat');
     return text;
   }
 

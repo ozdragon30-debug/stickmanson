@@ -67,8 +67,12 @@ function submitChat(text) {
     const mapFile = findMapFile(text.substring(5).trim());
     if (mapFile) loadMap(mapFile);
     else chatManager.addMessage('Server', `Unknown map: ${text.substring(5).trim()}`, null);
-  } else {
+  } else if (socketManager.isConnected) {
     socketManager.emit('chatMessage', { text });
+  } else {
+    // Offline: there is no server to echo the message back, so show it locally
+    // (it used to vanish silently).
+    chatManager.addMessage(settingsManager.name, text.slice(0, 80), settingsManager.spinnerHue);
   }
 }
 
