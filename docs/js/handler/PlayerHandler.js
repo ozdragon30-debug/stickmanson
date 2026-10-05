@@ -4,7 +4,7 @@ socketManager.on("currentPlayers", (players) => {
     const info = players[playerId];
     const player = new Player(info.position.x, info.position.y);
     if (info.name)                player.name               = info.name;
-    if (info.weaponId        != null) player.equipWeapon(info.weaponId);
+    if (info.weaponId        != null) player.equipWeapon(info.weaponId, true);
     if (info.indicatorHue        != null) player.indicatorHue        = info.indicatorHue;
     if (info.indicatorShapeIndex != null) player.indicatorShapeIndex = info.indicatorShapeIndex;
     playerManager.addPlayer(playerId, player);
@@ -37,7 +37,8 @@ socketManager.on("playerMoved", (data) => {
   const player = playerManager.getPlayer(playerId);
   if (!player) return;
 
-  player.setPosition(playerPos.x, playerPos.y, playerPos.rotation);
+  if (!playerPos || !Number.isFinite(playerPos.x) || !Number.isFinite(playerPos.y)) return;
+  player.setNetPosition(playerPos.x, playerPos.y, playerPos.rotation);
 });
 
 socketManager.on("playShoot", (data) => {
@@ -64,17 +65,28 @@ socketManager.on("playerGotHit", (data) => {
   }
   if (!player || player.isRespawning) return;
 
-  player.showHitsplat(damage, weaponId);
+  const attacker = playerManager.getPlayer(attackerId);
+  player.showHitsplat(damage, weaponId, attacker ? { x: attacker.body.x, y: attacker.body.y } : null);
 
   // Only the victim's own client triggers death, to avoid every player calling it.
   if (isMe && player.health <= 0) {
-    socketManager.emit('iDied', { killerId: _lastAttackerId });
+    socketManager.emit('iDied', { killerId: _lastAttackerId, weaponId });
     player.death();
   }
 });
 
 socketManager.on("playerDied", (data) => {
-  const { playerId } = data;
+  const { playerId, killerId, weaponId } = data;
+
+  // Kill feed (killerId/weaponId are only sent by updated servers).
+  const myId = socketManager.socket?.id;
+  const scores = scoreboardManager.scores || {};
+  const victim = scores[playerId], killer = killerId ? scores[killerId] : null;
+  hudManager.onKill({
+    killerName: killer?.name ?? (killerId ? '?' : 'World'), killerHue: killer?.indicatorHue,
+    victimName: victim?.name, victimHue: victim?.indicatorHue,
+    weaponId: weaponId ?? 0, killerIsMe: !!killerId && killerId === myId, victimIsMe: playerId === myId,
+  });
 
   // Bots are handled locally; we already triggered our own death above.
   if (botManager.isBot(playerId)) return;
@@ -146,7 +158,7 @@ socketManager.on("roundStart", (data) => {
     }
     // Reset all remote players back to fist — server resets weaponId on round start.
     for (const id in playerManager.getPlayers()) {
-      playerManager.getPlayers()[id].equipWeapon(0);
+      playerManager.getPlayers()[id].equipWeapon(0, true);
     }
     // Re-evaluate bots: despawn if others joined, keep/spawn if still alone.
     botManager.considerSpawning(data.scores);
@@ -181,7 +193,9 @@ socketManager.on("playerNameChanged", (data) => {
 });
 
 socketManager.on("kicked", (data) => {
-  alert(data.reason || 'You have been removed from the server.');
+  chatManager.addMessage('Server', data.reason || 'You have been removed from the server.', null);
+  hudManager.flash('DISCONNECTED', data.reason || 'You have been removed from the server.', '#ff6b6b', 8000);
+  socketManager.socket.io.opts.reconnection = false;
   socketManager.socket.disconnect();
 });
 

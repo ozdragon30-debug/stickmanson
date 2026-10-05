@@ -2,7 +2,16 @@ class AtlasSpritesheet {
   constructor(name, imageUrl, jsonData) {
     this.spritesheetName = name;
     this.image = new Image();
-    this.image.src = imageUrl;
+    this.image.decoding = 'async';
+    // Prefer the lossless WebP copy (pixel-identical, ~40% smaller download);
+    // fall back to the original PNG if the browser can't decode it.
+    const webp = imageUrl.replace(/\.png$/, '.webp');
+    if (webp !== imageUrl) {
+      this.image.onerror = () => { this.image.onerror = null; this.image.src = imageUrl; };
+      this.image.src = webp;
+    } else {
+      this.image.src = imageUrl;
+    }
     this.frames = {};
     this.animationMap = {};  // name -> { fps, frames: [frameKey, ...], offset?: [x, y] }
     this.setOrigins = {};
@@ -26,7 +35,8 @@ class AtlasSpritesheet {
       // URL string — fetch asynchronously.
       fetch(jsonData)
         .then(r => r.json())
-        .then(load);
+        .then(load)
+        .catch(err => console.error(`[Atlas] failed to load ${name}:`, err));
     }
   }
 

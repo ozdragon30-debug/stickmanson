@@ -37,7 +37,7 @@ class ScoreboardManager {
 
   draw(ctx, canvas) {
     ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    resetScreenTransform(ctx);
 
     // Round timer — always visible, top-center.
     const remaining = this.getRemainingTime();
@@ -45,12 +45,12 @@ class ScoreboardManager {
     const seconds  = String(remaining % 60).padStart(2, '0');
 
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(canvas.width / 2 - 42, 4, 84, 26);
+    ctx.fillRect(VIEW_W / 2 - 42, 4, 84, 26);
 
     ctx.fillStyle = 'white';
     ctx.font = 'bold 16px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(`${minutes}:${seconds}`, canvas.width / 2, 23);
+    ctx.fillText(`${minutes}:${seconds}`, VIEW_W / 2, 23);
 
     // Rank under timer — use 'local_player' when offline (matches BotManager's key).
     const myId = (typeof socketManager !== 'undefined')
@@ -63,31 +63,29 @@ class ScoreboardManager {
       const suffixes = ['th','st','nd','rd'];
       const suffix = (rank >= 11 && rank <= 13) ? 'th' : (suffixes[rank % 10] || 'th');
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
-      ctx.fillRect(canvas.width / 2 - 36, 31, 72, 17);
+      ctx.fillRect(VIEW_W / 2 - 36, 31, 72, 17);
       ctx.fillStyle = '#aaccee';
       ctx.font = '11px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`${rank}${suffix} / ${total}`, canvas.width / 2, 43);
+      ctx.fillText(`${rank}${suffix} / ${total}`, VIEW_W / 2, 43);
     }
 
     if (this.isVisible) {
       this._drawOverlay(ctx, canvas);
     }
 
-    // Bot status banner at bottom of screen.
-    if (typeof botManager !== 'undefined' && botManager.status !== 'none') {
+    // Bot status line under the timer/rank (kept clear of the chat box).
+    if (typeof botManager !== 'undefined' && botManager.status !== 'none' && !this.isVisible) {
       const msg = botManager.status === 'no-server'
-        ? 'No connection to the server, playing against bots.'
-        : 'Waiting for other players, playing against bots.';
-      ctx.font = '13px monospace';
+        ? 'Offline — playing against bots'
+        : 'Waiting for players — playing against bots';
+      ctx.font = '11px ui-monospace, monospace';
       const tw = ctx.measureText(msg).width;
-      const bx = (canvas.width - tw) / 2;
-      const by = canvas.height - 12;
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(bx - 8, by - 15, tw + 16, 20);
-      ctx.fillStyle = botManager.status === 'no-server' ? '#ff9955' : '#88ccff';
-      ctx.textAlign = 'left';
-      ctx.fillText(msg, bx, by);
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(VIEW_W / 2 - tw / 2 - 6, 50, tw + 12, 16);
+      ctx.fillStyle = botManager.status === 'no-server' ? '#ffb380' : '#9fd3ff';
+      ctx.textAlign = 'center';
+      ctx.fillText(msg, VIEW_W / 2, 62);
     }
 
     ctx.restore();
@@ -95,8 +93,8 @@ class ScoreboardManager {
 
   _drawOverlay(ctx, canvas) {
     const padX = 100, padY = 70;
-    const overlayW = canvas.width  - padX * 2;
-    const overlayH = canvas.height - padY * 2;
+    const overlayW = VIEW_W  - padX * 2;
+    const overlayH = VIEW_H - padY * 2;
 
     // Dim background
     ctx.fillStyle = 'rgba(0,0,0,0.78)';
@@ -113,7 +111,7 @@ class ScoreboardManager {
     ctx.textAlign = 'center';
     ctx.fillText(
       this.roundEndActive ? 'ROUND OVER' : 'SCOREBOARD',
-      canvas.width / 2,
+      VIEW_W / 2,
       padY + 40
     );
 

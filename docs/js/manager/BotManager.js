@@ -150,6 +150,16 @@ class BotManager {
     'feature/voiders.dat',
   ];
 
+  // Offline rounds mirror the server's rules: 5-minute rounds, 10 s scoreboard.
+  static ROUND_MS     = 5 * 60 * 1000;
+  static ROUND_END_MS = 10 * 1000;
+
+  // Random offline rotation (the debug test map is only reachable via "!map debug").
+  static randomMap(exclude = null) {
+    const pool = BotManager.OFFLINE_MAPS.filter(f => f !== 'debug.dat' && f !== exclude);
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
   static getBotCount(map) {
     const area = map.width * map.height;
     if (area <= 900) return 2;
@@ -180,6 +190,8 @@ class BotManager {
   init() {
     // Cancel the offline timer if the socket connects in time.
     socketManager.on('connect', () => {
+      // The server drives rounds from now on.
+      this._offlineRounds = false;
       if (this._offlineTimer) {
         clearTimeout(this._offlineTimer);
         this._offlineTimer = null;
@@ -284,7 +296,60 @@ class BotManager {
 
   update(dt) {
     if (!this.active) return;
+    if (this._offlineRounds) {
+      this._tickOfflineRound();
+      if (this._roundPhase === 'roundEnd') return; // everyone freezes on the scoreboard
+    }
     for (const bot of Object.values(this.bots)) bot.think(dt);
+  }
+
+  // ── Offline rounds ───────────────────────────────────────────────────────────
+
+  _beginOfflineRound() {
+    this._offlineRounds = true;
+    this._roundPhase = 'playing';
+    this._lastTick = performance.now();
+    scoreboardManager.roundEndsAt = Date.now() + BotManager.ROUND_MS;
+  }
+
+  _tickOfflineRound() {
+    const nowPerf = performance.now();
+    // Time spent paused (menus, hidden tab) doesn't count against the round.
+    const gap = nowPerf - (this._lastTick || nowPerf);
+    this._lastTick = nowPerf;
+    if (gap > 250) {
+      if (this._roundPhase === 'playing') scoreboardManager.roundEndsAt += gap;
+      else this._nextRoundAt += gap;
+    }
+
+    const now = Date.now();
+    if (this._roundPhase === 'playing' && now >= scoreboardManager.roundEndsAt) {
+      this._roundPhase = 'roundEnd';
+      this._updateScoreboard();
+      const scores = scoreboardManager.scores;
+      scoreboardManager.showRoundEnd(scores);
+      const myId = socketManager.socket?.id ?? 'local_player';
+      const ranked = Object.entries(scores).sort((a, b) => b[1].kills - a[1].kills);
+      soundManager.play(ranked[0] && ranked[0][0] === myId ? 'win' : 'lose');
+      chatManager.addMessage('Server', `Round over! Next round starting in ${BotManager.ROUND_END_MS / 1000} seconds...`, null);
+      this._nextRoundAt = now + BotManager.ROUND_END_MS;
+    } else if (this._roundPhase === 'roundEnd' && now >= this._nextRoundAt) {
+      this._roundPhase = 'loading';
+      const file = BotManager.randomMap(this._currentMap);
+      loadMap(file).then(() => {
+        this._currentMap = file;
+        scoreboardManager.hideRoundEnd();
+        // Fresh bots sized for the new map; scores reset like a server round.
+        const status = this.status;
+        this.despawn();
+        this.status = status;
+        const pts = (map.ready && map.spawnPoints.length) ? map.spawnPoints : [{ x: 400, y: 300 }];
+        if (playerManager.mainPlayer) playerManager.mainPlayer.forceRespawn(pts);
+        this.spawn(pts, BotManager.getBotCount(map));
+        this._beginOfflineRound();
+        chatManager.addMessage('Server', `Round started on ${map.name || file}!`, null);
+      }).catch(() => { this._roundPhase = 'roundEnd'; this._nextRoundAt = Date.now() + 2000; });
+    }
   }
 
   // ── Damage handling ───────────────────────────────────────────────────────────
@@ -299,10 +364,17 @@ class BotManager {
     const damage   = weapon?.damage   ?? 5;
     const weaponId = weapon?.id       ?? 0;
 
-    targetPlayer.showHitsplat(damage, weaponId);
+    targetPlayer.showHitsplat(damage, weaponId, { x: attackerBot.player.body.x, y: attackerBot.player.body.y });
     if (targetPlayer.health > 0) return;
 
-    if (targetPlayer === playerManager.mainPlayer) {
+    const victimIsMe = targetPlayer === playerManager.mainPlayer;
+    hudManager.onKill({
+      killerName: attackerBot.player.name, killerHue: attackerBot.player.indicatorHue,
+      victimName: targetPlayer.name, victimHue: targetPlayer.indicatorHue,
+      weaponId, killerIsMe: false, victimIsMe,
+    });
+
+    if (victimIsMe) {
       // Bot killed the human player.
       attackerBot.kills++;
       targetPlayer.deaths++;
@@ -327,6 +399,7 @@ class BotManager {
    * (Intercepted from 'playerHit' socket emit via _patchSocketEmit.)
    */
   _handleBotHit(botId, damage, weaponId) {
+    if (this._offlineRounds && this._roundPhase !== 'playing') return;
     const bot = this.bots[botId];
     if (!bot || bot.player.isRespawning) return;
 
@@ -339,6 +412,12 @@ class BotManager {
 
     bot.deaths++;
     if (playerManager.mainPlayer) playerManager.mainPlayer.kills++;
+    hudManager.onKill({
+      killerName: playerManager.mainPlayer?.name, killerHue: playerManager.mainPlayer?.indicatorHue,
+      victimName: bot.player.name, victimHue: bot.player.indicatorHue,
+      weaponId: wid, killerIsMe: true, victimIsMe: false,
+    });
+    soundManager.play('kill');
     bot.player.death();
     bot.respawnPending = true;
     this._updateScoreboard();
@@ -347,8 +426,8 @@ class BotManager {
   // ── Private ───────────────────────────────────────────────────────────────────
 
   _startOffline() {
-    const maps = BotManager.OFFLINE_MAPS;
-    const file = maps[Math.floor(Math.random() * maps.length)];
+    const file = BotManager.randomMap();
+    this._currentMap = file;
     // Determine initial status: if socket.io isn't even available we're fully offline;
     // if it is but hasn't connected yet we're still waiting to see.
     this.status = (typeof io === 'undefined' || !socketManager.socket) ? 'no-server' : 'waiting';
@@ -357,6 +436,7 @@ class BotManager {
         const pts = (map.ready && map.spawnPoints.length) ? map.spawnPoints : [{ x: 400, y: 300 }];
         const botCount = BotManager.getBotCount(map);
         this.spawn(pts, botCount);
+        if (!socketManager.isConnected) this._beginOfflineRound();
         chatManager.addMessage('Server', 'No server found — playing offline with bots.', null);
       })
       .catch(err => console.warn('[BotManager] Failed to load offline map:', err));

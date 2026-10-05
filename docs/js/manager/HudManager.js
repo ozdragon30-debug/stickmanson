@@ -1,0 +1,312 @@
+// HudManager – screen-space feedback layer drawn on top of the world.
+// Purely presentational: health bar, weapon slot, kill feed, hit markers,
+// damage direction, death banner, FPS / ping and connection status.
+
+class HudManager {
+  constructor() {
+    this.killFeed     = [];   // { killer, killerHue, victim, victimHue, weaponId, t, mine }
+    this.hitMarkerAt  = 0;
+    this.damageAt     = 0;
+    this.damageDirs   = [];   // { angle, t }
+    this.centerMsg    = null; // { text, sub, color, t, dur }
+    this.deathInfo    = null; // { killer, t }
+    this.displayHp    = 100;  // smoothed white "trail" behind the health bar
+    this.fps          = 0;
+    this._frames      = 0;
+    this._fpsT        = performance.now();
+    this.streak       = 0;
+  }
+
+  // ── Events ────────────────────────────────────────────────────────────────
+  onKill({ killerName, killerHue, victimName, victimHue, weaponId, killerIsMe, victimIsMe }) {
+    if (settingsManager.get('killFeed')) {
+      this.killFeed.push({
+        killer: killerIsMe ? 'You' : (killerName || '?'), killerHue,
+        victim: victimIsMe ? 'You' : (victimName || '?'), victimHue,
+        weaponId, t: performance.now(), mine: killerIsMe || victimIsMe,
+      });
+      if (this.killFeed.length > 5) this.killFeed.shift();
+    }
+    if (killerIsMe && !victimIsMe) {
+      this.streak++;
+      const names = { 2: 'DOUBLE KILL', 3: 'TRIPLE KILL', 4: 'MULTI KILL', 5: 'RAMPAGE' };
+      const sub = this.streak >= 2 ? (names[Math.min(this.streak, 5)] || 'RAMPAGE') : null;
+      this.flash(`ELIMINATED ${victimName || ''}`.trim(), sub, '#ffd166', 1600);
+    }
+    if (victimIsMe) {
+      this.streak = 0;
+      this.deathInfo = { killer: killerIsMe ? null : killerName, t: performance.now() };
+    }
+  }
+
+  onHitConfirmed() {
+    if (settingsManager.get('hitMarkers')) this.hitMarkerAt = performance.now();
+  }
+
+  // attackerPos: world position of the attacker (optional) for the direction arc.
+  onDamaged(attackerPos) {
+    if (!settingsManager.get('damageFlash')) return;
+    const now = performance.now();
+    this.damageAt = now;
+    const me = playerManager.mainPlayer;
+    if (attackerPos && me) {
+      const dx = attackerPos.x - me.body.x, dy = attackerPos.y - me.body.y;
+      if (dx * dx + dy * dy > 30 * 30) {
+        this.damageDirs.push({ angle: Math.atan2(dy, dx), t: now });
+        if (this.damageDirs.length > 4) this.damageDirs.shift();
+      }
+    }
+    if (typeof gamepadInput !== 'undefined') gamepadInput.rumble(0.45, 0.25, 110);
+    if (inputMode.mode === 'touch' && navigator.vibrate) navigator.vibrate(25);
+  }
+
+  onRespawn() { this.deathInfo = null; }
+
+  flash(text, sub = null, color = '#fff', dur = 1500) {
+    this.centerMsg = { text, sub, color, t: performance.now(), dur };
+  }
+
+  // ── Draw ──────────────────────────────────────────────────────────────────
+  tickFps(now) {
+    this._frames++;
+    if (now - this._fpsT >= 500) {
+      this.fps = Math.round(this._frames * 1000 / (now - this._fpsT));
+      this._frames = 0;
+      this._fpsT = now;
+    }
+  }
+
+  draw(ctx) {
+    const now = performance.now();
+    const me = playerManager.mainPlayer;
+    ctx.save();
+    resetScreenTransform(ctx);
+
+    this._drawDamage(ctx, now);
+    if (me) {
+      this._drawHealth(ctx, me);
+      this._drawWeapon(ctx, me);
+    }
+    this._drawKillFeed(ctx, now);
+    this._drawCenter(ctx, now);
+    if (me && me.isRespawning) this._drawDeath(ctx, now);
+    this._drawHitMarker(ctx, now);
+    this._drawStats(ctx);
+    this._drawConnection(ctx);
+    if (typeof touchInput !== 'undefined') touchInput.draw(ctx);
+
+    ctx.restore();
+  }
+
+  _drawHealth(ctx, me) {
+    const x = 50, y = 15, w = 100, h = 20;
+    const hp = Math.max(0, Math.min(100, me.health));
+    // Trail eases down toward the real value after taking damage.
+    this.displayHp = hp > this.displayHp ? hp : this.displayHp + (hp - this.displayHp) * 0.08;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillRect(x, y, this.displayHp / 100 * w, h);
+    const grad = ctx.createLinearGradient(0, y, 0, y + h);
+    const low = hp <= 20;
+    const pulse = low ? 0.65 + 0.35 * Math.sin(performance.now() / 120) : 1;
+    grad.addColorStop(0, low ? `rgba(255,70,70,${pulse})` : '#ff3b3b');
+    grad.addColorStop(1, low ? `rgba(150,0,0,${pulse})` : '#b30000');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, hp / 100 * w, h);
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x - 0.5, y - 0.5, w + 1, h + 1);
+
+    ctx.font = 'bold 12px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillText(Math.ceil(hp), x + w / 2 + 1, y + h / 2 + 1);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(Math.ceil(hp), x + w / 2, y + h / 2);
+    ctx.textBaseline = 'alphabetic';
+
+    me.healthbarHeart.drawCentered(ctx);
+  }
+
+  _drawWeapon(ctx, me) {
+    const weapon = me.currentWeapon;
+    if (!weapon || !weapon.hasPickup || !pickupAtlas.ready) return;
+    const f = pickupAtlas.getFrameData(weapon.name + '_pickup', 0);
+    if (!f) return;
+    const x = VIEW_W - f.w - 10, y = 10;
+    ctx.drawImage(pickupAtlas.image, f.x, f.y, f.w, f.h, x, y, f.w, f.h);
+    ctx.font = 'bold 10px ui-monospace, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    const label = weapon.name.replace('_', ' ').toUpperCase();
+    const tw = ctx.measureText(label).width;
+    ctx.fillRect(VIEW_W - 12 - tw - 4, y + f.h + 2, tw + 8, 14);
+    ctx.fillStyle = '#cfe3f7';
+    ctx.fillText(label, VIEW_W - 12, y + f.h + 13);
+  }
+
+  _hueColor(h, l = 65, a = 1) {
+    return h == null ? `rgba(255,255,255,${a})` : `hsla(${(h + 36) % 360},80%,${l}%,${a})`;
+  }
+
+  _drawKillFeed(ctx, now) {
+    if (!this.killFeed.length) return;
+    this.killFeed = this.killFeed.filter(k => now - k.t < 6000);
+    let y = 92;
+    ctx.font = 'bold 12px system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+    for (const k of this.killFeed) {
+      const age = (now - k.t) / 1000;
+      const a = Math.min(1, Math.max(0, 6 - age)) * Math.min(1, age * 6 + 0.2);
+      const weapon = Constants.WEAPON_ID_MAP[k.weaponId];
+      const f = weapon && weapon.hasPickup && pickupAtlas.ready ? pickupAtlas.getFrameData(weapon.name + '_pickup', 0) : null;
+      const iconH = 16, iconW = f ? Math.min(44, f.w * iconH / f.h) : ctx.measureText('✊').width;
+      const kw = ctx.measureText(k.killer).width, vw = ctx.measureText(k.victim).width;
+      const total = kw + vw + iconW + 24;
+      let x = VIEW_W - 10 - total;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = k.mine ? 'rgba(80,30,30,0.75)' : 'rgba(0,0,0,0.55)';
+      ctx.fillRect(x - 6, y - 10, total + 12, 20);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = this._hueColor(k.killerHue);
+      ctx.fillText(k.killer, x, y + 1);
+      x += kw + 8;
+      if (f) ctx.drawImage(pickupAtlas.image, f.x, f.y, f.w, f.h, x, y - iconH / 2, iconW, iconH);
+      else { ctx.fillStyle = '#fff'; ctx.fillText('✊', x, y + 1); }
+      x += iconW + 8;
+      ctx.fillStyle = this._hueColor(k.victimHue);
+      ctx.fillText(k.victim, x, y + 1);
+      y += 24;
+    }
+    ctx.globalAlpha = 1;
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  _drawCenter(ctx, now) {
+    const m = this.centerMsg;
+    if (!m) return;
+    const age = now - m.t;
+    if (age > m.dur) { this.centerMsg = null; return; }
+    const a = Math.min(1, (m.dur - age) / 300);
+    const s = 1 + Math.max(0, 0.25 - age / 600);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(VIEW_W / 2, 150);
+    ctx.scale(s, s);
+    ctx.textAlign = 'center';
+    ctx.font = '900 22px system-ui, sans-serif';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    ctx.strokeText(m.text, 0, 0);
+    ctx.fillStyle = m.color;
+    ctx.fillText(m.text, 0, 0);
+    if (m.sub) {
+      ctx.font = '800 15px system-ui, sans-serif';
+      ctx.strokeText(m.sub, 0, 24);
+      ctx.fillStyle = '#ff8f5a';
+      ctx.fillText(m.sub, 0, 24);
+    }
+    ctx.restore();
+  }
+
+  _drawDeath(ctx, now) {
+    const t = this.deathInfo ? (now - this.deathInfo.t) / 1000 : 1;
+    const a = Math.min(1, t * 3);
+    ctx.save();
+    ctx.globalAlpha = a * 0.35;
+    ctx.fillStyle = '#300';
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.globalAlpha = a;
+    ctx.textAlign = 'center';
+    ctx.font = '900 30px system-ui, sans-serif';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+    ctx.strokeText('YOU DIED', VIEW_W / 2, VIEW_H / 2 - 70);
+    ctx.fillStyle = '#ff6b6b';
+    ctx.fillText('YOU DIED', VIEW_W / 2, VIEW_H / 2 - 70);
+    const killer = this.deathInfo && this.deathInfo.killer;
+    ctx.font = '600 15px system-ui, sans-serif';
+    ctx.lineWidth = 3;
+    const sub = killer ? `Killed by ${killer} — respawning…` : 'Respawning…';
+    ctx.strokeText(sub, VIEW_W / 2, VIEW_H / 2 - 44);
+    ctx.fillStyle = '#eee';
+    ctx.fillText(sub, VIEW_W / 2, VIEW_H / 2 - 44);
+    ctx.restore();
+  }
+
+  _drawDamage(ctx, now) {
+    const age = (now - this.damageAt) / 1000;
+    if (age < 0.45) {
+      const a = (1 - age / 0.45) * 0.45;
+      const g = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.35, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.7);
+      g.addColorStop(0, 'rgba(255,0,0,0)');
+      g.addColorStop(1, `rgba(200,0,0,${a})`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    }
+    // Direction arcs around the player.
+    this.damageDirs = this.damageDirs.filter(d => now - d.t < 900);
+    for (const d of this.damageDirs) {
+      const a = 1 - (now - d.t) / 900;
+      ctx.strokeStyle = `rgba(255,60,60,${a * 0.85})`;
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(VIEW_W / 2, VIEW_H / 2, 70, d.angle - 0.32, d.angle + 0.32);
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+  }
+
+  _drawHitMarker(ctx, now) {
+    const age = now - this.hitMarkerAt;
+    if (age > 160) return;
+    const a = 1 - age / 160;
+    const cx = mouseScreenX, cy = mouseScreenY;
+    if (cx < 0 || cy < 0) return;
+    ctx.strokeStyle = `rgba(255,255,255,${a})`;
+    ctx.lineWidth = 2;
+    const s = 5, g = 10;
+    ctx.beginPath();
+    for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      ctx.moveTo(cx + dx * s, cy + dy * s);
+      ctx.lineTo(cx + dx * g, cy + dy * g);
+    }
+    ctx.stroke();
+  }
+
+  _drawStats(ctx) {
+    const parts = [];
+    if (settingsManager.get('showFps')) parts.push(`${this.fps} FPS`);
+    if (settingsManager.get('showPing') && socketManager.isConnected && socketManager.ping != null) parts.push(`${socketManager.ping} ms`);
+    if (!parts.length) return;
+    const text = parts.join('  ·  ');
+    ctx.font = '11px ui-monospace, monospace';
+    ctx.textAlign = 'right';
+    const tw = ctx.measureText(text).width;
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(VIEW_W - tw - 16, VIEW_H - 22, tw + 10, 16);
+    const p = socketManager.ping;
+    ctx.fillStyle = p == null || p < 80 ? '#9fe0a8' : p < 160 ? '#ffd166' : '#ff6b6b';
+    ctx.fillText(text, VIEW_W - 11, VIEW_H - 10);
+  }
+
+  _drawConnection(ctx) {
+    if (!socketManager.wasConnected || socketManager.isConnected) return;
+    const msg = 'Connection lost — reconnecting…';
+    ctx.font = 'bold 13px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    const tw = ctx.measureText(msg).width;
+    ctx.fillStyle = 'rgba(120,20,20,0.85)';
+    ctx.fillRect(VIEW_W / 2 - tw / 2 - 12, 72, tw + 24, 24);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(msg, VIEW_W / 2, 89);
+  }
+}
+
+const hudManager = new HudManager();

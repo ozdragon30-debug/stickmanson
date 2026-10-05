@@ -1,7 +1,8 @@
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-let scaleFactor = Math.min(canvas.width / 800, canvas.height / 600);
+// World zoom: the original 960×720 canvas rendered the 800×600 Flash stage at 1.2×.
+const scaleFactor = Math.min(VIEW_W / 800, VIEW_H / 600);
 let debugTiles = false;  // toggle with !debug command
 
 const map = new MapLoader();
@@ -18,8 +19,12 @@ function drawMap(nowMs) {
   const startX = Math.max(0, Math.floor(camera.x / (tileSize * scaleFactor)));
   const startY = Math.max(0, Math.floor(camera.y / (tileSize * scaleFactor)));
 
-  const endX = Math.min(mapWidth, startX + Math.ceil(canvas.width / (tileSize * scaleFactor)) + 1);
-  const endY = Math.min(mapHeight, startY + Math.ceil(canvas.height / (tileSize * scaleFactor)) + 1);
+  const endX = Math.min(mapWidth, startX + Math.ceil(VIEW_W / (tileSize * scaleFactor)) + 1);
+  const endY = Math.min(mapHeight, startY + Math.ceil(VIEW_H / (tileSize * scaleFactor)) + 1);
+
+  // At non-integer render scales, anti-aliased tile edges leave hairline seams
+  // between neighbouring tiles. Overdraw each tile by ~1 device pixel to hide them.
+  const seam = 1 / (display.scale * scaleFactor);
 
   for (let y = startY; y < endY; y++) {
     for (let x = startX; x < endX; x++) {
@@ -45,7 +50,7 @@ function drawMap(nowMs) {
           (flip === 2 || flip === 3) ? -1 : 1
         );
       }
-      ctx.drawImage(mapAtlas.image, f.x, f.y, f.w, f.h, -half, -half, tileSize, tileSize);
+      ctx.drawImage(mapAtlas.image, f.x, f.y, f.w, f.h, -half - seam / 2, -half - seam / 2, tileSize + seam, tileSize + seam);
       ctx.restore();
 
       if (debugTiles) {
@@ -89,52 +94,28 @@ function drawMap(nowMs) {
   }
 }
 
-function drawHealthBar() {
-  let x = 50;
-  let y = 15;
-  const width = 100;
-  const height = 20;
-  const health = Math.max(0, Math.min(width, playerManager.mainPlayer.health));
-
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  playerManager.mainPlayer.healthbarHeart.drawCentered(ctx);
-  ctx.fillStyle = 'red';
-  ctx.fillRect(x, y, health, height);
-  ctx.fillStyle = 'black';
-  ctx.fillRect(health + x, y, width - health, height);
-  ctx.restore();
-}
-
-function drawHUD() {
-  drawHealthBar();
-  const weapon = playerManager.mainPlayer.currentWeapon;
-  if (weapon.hasPickup && pickupAtlas.ready) {
-    const f = pickupAtlas.getFrameData(weapon.name + '_pickup', 0);
-    if (f) {
-      ctx.save();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.drawImage(pickupAtlas.image, f.x, f.y, f.w, f.h, canvas.width - f.w - 10, 10, f.w, f.h);
-      ctx.restore();
-    }
-  }
+// Offline bot matches pause while a menu is open (online matches can't pause).
+function isOfflinePaused() {
+  return botManager.active && !socketManager.isConnected && isUiBlocking();
 }
 
 function update(dt) {
   playerManager.updatePlayers();
   pickupManager.update();
-  botManager.update(dt);
+  if (!isOfflinePaused()) botManager.update(dt);
 }
 
 function drawCursor() {
   if (!cursorAtlas.ready) return;
+  if (inputMode.mode === 'touch' || isUiBlocking()) return;
+  if (inputMode.mode === 'mouse' && !mouseInView) return;
   const names = Object.keys(cursorAtlas.animationMap);
   if (!names.length) return;
   const animName = names[settingsManager.cursorIndex % names.length];
   const f = cursorAtlas.getFrameData(animName, 0);
   if (!f) return;
   ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  resetScreenTransform(ctx);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(cursorAtlas.image, f.x, f.y, f.w, f.h,
     Math.round(mouseScreenX - f.w / 2),
@@ -144,16 +125,19 @@ function drawCursor() {
 }
 
 function draw(nowMs) {
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  resetScreenTransform(ctx);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   ctx.translate(-camera.x, -camera.y);
   ctx.scale(scaleFactor, scaleFactor);
 
+  ctx.imageSmoothingEnabled = !settingsManager.get('pixelArt');
+
   drawMap(nowMs);
   pickupManager.draw(ctx);
-  drawHUD();
   playerManager.drawPlayers(ctx);
   if (debugTiles) drawDebugHitshape(ctx);
+  hudManager.draw(ctx);
   scoreboardManager.draw(ctx, canvas);
   chatManager.draw(ctx, canvas);
   drawCursor();
@@ -232,30 +216,70 @@ function loop(nowMs) {
   const dt = Math.min((nowMs - lastTime) / 1000, 0.1);  // seconds; capped to avoid spiral after tab switch
   lastTime = nowMs;
 
+  // Input is applied before update/draw so the frame on screen reflects it
+  // (previously movement was applied after drawing: one frame of extra lag).
+  gamepadInput.poll();
+  touchInput.update();
+  if (!isOfflinePaused()) {
+    keyEvents(dt);
+    mouseEvents();
+  }
   update(dt);
   draw(nowMs);
-  keyEvents(dt);
-  mouseEvents();
+  hudManager.tickFps(nowMs);
   requestAnimationFrame(loop);
 }
 
 document.addEventListener("keydown", keyDownHandler);
 document.addEventListener("keyup", keyUpHandler);
-document.addEventListener("blur", onBlurHandler)
-canvas.addEventListener("mousemove", mouseMoveHandler);
-canvas.addEventListener("mousedown", onMouseDown);
-canvas.addEventListener("mouseup", onMouseUp);
+// 'blur' only fires on window (not document); previously keys stayed stuck after Alt+Tab.
+window.addEventListener("blur", onBlurHandler);
+document.addEventListener("visibilitychange", () => { if (document.hidden) onBlurHandler(); });
+window.addEventListener("pointermove", mouseMoveHandler);
+canvas.addEventListener("pointerdown", onMouseDown);
+window.addEventListener("pointerup", onMouseUp);
 canvas.addEventListener("dragstart", e => e.preventDefault());
+canvas.addEventListener("contextmenu", e => e.preventDefault());
 
-const observer = new MutationObserver((mutations) => {
-  mutations.forEach((mutation) => {
-    if (mutation.attributeName === "width" || mutation.attributeName === "height") {
-      scaleFactor = Math.min(canvas.width / 800, canvas.height / 600);
-    }
-  });
+// Global shortcuts that work outside the chat box.
+document.addEventListener("keydown", e => {
+  if (chatManager.isOpen || e.repeat) return;
+  if (document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+  if (e.code === 'KeyM' && !Object.values(settingsManager.settings.keybinds).includes('KeyM')) {
+    settingsManager.set('muted', !settingsManager.get('muted'));
+    hudManager.flash(settingsManager.get('muted') ? 'SOUND OFF' : 'SOUND ON', null, '#cfe3f7', 900);
+  }
 });
 
-observer.observe(canvas, { attributes: true });
+// Apply presentation settings now and whenever they change.
+settingsManager.onChange((key, value) => {
+  if (key === 'volume') soundManager.setVolume(value);
+  else if (key === 'muted') soundManager.setMuted(value);
+  else if (key === 'spatialAudio') soundManager.setSpatial(value);
+  else if (key === 'renderQuality') display.setQuality(value);
+  else if (key === 'pixelArt') document.body.classList.toggle('pixel-art', !!value);
+  else if (key === 'touchControls') updateTouchControls();
+});
+
+function updateTouchControls() {
+  const pref = settingsManager.get('touchControls');
+  touchInput.setEnabled(pref === 'on' || (pref === 'auto' && inputMode.mode === 'touch'));
+}
+inputMode.onChange(updateTouchControls);
+
+// Warm up the Web Audio cache with every sound the game can play.
+Constants._weaponsReady.then(() => {
+  const names = new Set(['kill', 'win', 'lose', 'join_lobby', 'position_first', 'position_change', 'btn_chat', ...Constants.DEATH_SOUNDS]);
+  for (const w of Object.values(Constants.WEAPON_ID_MAP)) {
+    (w.shootSounds || [w.name + '_shoot']).forEach(n => names.add(n));
+    if (w.impactSound) names.add(w.impactSound);
+    if (w.hasPickup) names.add(w.name + '_pickup');
+  }
+  const preload = () => soundManager.preload([...names]);
+  // Decoding needs an AudioContext, which needs a user gesture.
+  for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(ev, preload, { once: true, capture: true });
+});
+
 
 let loopStarted = false;
 
@@ -273,7 +297,10 @@ function loadMap(filename) {
     if (!loopStarted) {
       playerManager.createMainPlayer(map.spawnPoints);
       loopStarted = true;
-      loop();
+      // Must go through rAF: calling loop() directly passed an undefined timestamp,
+      // making the first frame's dt NaN (and the player's position NaN if a key was held).
+      requestAnimationFrame(loop);
+      menu.setReady();
     }
   }).catch(err => console.error('Failed to load map:', err));
 }

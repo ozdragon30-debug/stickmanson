@@ -1,6 +1,7 @@
 // ──────────────────────────────────────────────────────────────────────────────
 //  SettingsManager – persists user prefs and renders the in-game settings panel.
 //  Press Escape to open / close. Settings are saved to localStorage.
+//  Only presentation / comfort options live here: nothing changes gameplay.
 // ──────────────────────────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS = {
@@ -8,15 +9,40 @@ const DEFAULT_SETTINGS = {
   cursorIndex:       0,
   spinnerShapeIndex: 0,
   spinnerHue:        0,
+  // Audio
+  volume:            0.5,
+  muted:             false,
+  spatialAudio:      true,
+  // Video
+  renderQuality:     'auto',   // auto | high | low
+  pixelArt:          false,    // nearest-neighbour sprite scaling
+  showFps:           false,
+  showPing:          true,
+  // HUD feedback
+  damageFlash:       true,
+  hitMarkers:        true,
+  killFeed:          true,
+  // Controls
+  touchControls:     'auto',   // auto | on | off
   keybinds: {
-    up:     'w',
-    left:   'a',
-    down:   's',
-    right:  'd',
-    shoot:  ' ',
-    sprint: 'Shift',
+    up:     'KeyW',
+    left:   'KeyA',
+    down:   'KeyS',
+    right:  'KeyD',
+    shoot:  'Space',
+    sprint: 'ShiftLeft',
   },
 };
+
+// Convert a legacy KeyboardEvent.key bind (pre-2026 saves) to a layout-independent code.
+function migrateBind(v) {
+  if (typeof v !== 'string' || !v) return v;
+  if (/^[a-z]$/i.test(v)) return 'Key' + v.toUpperCase();
+  if (/^\d$/.test(v)) return 'Digit' + v;
+  if (v === ' ') return 'Space';
+  if (v === 'Shift' || v === 'Control' || v === 'Alt') return v + 'Left';
+  return v; // already a code, or a non-ASCII key we keep matching by value
+}
 
 class SettingsManager {
   static getInstance() {
@@ -32,10 +58,14 @@ class SettingsManager {
     if (saved.cursorIndex       == null) DEFAULT_SETTINGS.cursorIndex       = Math.floor(Math.random() * 8);
     if (!saved.name)                     DEFAULT_SETTINGS.name              = 'Player' + Math.random().toString(36).slice(2, 5).toUpperCase();
 
-    this.settings  = this._merge(saved);
-    this._isOpen   = false;
+    this.settings   = this._merge(saved);
+    this.isFirstRun = !saved.name;
+    this._isOpen    = false;
     this._rebinding = null;
+    this._tab       = 'profile';
+    this._listeners = [];
     this._buildUI();
+    this._save();
     // Use capture phase so we intercept Escape / rebind before Keyboard.js sees it.
     document.addEventListener('keydown', e => this._onGlobalKey(e), true);
   }
@@ -47,37 +77,76 @@ class SettingsManager {
   get spinnerHue()        { return this.settings.spinnerHue; }
   isOpen()                { return this._isOpen; }
   getKey(action)          { return this.settings.keybinds[action] ?? ''; }
+  get(key)                { return this.settings[key]; }
+
+  set(key, value) {
+    this.settings[key] = value;
+    this._save();
+    for (const fn of this._listeners) fn(key, value);
+    if (this._isOpen) this._syncControls();
+  }
+
+  // fn(key, value) is called on every change; also invoked once per key immediately.
+  onChange(fn, { immediate = true } = {}) {
+    this._listeners.push(fn);
+    if (immediate) for (const k in this.settings) fn(k, this.settings[k]);
+  }
+
+  setName(name) {
+    const clean = String(name ?? '').replace(/\s+/g, ' ').trim().slice(0, 20);
+    if (!clean) return;
+    this.settings.name = clean;
+    this._save();
+    if (typeof playerManager !== 'undefined' && playerManager.mainPlayer) playerManager.mainPlayer.name = clean;
+    if (typeof socketManager !== 'undefined') socketManager.emit('setName', { name: clean });
+  }
 
   // ── Persistence ────────────────────────────────────────────────────────────
   _loadRaw() {
-    try { return JSON.parse(localStorage.getItem('sar_settings') || '{}'); }
+    try { return JSON.parse(localStorage.getItem('sar_settings') || '{}') || {}; }
     catch (e) { return {}; }
   }
   _merge(saved) {
     const s = { ...DEFAULT_SETTINGS, ...saved };
-    s.keybinds = { ...DEFAULT_SETTINGS.keybinds, ...(saved.keybinds || {}) };
+    s.keybinds = { ...DEFAULT_SETTINGS.keybinds };
+    for (const [a, v] of Object.entries(saved.keybinds || {})) s.keybinds[a] = migrateBind(v);
     return s;
   }
   _save() {
     try { localStorage.setItem('sar_settings', JSON.stringify(this.settings)); } catch (e) {}
   }
 
+  resetDefaults() {
+    const keep = {
+      name: this.settings.name, cursorIndex: this.settings.cursorIndex,
+      spinnerShapeIndex: this.settings.spinnerShapeIndex, spinnerHue: this.settings.spinnerHue,
+    };
+    const fresh = this._merge({});
+    for (const k in fresh) if (!(k in keep)) this.set(k, fresh[k]);
+    this.settings.keybinds = { ...DEFAULT_SETTINGS.keybinds };
+    this._save();
+    this._refresh();
+  }
+
   // ── Open / close ───────────────────────────────────────────────────────────
   toggle() { this._isOpen ? this.close() : this.open(); }
 
-  open() {
+  open(tab) {
     this._isOpen  = true;
     this._rebinding = null;
-    this._overlay.style.display = 'flex';
-    canvas.style.cursor = 'default';
+    if (tab) this._tab = tab;
+    if (typeof onBlurHandler === 'function') onBlurHandler();
+    this._overlay.classList.add('open');
     this._refresh();
   }
 
   close() {
     this._isOpen  = false;
     this._rebinding = null;
-    this._overlay.style.display = 'none';
-    canvas.style.cursor = 'none';
+    this._overlay.classList.remove('open');
+    // Commit any half-typed name.
+    const nameEl = this._panel.querySelector('#sar-name');
+    if (nameEl.value.trim() && nameEl.value.trim() !== this.settings.name) this.setName(nameEl.value);
     this._applyToPlayer();
   }
 
@@ -111,118 +180,142 @@ class SettingsManager {
     if (this._rebinding) {
       e.preventDefault();
       e.stopImmediatePropagation();
-      this.settings.keybinds[this._rebinding] = e.key;
+      if (e.key !== 'Escape') {
+        // Unbind the same key from any other action to avoid conflicts.
+        for (const a in this.settings.keybinds) {
+          if (this.settings.keybinds[a] === e.code) this.settings.keybinds[a] = '';
+        }
+        this.settings.keybinds[this._rebinding] = e.code;
+      }
       this._rebinding = null;
       this._save();
       this._buildKeybinds();
       return;
     }
     if (e.key === 'Escape') {
+      if (typeof chatManager !== 'undefined' && chatManager.isOpen) return;
+      if (typeof menu !== 'undefined' && menu.isOpen) return;
       e.preventDefault();
-      if (this._isOpen) this.close();
-      else if (typeof chatManager === 'undefined' || !chatManager.isOpen) this.open();
+      this.toggle();
     }
   }
 
   // ── Build DOM ─────────────────────────────────────────────────────────────
   _buildUI() {
     const overlay = document.createElement('div');
-    Object.assign(overlay.style, {
-      display: 'none', position: 'fixed', inset: '0',
-      background: 'rgba(0,0,0,0.78)', zIndex: '1000',
-      alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'monospace',
-      cursor: 'default',
-    });
+    overlay.className = 'sar-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Settings');
     // Don't let clicks fall through to the canvas.
     overlay.addEventListener('mousedown', e => e.stopPropagation());
     overlay.addEventListener('click',     e => { if (e.target === overlay) this.close(); });
 
     const panel = document.createElement('div');
-    Object.assign(panel.style, {
-      background: '#1a2332', border: '2px solid #2d4060',
-      borderRadius: '8px', padding: '20px 24px',
-      width: '500px', maxHeight: '84vh', overflowY: 'auto',
-      color: '#bbb', fontSize: '13px', boxSizing: 'border-box',
-    });
-
+    panel.className = 'sar-panel';
     panel.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-        <span style="font-size:15px;font-weight:bold;color:#fff">⚙ Settings
-          <span style="font-size:10px;color:#445;font-weight:normal;margin-left:8px;">[Esc]</span></span>
-        <button id="sar-close" style="background:none;border:none;color:#667;font-size:18px;cursor:pointer;line-height:1">✕</button>
+      <div class="sar-head">
+        <span class="sar-title">Settings <kbd>Esc</kbd></span>
+        <button id="sar-close" class="sar-x" aria-label="Close settings">✕</button>
       </div>
+      <nav class="sar-tabs" role="tablist">
+        <button data-tab="profile">Profile</button>
+        <button data-tab="controls">Controls</button>
+        <button data-tab="audio">Audio</button>
+        <button data-tab="video">Video</button>
+        <button data-tab="hud">HUD</button>
+      </nav>
 
-      <div class="sar-sec">
-        <div class="sar-lbl">Player Name</div>
-        <input id="sar-name" type="text" maxlength="20"
-          style="width:100%;background:#0c1420;border:1px solid #2d4060;color:#fff;
-                 padding:6px 8px;border-radius:4px;font-family:monospace;font-size:13px;
-                 box-sizing:border-box;outline:none">
-      </div>
+      <section data-pane="profile">
+        <div class="sar-sec">
+          <label class="sar-lbl" for="sar-name">Player Name</label>
+          <input id="sar-name" type="text" maxlength="20" autocomplete="nickname" class="sar-text">
+        </div>
+        <div class="sar-sec">
+          <div class="sar-lbl">Cursor</div>
+          <div id="sar-cursor-grid" class="sar-grid"></div>
+        </div>
+        <div class="sar-sec">
+          <div class="sar-lbl">Spinner Shape</div>
+          <div id="sar-spin-grid" class="sar-grid sar-scroll"></div>
+        </div>
+        <div class="sar-sec">
+          <label class="sar-lbl" for="sar-hue">Spinner Color — <span id="sar-hue-lbl"></span></label>
+          <input id="sar-hue" type="range" min="0" max="360" class="sar-range">
+          <div class="sar-hue-bar"></div>
+        </div>
+      </section>
 
-      <div class="sar-sec">
-        <div class="sar-lbl">Cursor</div>
-        <div id="sar-cursor-grid" style="display:flex;gap:6px;flex-wrap:wrap"></div>
-      </div>
+      <section data-pane="controls">
+        <div class="sar-sec">
+          <div class="sar-lbl">Keybinds <span class="sar-hint">(arrow keys always move too)</span></div>
+          <div id="sar-keybinds"></div>
+        </div>
+        <div class="sar-sec">
+          <div class="sar-lbl">Touch Controls</div>
+          <select id="sar-touch" class="sar-select" data-setting="touchControls">
+            <option value="auto">Auto (touch screens)</option>
+            <option value="on">Always on</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+        <div class="sar-sec sar-help">
+          <div class="sar-lbl">Gamepad</div>
+          Left stick / D-pad: move · Right stick: aim · RT / A: attack · Back/View: scoreboard · Start: settings
+          <div id="sar-pad-status" class="sar-hint"></div>
+        </div>
+      </section>
 
-      <div class="sar-sec">
-        <div class="sar-lbl">Spinner Shape</div>
-        <div id="sar-spin-grid"
-          style="display:flex;gap:5px;flex-wrap:wrap;max-height:170px;overflow-y:auto;
-                 background:#0c1420;border:1px solid #2d4060;border-radius:4px;padding:8px"></div>
-      </div>
+      <section data-pane="audio">
+        <div class="sar-sec">
+          <label class="sar-lbl" for="sar-volume">Volume — <span id="sar-vol-lbl"></span></label>
+          <input id="sar-volume" type="range" min="0" max="100" class="sar-range">
+        </div>
+        <label class="sar-check"><input type="checkbox" data-setting="muted"> Mute all sounds <kbd>M</kbd></label>
+        <label class="sar-check"><input type="checkbox" data-setting="spatialAudio"> Positional audio
+          <span class="sar-hint">— pan &amp; soften other players' sounds by distance</span></label>
+      </section>
 
-      <div class="sar-sec">
-        <div class="sar-lbl">Spinner Color — <span id="sar-hue-lbl"></span></div>
-        <input id="sar-hue" type="range" min="0" max="360"
-          style="width:100%;accent-color:#4a9eff;margin-bottom:6px">
-        <div style="height:12px;border-radius:3px;
-          background:linear-gradient(to right,
-            hsl(36,80%,50%),hsl(96,80%,50%),hsl(156,80%,50%),
-            hsl(216,80%,50%),hsl(276,80%,50%),hsl(336,80%,50%),hsl(396,80%,50%))"></div>
-      </div>
+      <section data-pane="video">
+        <div class="sar-sec">
+          <div class="sar-lbl">Render Resolution</div>
+          <select class="sar-select" data-setting="renderQuality">
+            <option value="auto">Auto (sharp, up to 2×)</option>
+            <option value="high">High (native, up to 3×)</option>
+            <option value="low">Low (1× – fastest)</option>
+          </select>
+        </div>
+        <label class="sar-check"><input type="checkbox" data-setting="pixelArt"> Pixel-art scaling
+          <span class="sar-hint">— crisp nearest-neighbour sprites</span></label>
+        <label class="sar-check"><input type="checkbox" data-setting="showFps"> Show FPS</label>
+        <label class="sar-check"><input type="checkbox" data-setting="showPing"> Show ping</label>
+        <div class="sar-sec" style="margin-top:14px">
+          <button id="sar-fullscreen" class="sar-btn">Toggle Fullscreen <kbd>F11</kbd></button>
+        </div>
+      </section>
 
-      <div class="sar-sec">
-        <div class="sar-lbl">Keybinds</div>
-        <div id="sar-keybinds"></div>
+      <section data-pane="hud">
+        <label class="sar-check"><input type="checkbox" data-setting="killFeed"> Kill feed</label>
+        <label class="sar-check"><input type="checkbox" data-setting="hitMarkers"> Hit markers</label>
+        <label class="sar-check"><input type="checkbox" data-setting="damageFlash"> Damage flash</label>
+      </section>
+
+      <div class="sar-foot">
+        <button id="sar-reset" class="sar-btn sar-btn-ghost">Reset to defaults</button>
+        <button id="sar-done" class="sar-btn">Done</button>
       </div>
     `;
-
-    const sty = document.createElement('style');
-    sty.textContent = `
-      .sar-sec { margin-bottom:18px }
-      .sar-lbl { color:#4a7a9a;font-size:10px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px }
-      .sar-tile { width:46px;height:46px;border:2px solid #253545;border-radius:5px;cursor:pointer;
-                  display:flex;align-items:center;justify-content:center;background:#0c1420;flex-shrink:0 }
-      .sar-tile:hover { border-color:#4a9effaa }
-      .sar-tile.sel   { border-color:#4a9eff;background:#0a2040 }
-      .sar-tile canvas { cursor:pointer }
-      .sar-bind { display:flex;justify-content:space-between;align-items:center;
-                  padding:6px 2px;border-bottom:1px solid #1a2535 }
-      .sar-bind:last-child { border-bottom:none }
-      .sar-key  { background:#182535;border:1px solid #2d4060;color:#ccc;padding:3px 10px;
-                  border-radius:3px;cursor:pointer;font-family:monospace;font-size:12px;
-                  min-width:68px;text-align:center }
-      .sar-key:hover     { background:#253545 }
-      .sar-key.listening { border-color:#f84;color:#f84;background:#1c0e00 }
-    `;
-    document.head.appendChild(sty);
 
     panel.querySelector('#sar-close').onclick = () => this.close();
+    panel.querySelector('#sar-done').onclick  = () => this.close();
+    panel.querySelector('#sar-reset').onclick = () => this.resetDefaults();
+    panel.querySelector('#sar-fullscreen').onclick = () => toggleFullscreen();
 
-    panel.querySelector('#sar-name').addEventListener('input', e => {
-      this.settings.name = e.target.value;
-      this._save();
+    panel.querySelectorAll('.sar-tabs button').forEach(b => {
+      b.onclick = () => { this._tab = b.dataset.tab; this._showTab(); };
     });
 
-    panel.querySelector('#sar-name').addEventListener('change', e => {
-      // Sync name to server when the field loses focus or Enter is pressed.
-      this.settings.name = e.target.value;
-      this._save();
-      if (typeof playerManager !== 'undefined' && playerManager.mainPlayer) playerManager.mainPlayer.name = this.settings.name;
-      if (typeof socketManager !== 'undefined') socketManager.emit('setName', { name: this.settings.name });
-    });
+    panel.querySelector('#sar-name').addEventListener('change', e => this.setName(e.target.value));
 
     panel.querySelector('#sar-hue').addEventListener('input', e => {
       this.settings.spinnerHue = +e.target.value;
@@ -232,6 +325,16 @@ class SettingsManager {
       this._syncIdentity();
     });
 
+    panel.querySelector('#sar-volume').addEventListener('input', e => {
+      this.set('volume', +e.target.value / 100);
+    });
+
+    panel.querySelectorAll('[data-setting]').forEach(el => {
+      el.addEventListener('change', () => {
+        this.set(el.dataset.setting, el.type === 'checkbox' ? el.checked : el.value);
+      });
+    });
+
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
     this._overlay = overlay;
@@ -239,37 +342,15 @@ class SettingsManager {
 
     // ── Gear button ────────────────────────────────────────────────────────
     const gear = document.createElement('button');
+    gear.className = 'sar-gear';
     gear.textContent = '⚙';
-    Object.assign(gear.style, {
-      position: 'fixed', zIndex: '999',
-      width: '34px', height: '34px',
-      background: 'rgba(10,20,32,0.72)', border: '1.5px solid #2d4060',
-      borderRadius: '6px', color: '#5a8ab0', fontSize: '18px',
-      cursor: 'pointer', lineHeight: '1',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      transition: 'background 0.15s, color 0.15s',
-    });
     gear.title = 'Settings [Esc]';
-    gear.addEventListener('mouseenter', () => {
-      gear.style.background = 'rgba(20,40,60,0.92)';
-      gear.style.color = '#8ac0e8';
-    });
-    gear.addEventListener('mouseleave', () => {
-      gear.style.background = 'rgba(10,20,32,0.72)';
-      gear.style.color = '#5a8ab0';
-    });
+    gear.setAttribute('aria-label', 'Settings');
     gear.addEventListener('mousedown', e => e.stopPropagation());
+    gear.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
     gear.addEventListener('click', () => this.toggle());
-    document.body.appendChild(gear);
+    (document.getElementById('stage') || document.body).appendChild(gear);
     this._gearBtn = gear;
-
-    const positionGear = () => {
-      const r = canvas.getBoundingClientRect();
-      gear.style.left   = (r.left + 6) + 'px';
-      gear.style.bottom = (window.innerHeight - r.bottom + 6) + 'px';
-    };
-    positionGear();
-    window.addEventListener('resize', positionGear);
   }
 
   // ── Refresh ───────────────────────────────────────────────────────────────
@@ -277,9 +358,36 @@ class SettingsManager {
     this._panel.querySelector('#sar-name').value = this.settings.name;
     this._panel.querySelector('#sar-hue').value  = this.settings.spinnerHue;
     this._refreshHueLbl();
+    this._syncControls();
     this._buildCursorPicker();
     this._buildSpinnerPicker();
     this._buildKeybinds();
+    this._showTab();
+  }
+
+  _showTab() {
+    this._panel.querySelectorAll('.sar-tabs button').forEach(b => {
+      b.classList.toggle('sel', b.dataset.tab === this._tab);
+      b.setAttribute('aria-selected', b.dataset.tab === this._tab);
+    });
+    this._panel.querySelectorAll('[data-pane]').forEach(p => {
+      p.hidden = p.dataset.pane !== this._tab;
+    });
+    const padEl = this._panel.querySelector('#sar-pad-status');
+    if (padEl) {
+      const pad = typeof gamepadInput !== 'undefined' ? gamepadInput.connectedName : null;
+      padEl.textContent = pad ? `Connected: ${pad}` : 'No gamepad detected — press any button on it.';
+    }
+  }
+
+  _syncControls() {
+    this._panel.querySelectorAll('[data-setting]').forEach(el => {
+      const v = this.settings[el.dataset.setting];
+      if (el.type === 'checkbox') el.checked = !!v; else el.value = v;
+    });
+    const vol = Math.round(this.settings.volume * 100);
+    this._panel.querySelector('#sar-volume').value = vol;
+    this._panel.querySelector('#sar-vol-lbl').textContent = vol + '%';
   }
 
   _refreshHueLbl() {
@@ -304,9 +412,10 @@ class SettingsManager {
         fd.x, fd.y, fd.w, fd.h,
         (46 - fd.w * scale) / 2, (46 - fd.h * scale) / 2,
         fd.w * scale, fd.h * scale);
-      const tile = document.createElement('div');
+      const tile = document.createElement('button');
       tile.className = 'sar-tile' + (i === this.settings.cursorIndex % names.length ? ' sel' : '');
       tile.title = `Cursor ${i + 1}`;
+      tile.setAttribute('aria-label', `Cursor ${i + 1}`);
       tile.appendChild(c);
       tile.onclick = () => {
         this.settings.cursorIndex = i;
@@ -331,14 +440,13 @@ class SettingsManager {
       c.width = 40; c.height = 40;
       const cx = c.getContext('2d');
       cx.imageSmoothingEnabled = false;
-      cx.filter = `sepia(1) saturate(5) hue-rotate(${this.settings.spinnerHue}deg)`;
-      cx.drawImage(indicatorAtlas.image,
-        fd.x, fd.y, fd.w, fd.h,
+      const src = tintCache.get(indicatorAtlas, fd, this.settings.spinnerHue);
+      cx.drawImage(src.canvas, src.x, src.y, fd.w, fd.h,
         (40 - fd.w * scale) / 2, (40 - fd.h * scale) / 2,
         fd.w * scale, fd.h * scale);
-      const tile = document.createElement('div');
-      tile.style.cssText = 'width:40px;height:40px;flex-shrink:0';
-      tile.className = 'sar-tile' + (i === selIdx ? ' sel' : '');
+      const tile = document.createElement('button');
+      tile.className = 'sar-tile sar-tile-sm' + (i === selIdx ? ' sel' : '');
+      tile.setAttribute('aria-label', `Spinner ${i + 1}`);
       tile.appendChild(c);
       tile.onclick = () => {
         this.settings.spinnerShapeIndex = i;
@@ -359,40 +467,46 @@ class SettingsManager {
       left:   'Move Left',
       down:   'Move Down',
       right:  'Move Right',
-      shoot:  'Shoot',
+      shoot:  'Attack',
     };
     for (const [action, label] of Object.entries(labels)) {
       const current = this.settings.keybinds[action] ?? '';
-      const display = current === ' ' ? 'Space' : (current || '—');
       const row = document.createElement('div');
       row.className = 'sar-bind';
       const btn = document.createElement('button');
-      btn.className = 'sar-key';
+      btn.className = 'sar-key' + (this._rebinding === action ? ' listening' : '');
       btn.dataset.action = action;
-      btn.textContent = display;
+      btn.textContent = this._rebinding === action ? 'Press a key…' : keyLabel(current);
       btn.onclick = () => {
-        if (this._rebinding === action) {
-          this._rebinding = null;
-          btn.classList.remove('listening');
-          btn.textContent = display;
-          return;
-        }
-        // Clear any other listening state.
-        container.querySelectorAll('.sar-key').forEach(b => {
-          b.classList.remove('listening');
-          const a = b.dataset.action;
-          const k = this.settings.keybinds[a] ?? '';
-          b.textContent = k === ' ' ? 'Space' : (k || '—');
-        });
-        this._rebinding = action;
-        btn.classList.add('listening');
-        btn.textContent = '…';
+        this._rebinding = this._rebinding === action ? null : action;
+        this._buildKeybinds();
       };
       const lbl = document.createElement('span');
       lbl.textContent = label;
       row.appendChild(lbl);
       row.appendChild(btn);
       container.appendChild(row);
+    }
+    const extra = document.createElement('div');
+    extra.className = 'sar-hint';
+    extra.style.marginTop = '8px';
+    extra.textContent = 'Mouse: aim & attack · Enter: chat · Tab / Shift: scoreboard · M: mute';
+    container.appendChild(extra);
+  }
+}
+
+function toggleFullscreen() {
+  const el = document.getElementById('stage') || document.documentElement;
+  if (document.fullscreenElement || document.webkitFullscreenElement) {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  } else {
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (req) {
+      const p = req.call(el, { navigationUI: 'hide' });
+      // Lock to landscape on phones where supported.
+      if (p && p.then && screen.orientation && screen.orientation.lock) {
+        p.then(() => screen.orientation.lock('landscape').catch(() => {})).catch(() => {});
+      }
     }
   }
 }

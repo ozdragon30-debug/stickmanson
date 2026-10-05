@@ -10,32 +10,51 @@ class ChatManager {
     this.messages  = [];   // [{ name, text, timestamp }]
     this.maxMessages = 10;
     this.isOpen    = false;
-    this.input     = '';   // text the player is currently typing
+
+    // A real (visually hidden) text field backs the chat line, so paste, IME
+    // composition (e.g. Turkish/CJK input), mobile keyboards and caret
+    // movement all work. The canvas still draws the visible chat box.
+    const el = document.createElement('input');
+    el.type = 'text';
+    el.maxLength = 80;
+    el.autocomplete = 'off';
+    el.spellcheck = false;
+    el.setAttribute('aria-label', 'Chat message');
+    el.setAttribute('enterkeyhint', 'send');
+    el.className = 'chat-input';
+    el.addEventListener('keydown', e => {
+      e.stopPropagation();
+      if (e.key === 'Enter' && !e.isComposing) {
+        e.preventDefault();
+        const text = this.close();
+        if (typeof submitChat === 'function') submitChat(text);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.close();
+      }
+    });
+    el.addEventListener('keyup', e => e.stopPropagation());
+    el.addEventListener('blur', () => { if (this.isOpen) this.close(); });
+    document.body.appendChild(el);
+    this._el = el;
   }
+
+  get input() { return this._el.value; }
 
   open() {
     this.isOpen = true;
-    this.input  = '';
+    this._el.value = '';
+    if (typeof onBlurHandler === 'function') onBlurHandler(); // release held movement keys
+    this._el.focus({ preventScroll: true });
   }
 
   // Returns the message text (may be empty), then closes.
   close() {
-    const text = this.input.trim();
+    const text = this._el.value.trim();
     this.isOpen = false;
-    this.input  = '';
+    this._el.value = '';
+    this._el.blur();
     return text;
-  }
-
-  handleKey(event) {
-    if (!this.isOpen) return;
-    event.stopPropagation();
-
-    if (event.key === 'Backspace') {
-      this.input = this.input.slice(0, -1);
-    } else if (event.key.length === 1) {
-      // Limit message length to 80 chars.
-      if (this.input.length < 80) this.input += event.key;
-    }
   }
 
   addMessage(name, text, hue = null) {
@@ -49,7 +68,7 @@ class ChatManager {
     if (!this.messages.length && !this.isOpen) return;
 
     ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    resetScreenTransform(ctx);
 
     const x      = 12;
     const lineH  = 18;
@@ -58,7 +77,7 @@ class ChatManager {
     const bottomPad = 12;
     // Chat input box starts further right to avoid overlapping the gear button in the lower-left corner.
     const inputX = 50;
-    const baseY  = canvas.height - bottomPad - inputH - (this.messages.length * lineH);
+    const baseY  = VIEW_H - bottomPad - inputH - (this.messages.length * lineH);
 
     // Draw message history — fade out older messages when chat is closed.
     this.messages.forEach((msg, i) => {
@@ -94,7 +113,7 @@ class ChatManager {
 
     // Draw input box when open.
     if (this.isOpen) {
-      const inputY = canvas.height - bottomPad - inputH;
+      const inputY = VIEW_H - bottomPad - inputH;
       ctx.fillStyle = 'rgba(0,0,0,0.65)';
       ctx.fillRect(inputX - 4, inputY, 340, inputH);
 
@@ -102,11 +121,22 @@ class ChatManager {
       ctx.lineWidth   = 1;
       ctx.strokeRect(inputX - 4, inputY, 340, inputH);
 
-      // Blinking cursor
-      const cursor = (Math.floor(Date.now() / 500) % 2 === 0) ? '_' : '';
+      // Text (scrolled so the caret stays visible) + blinking caret.
       ctx.font      = `${msgFontSize}px monospace`;
       ctx.fillStyle = 'white';
-      ctx.fillText(this.input + cursor, inputX + 2, inputY + 16);
+      const caretIdx = this._el.selectionStart ?? this.input.length;
+      const boxW = 340 - 10;
+      const caretX = ctx.measureText(this.input.slice(0, caretIdx)).width;
+      const scroll = Math.max(0, caretX - boxW);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(inputX - 2, inputY, boxW + 6, inputH);
+      ctx.clip();
+      ctx.fillText(this.input, inputX + 2 - scroll, inputY + 16);
+      if (Math.floor(Date.now() / 500) % 2 === 0) {
+        ctx.fillRect(inputX + 2 - scroll + caretX, inputY + 5, 1.5, 14);
+      }
+      ctx.restore();
     }
 
     ctx.restore();

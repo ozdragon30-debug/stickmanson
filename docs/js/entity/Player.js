@@ -66,6 +66,7 @@ class Player {
       if (this.isMainPlayer) {
         this.healthbarHeart.setAnimation('heartbeat_healthy');
         this.respawn();
+        if (typeof hudManager !== 'undefined') hudManager.onRespawn();
       }
 
       this.isRespawning = false;
@@ -119,6 +120,7 @@ class Player {
       }
     }
 
+    let anyHit = false;
     const otherPlayers = playerManager.getPlayers();
     for (const playerId in otherPlayers) {
       const otherPlayer = otherPlayers[playerId];
@@ -138,8 +140,40 @@ class Player {
         hit = Physics.isCircleCollidingRect(targetPos, hitboxRegion);
       }
 
-      if (hit) socketManager.emit("playerHit", { playerId, damage: this.currentWeapon.damage ?? 5, weaponId: this.currentWeapon.id ?? 0 });
+      if (hit) {
+        socketManager.emit("playerHit", { playerId, damage: this.currentWeapon.damage ?? 5, weaponId: this.currentWeapon.id ?? 0 });
+        anyHit = true;
+      }
     }
+    if (anyHit && typeof hudManager !== 'undefined') hudManager.onHitConfirmed();
+  }
+
+  // Network position update for a remote player: rotation applies immediately,
+  // position is eased over a few frames to hide network jitter. Large jumps
+  // (respawns, teleports) snap instantly.
+  setNetPosition(x, y, rotation) {
+    if (rotation) this.body.setRotation(rotation);
+    const dx = x - this.body.x, dy = y - this.body.y;
+    if (!this._netTarget || dx * dx + dy * dy > 120 * 120 || this.isRespawning) {
+      this.body.setPosition(x, y);
+      this._netTarget = { x, y };
+    } else {
+      this._netTarget.x = x;
+      this._netTarget.y = y;
+    }
+    this._netTime = performance.now();
+  }
+
+  _smoothNetPosition() {
+    const t = this._netTarget;
+    if (!t) return;
+    const now = performance.now();
+    const dt = Math.min(0.1, (now - (this._smoothAt || now)) / 1000);
+    this._smoothAt = now;
+    const k = 1 - Math.exp(-dt * 40); // ~25 ms time constant
+    const dx = t.x - this.body.x, dy = t.y - this.body.y;
+    if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) { this.body.setPosition(t.x, t.y); return; }
+    this.body.setPosition(this.body.x + dx * k, this.body.y + dy * k);
   }
 
   setPosition(x, y, rotation) {
@@ -164,6 +198,7 @@ class Player {
   }
 
   playWalkingAnim(legRotation = 0) {
+    this._lastWalkAt = performance.now();
     this.legs.isVisible = true;
     this.canMove = false;
     this.legs.setPosition(this.body.x, this.body.y);
@@ -199,27 +234,39 @@ class Player {
 
     this.playWalkingAnim(legRotation);
 
+    // Throttled: the leg animation only needs a refresh every few frames, and
+    // per-frame emits flooded the server on high-refresh (144/240 Hz) monitors.
     if (this.isMainPlayer) {
-      socketManager.emit("playedWalkingAnimation", { rotation: legRotation });
+      const now = performance.now();
+      if (legRotation !== this._lastWalkRot || now - (this._lastWalkEmit || 0) >= 50) {
+        this._lastWalkEmit = now;
+        this._lastWalkRot = legRotation;
+        socketManager.emit("playedWalkingAnimation", { rotation: legRotation });
+      }
     }
   }
 
-  equipWeapon(weaponId) {
+  // World position for positional audio; null for the local player (always centred).
+  _soundPos() {
+    return this.isMainPlayer ? null : { x: this.body.x, y: this.body.y };
+  }
+
+  equipWeapon(weaponId, silent = false) {
     const weapon = Constants.WEAPON_ID_MAP[weaponId] ?? Constants.WEAPON_ID_MAP[2];
     this.currentWeapon = weapon;
     const idleAnim = weapon.name + '_idle';
     this.body._defaultAnim = idleAnim;
     this.body.isShootingAnimation = false;
     this.body.setAnimation(idleAnim);
-    if (weapon.hasPickup) {
-      soundManager.play(weapon.name + '_pickup');
+    if (weapon.hasPickup && !silent) {
+      soundManager.play(weapon.name + '_pickup', this._soundPos());
     }
   }
 
   shoot() {
     const weapon = this.currentWeapon;
     const shootSounds = weapon.shootSounds ?? [weapon.name + '_shoot'];
-    soundManager.playRandom(shootSounds);
+    soundManager.playRandom(shootSounds, this._soundPos());
     this.canShoot = false;
     setTimeout(() => { this.canShoot = true; }, weapon.fireCooldown);
     const shootAnim = weapon.shootAnims[Math.floor(Math.random() * weapon.shootAnims.length)];
@@ -250,10 +297,10 @@ class Player {
     this.canShoot = false;
     this.canMove = false;
 
-    soundManager.playRandom(Constants.DEATH_SOUNDS);
+    soundManager.playRandom(Constants.DEATH_SOUNDS, this._soundPos());
 
     // Reset to fist.
-    this.equipWeapon(0);
+    this.equipWeapon(0, true);
 
     // Pick a random death animation.
     const animName = 'death_' + Math.floor(Math.random() * 8);
@@ -289,19 +336,20 @@ class Player {
     this.deathBody.isVisible = false;
     this.body.isVisible = true;
     this.body.isShootingAnimation = false;
-    this.equipWeapon(0);
+    this.equipWeapon(0, true);
     this.body.setPosition(x, y);
 
     if (this.isMainPlayer) {
       this.healthbarHeart.setAnimation('heartbeat_healthy');
+      if (typeof hudManager !== 'undefined') hudManager.onRespawn();
       socketManager.emit("playerRespawn", { position: { x, y } });
     }
   }
 
-  showHitsplat(damage, attackerWeaponId) {
+  showHitsplat(damage, attackerWeaponId, attackerPos = null) {
     const attackerWeapon = Constants.WEAPON_ID_MAP[attackerWeaponId];
     const impactKey = attackerWeapon?.impactSound ?? 'impact';
-    soundManager.play(impactKey);
+    soundManager.play(impactKey, this._soundPos());
     const anims = this.currentWeapon.bloodAnims;
     const anim = anims[Math.floor(Math.random() * anims.length)];
     this.hitsplat.setAnimation(anim, 1);
@@ -310,6 +358,7 @@ class Player {
     this.health -= (damage ?? this.currentWeapon.damage);
 
     if (this.isMainPlayer) {
+      if (typeof hudManager !== 'undefined') hudManager.onDamaged(attackerPos);
       const targetAnim = this.health >= 75 ? 'heartbeat_healthy'
                        : this.health >  20 ? 'heartbeat_impacted'
                                            : 'heartbeat_critical';
@@ -335,10 +384,30 @@ class Player {
       this.healthbarHeart.update();
     }
 
+    // Legs stop as soon as the player stops (they used to keep running until the
+    // 3-second run cycle finished). Remote players get extra slack for network jitter.
+    if (this.legs.isVisible && this._lastWalkAt) {
+      const idleMs = performance.now() - this._lastWalkAt;
+      if (idleMs > (this.isMainPlayer ? 120 : 260)) {
+        this.legs.isVisible = false;
+        this.canMove = true;
+        this.legs.resetAnimationRepeat(1);
+      }
+    }
+
+    if (!this.isMainPlayer) this._smoothNetPosition();
+
+    // Position updates are capped at ~60 Hz regardless of monitor refresh rate.
+    // The latest position is always sent: an unsent change stays "changed" and
+    // goes out on the next eligible frame.
     const currentPosition = this.getPosition();
-    if (this.isPositionChanged(currentPosition) && this.isMainPlayer) {
-      socketManager.emit("playerMovement", currentPosition);
-      this.previousPosition = currentPosition;
+    if (this.isMainPlayer && this.isPositionChanged(currentPosition)) {
+      const now = performance.now();
+      if (now - (this._lastNetSend || 0) >= 15) {
+        this._lastNetSend = now;
+        socketManager.emit("playerMovement", currentPosition);
+        this.previousPosition = currentPosition;
+      }
     }
   }
 
@@ -368,13 +437,13 @@ class Player {
     const dw = f.w * scale;
     const dh = f.h * scale;
 
+    const tinted = tintCache.get(indicatorAtlas, f, this.indicatorHue);
     ctx.save();
-    ctx.filter = `sepia(1) saturate(5) hue-rotate(${this.indicatorHue}deg)`;
     ctx.translate(this.body.x, this.body.y);
     if (!isAnimated) {
       ctx.rotate((now % 3000) / 3000 * Math.PI * 2);
     }
-    ctx.drawImage(indicatorAtlas.image, f.x, f.y, f.w, f.h, -dw / 2, -dh / 2, dw, dh);
+    ctx.drawImage(tinted.canvas, tinted.x, tinted.y, f.w, f.h, -dw / 2, -dh / 2, dw, dh);
     ctx.restore();
   }
 
