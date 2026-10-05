@@ -16,3 +16,5 @@ jobs:
         run: for f in app.js $(find docs/js -name '*.js') docs/sw.js; do node --check "$f"; done
       - run: npm run lint
       - run: npm test
+      - name: Browser smoke test
+        run: npx playwright install --with-deps chromium && npm run e2e
