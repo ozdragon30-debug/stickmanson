@@ -341,6 +341,8 @@ io.on("connection", (socket) => {
       const parts = text.split(/\s+/);
       const cmd   = parts[0].toLowerCase();
 
+      if (cmd === '!help') return; // the client prints its own help text
+
       if (cmd === '!login') {
         if (ADMIN_PASSWORD && parts[1] === ADMIN_PASSWORD) {
           socket.data.isAdmin = true;

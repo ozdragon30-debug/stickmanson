@@ -53,7 +53,10 @@ function findMapFile(name) {
 // Handles a submitted chat line: local "!" commands first, then sends to server.
 function submitChat(text) {
   if (!text) return;
-  if (text === '!debug') {
+  if (text === '!help') {
+    for (const line of t('chat.help').split('\n')) chatManager.addMessage('?', line, null);
+    if (socketManager.isConnected) socketManager.emit('chatMessage', { text });
+  } else if (text === '!debug') {
     debugTiles = !debugTiles;
   } else if (text === '!fps') {
     settingsManager.set('showFps', !settingsManager.get('showFps'));
