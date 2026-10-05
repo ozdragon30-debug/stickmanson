@@ -380,6 +380,28 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 }
 .sar-gear:hover { background: rgba(20, 40, 60, .92); color: #8ac0e8; }
 
+/* Portrait phones: the 4:3 view is tiny, suggest landscape. */
+.rotate-hint {
+  display: none;
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(10, 20, 32, .85);
+  border: 1px solid var(--line);
+  color: #cfe3f7;
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.rotate-hint span:first-child { display: inline-block; animation: spin 2.4s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (orientation: portrait) and (pointer: coarse) { .rotate-hint { display: block; } }
+@media (prefers-reduced-motion: reduce) { .rotate-hint span:first-child { animation: none; } }
+
 /* ── Touch controls ────────────────────────────────────────────────────── */
 #touch-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; display: none; }
 #touch-layer.active { display: block; pointer-events: auto; touch-action: none; }

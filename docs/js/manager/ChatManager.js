@@ -59,7 +59,10 @@ class ChatManager {
 
   addMessage(name, text, hue = null) {
     // System lines from the (English) server are translated client-side.
-    if ((name === 'Server' || name === '[Admin]') && typeof i18n !== 'undefined') text = i18n.chat(text);
+    if ((name === 'Server' || name === '[Admin]') && typeof i18n !== 'undefined') {
+      text = i18n.chat(text);
+      if (name === 'Server') name = t('chat.server');
+    }
     this.messages.push({ name, text, hue, timestamp: Date.now() });
     if (this.messages.length > this.maxMessages) {
       this.messages.shift();
