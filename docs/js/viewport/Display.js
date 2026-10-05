@@ -13,6 +13,9 @@ class Display {
     this.canvas = canvas;
     this.scale = 1;          // backing-store pixels per logical pixel
     this.quality = 'auto';   // 'auto' | 'high' | 'low'
+    this.dynamicCap = Infinity; // lowered by adaptive resolution on slow devices
+    this._frameTimeSum = 0;     // sum of frame times in the current window (ms)
+    this._frameSamples = 0;
     this.listeners = [];
 
     const onResize = () => this.resize();
@@ -41,7 +44,8 @@ class Display {
     const dpr = window.devicePixelRatio || 1;
     if (this.quality === 'low') return 1;
     if (this.quality === 'high') return Math.min(dpr, 3);
-    return Math.min(dpr, 2); // auto: sharp, but cap the fill-rate cost on 3× phones
+    // auto: sharp, but cap the fill-rate cost on 3× phones (and lower further if slow)
+    return Math.max(1, Math.min(dpr, 2, this.dynamicCap));
   }
 
   resize() {
@@ -73,6 +77,24 @@ class Display {
   }
 
   onResize(fn) { this.listeners.push(fn); }
+
+  // Adaptive resolution ('auto' quality only): if frames keep taking longer
+  // than ~22 ms (< 45 fps) for a few seconds, step the render scale down.
+  // It only ever steps down, so it can't oscillate.
+  reportFrame(ms) {
+    if (this.quality !== 'auto' || document.hidden || ms > 250) return;
+    this._frameSamples++;
+    this._frameTimeSum += ms;                          // accumulated frame time
+    if (this._frameSamples < 180) return;            // ~3 s window
+    const avg = this._frameTimeSum / this._frameSamples;
+    this._frameSamples = this._frameTimeSum = 0;
+    const current = this._pixelRatio();
+    if (avg > 22 && current > 1) {
+      this.dynamicCap = Math.max(1, Math.round((current - 0.5) * 2) / 2);
+      console.info(`[Display] slow frames — render scale ${current}× → ${this.dynamicCap}×`);
+      this.resize();
+    }
+  }
 
   // Convert a pointer event's client coordinates into logical view coordinates.
   toView(clientX, clientY) {

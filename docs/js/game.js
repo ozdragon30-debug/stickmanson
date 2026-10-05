@@ -225,6 +225,7 @@ function drawDebugHitshape(ctx) {
 let lastTime = 0;
 function loop(nowMs) {
   if (!lastTime) lastTime = nowMs;
+  display.reportFrame(nowMs - lastTime);
   const dt = Math.min((nowMs - lastTime) / 1000, 0.1);  // seconds; capped to avoid spiral after tab switch
   lastTime = nowMs;
 
