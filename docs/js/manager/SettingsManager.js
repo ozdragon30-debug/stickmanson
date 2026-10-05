@@ -195,9 +195,10 @@ class SettingsManager {
     }
     if (e.key === 'Escape') {
       if (typeof chatManager !== 'undefined' && chatManager.isOpen) return;
-      if (typeof menu !== 'undefined' && menu.isOpen) return;
+      if (this._isOpen) { e.preventDefault(); e.stopImmediatePropagation(); this.close(); return; }
+      if (typeof menu !== 'undefined' && menu.isOpen) return; // the menu handles Esc itself
       e.preventDefault();
-      this.toggle();
+      this.open();
     }
   }
 
