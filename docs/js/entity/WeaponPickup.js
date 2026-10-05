@@ -23,9 +23,9 @@ class WeaponPickup {
     const f = pickupAtlas.getFrameData(this.sprite.animName, 0);
     if (!f) return;
 
-    const t = performance.now() / 1000 + this.phaseOffset;
-    const bob   = Math.sin(t * 1.5) * 5;  // ±5 px vertical bob
-    const angle = t * (Math.PI * 2 / 6);  // one full rotation every 6 s
+    const time = performance.now() / 1000 + this.phaseOffset;
+    const bob   = Math.sin(time * 1.5) * 5;  // ±5 px vertical bob
+    const angle = time * (Math.PI * 2 / 6);  // one full rotation every 6 s
 
     ctx.save();
     ctx.translate(this.sprite.x, this.sprite.y + bob);

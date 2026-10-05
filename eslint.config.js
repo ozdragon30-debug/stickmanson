@@ -41,7 +41,18 @@ module.exports = [
       sourceType: 'script',
       globals: { ...globals.browser, io: 'readonly', ...clientGlobals() },
     },
-    rules: { ...rules, 'no-unused-vars': 'off' }, // cross-file globals look "unused" per file
+    rules: {
+      ...rules,
+      'no-unused-vars': 'off', // cross-file globals look "unused" per file
+      // t() is the global translate function: a local `t` silently breaks it.
+      'no-restricted-syntax': ['error',
+        { selector: "VariableDeclarator[id.name='t']", message: 'Do not shadow the global t() translation function.' },
+        { selector: ":function > Identifier.params[name='t']", message: 'Do not shadow the global t() translation function.' }],
+    },
+  },
+  {
+    files: ['docs/js/utils/Physics.js', 'docs/js/utils/I18n.js'],
+    rules: { 'no-restricted-syntax': 'off' }, // no t() calls here; Physics' `t` is locked by the golden tests
   },
   {
     files: ['app.js', 'server/**/*.js', 'test/**/*.js', 'eslint.config.js'],

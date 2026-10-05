@@ -167,14 +167,14 @@ class Player {
   }
 
   _smoothNetPosition() {
-    const t = this._netTarget;
-    if (!t) return;
+    const target = this._netTarget;
+    if (!target) return;
     const now = performance.now();
     const dt = Math.min(0.1, (now - (this._smoothAt || now)) / 1000);
     this._smoothAt = now;
     const k = 1 - Math.exp(-dt * 40); // ~25 ms time constant
-    const dx = t.x - this.body.x, dy = t.y - this.body.y;
-    if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) { this.body.setPosition(t.x, t.y); return; }
+    const dx = target.x - this.body.x, dy = target.y - this.body.y;
+    if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) { this.body.setPosition(target.x, target.y); return; }
     this.body.setPosition(this.body.x + dx * k, this.body.y + dy * k);
   }
 
@@ -186,8 +186,8 @@ class Player {
   }
 
   getHitPosition() {
-    const t = this._netTarget;
-    return t ? { x: t.x, y: t.y, rotation: this.body.rotation } : this.getPosition();
+    const target = this._netTarget;
+    return target ? { x: target.x, y: target.y, rotation: this.body.rotation } : this.getPosition();
   }
 
   getPosition() {

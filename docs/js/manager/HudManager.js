@@ -256,8 +256,8 @@ class HudManager {
   }
 
   _drawDeath(ctx, now) {
-    const t = this.deathInfo ? (now - this.deathInfo.t) / 1000 : 1;
-    const a = Math.min(1, t * 3);
+    const since = this.deathInfo ? (now - this.deathInfo.t) / 1000 : 1;
+    const a = Math.min(1, since * 3);
     ctx.save();
     ctx.globalAlpha = a * 0.35;
     ctx.fillStyle = '#300';

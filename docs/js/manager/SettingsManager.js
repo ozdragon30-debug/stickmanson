@@ -436,7 +436,7 @@ class SettingsManager {
       tile.onclick = () => {
         this.settings.cursorIndex = i;
         this._save();
-        grid.querySelectorAll('.sar-tile').forEach((t, j) => t.classList.toggle('sel', j === i));
+        grid.querySelectorAll('.sar-tile').forEach((el, j) => el.classList.toggle('sel', j === i));
       };
       grid.appendChild(tile);
     });
@@ -468,7 +468,7 @@ class SettingsManager {
         this.settings.spinnerShapeIndex = i;
         this._save();
         this._syncIdentity();
-        grid.querySelectorAll('.sar-tile').forEach((t, j) => t.classList.toggle('sel', j === i));
+        grid.querySelectorAll('.sar-tile').forEach((el, j) => el.classList.toggle('sel', j === i));
       };
       grid.appendChild(tile);
     });
