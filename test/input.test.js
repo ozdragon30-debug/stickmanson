@@ -14,7 +14,7 @@ vm.runInContext(fs.readFileSync(path.join(ROOT, 'js/input/InputMode.js'), 'utf8'
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js/input/Keyboard.js'), 'utf8') + '\nglobalThis.keyLabel = keyLabel; globalThis.CODE_RE = CODE_RE;', ctx);
 // migrateBind lives in SettingsManager.js next to DOM code; evaluate just that function.
 const sm = fs.readFileSync(path.join(ROOT, 'js/manager/SettingsManager.js'), 'utf8');
-vm.runInContext(sm.match(/function migrateBind[\s\S]*?\n}\n/)[0] + '\nglobalThis.migrateBind = migrateBind;', ctx);
+vm.runInContext(sm.match(/const DEFAULT_SETTINGS = \{[\s\S]*?\n\};\n/)[0] + sm.match(/const LEGACY_DEFAULTS[\s\S]*?function migrateBind[\s\S]*?\n}\n/)[0] + '\nglobalThis.migrateBind = migrateBind;', ctx);
 
 const dirs = k => ['up', 'down', 'left', 'right'].filter(d => k[d]).join('+') || 'none';
 
@@ -40,14 +40,18 @@ test('every analog angle maps to a valid keyboard combo (never opposite keys)', 
   }
 });
 
-test('legacy key binds migrate to layout-independent codes', () => {
-  assert.strictEqual(ctx.migrateBind('w'), 'KeyW');
-  assert.strictEqual(ctx.migrateBind('D'), 'KeyD');
-  assert.strictEqual(ctx.migrateBind(' '), 'Space');
-  assert.strictEqual(ctx.migrateBind('Shift'), 'ShiftLeft');
-  assert.strictEqual(ctx.migrateBind('3'), 'Digit3');
-  assert.strictEqual(ctx.migrateBind('KeyQ'), 'KeyQ');
-  assert.strictEqual(ctx.migrateBind('ı'), 'ı'); // non-ASCII kept as a legacy key bind
+test('old default binds migrate to layout-independent codes', () => {
+  assert.strictEqual(ctx.migrateBind('up', 'w'), 'KeyW');
+  assert.strictEqual(ctx.migrateBind('right', 'd'), 'KeyD');
+  assert.strictEqual(ctx.migrateBind('shoot', ' '), 'Space');
+  assert.strictEqual(ctx.migrateBind('sprint', 'Shift'), 'ShiftLeft');
+  assert.strictEqual(ctx.migrateBind('up', 'KeyQ'), 'KeyQ');
+});
+
+test('custom legacy binds are kept as key values (AZERTY "z" stays the Z key)', () => {
+  assert.strictEqual(ctx.migrateBind('up', 'z'), 'z');
+  assert.strictEqual(ctx.migrateBind('left', 'q'), 'q');
+  assert.strictEqual(ctx.migrateBind('up', 'ı'), 'ı');
 });
 
 test('key labels are human readable', () => {

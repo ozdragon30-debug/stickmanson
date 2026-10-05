@@ -73,6 +73,10 @@ function submitChat(text) {
 function keyDownHandler(event) {
   // While chat is open the focused <input> owns the keyboard.
   if (chatManager.isOpen) return;
+  // Menus and focused form controls (Play button, name field…) keep their keys.
+  if (typeof menu !== 'undefined' && menu.isOpen) return;
+  const tag = event.target && event.target.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
 
   // Settings panel handles Escape via capture phase; suppress game input while open.
   if (settingsManager.isOpen()) return;

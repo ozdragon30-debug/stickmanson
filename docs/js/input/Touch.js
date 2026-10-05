@@ -47,8 +47,14 @@ class TouchInput {
       e.stopPropagation(); e.preventDefault();
       sb.classList.add('pressed');
       scoreboardManager.tabHeld = true;
-      const up = () => { sb.classList.remove('pressed'); scoreboardManager.tabHeld = false; window.removeEventListener('pointerup', up); };
+      const up = () => {
+        sb.classList.remove('pressed');
+        scoreboardManager.tabHeld = false;
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+      };
       window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
     });
   }
 
@@ -64,7 +70,8 @@ class TouchInput {
   }
 
   _down(e) {
-    if (e.pointerType === 'mouse') return;
+    // "Always on" touch controls must not swallow mouse clicks.
+    if (e.pointerType === 'mouse') { if (typeof onMouseDown === 'function') onMouseDown(e); return; }
     e.preventDefault();
     inputMode.set('touch');
     if (typeof isUiBlocking === 'function' && isUiBlocking()) return;

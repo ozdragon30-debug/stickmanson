@@ -46,6 +46,8 @@ class TintCache {
     const key = `${atlas.spritesheetName}|${f.x},${f.y},${f.w},${f.h}|${hue}`;
     let hit = this.cache.get(key);
     if (hit) return hit;
+    // Don't bake (and cache forever) a blank frame while the atlas is still loading.
+    if (!atlas.image.complete || !atlas.image.naturalWidth) return null;
 
     const c = document.createElement('canvas');
     c.width = Math.max(1, f.w);

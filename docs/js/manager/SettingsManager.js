@@ -35,13 +35,13 @@ const DEFAULT_SETTINGS = {
 };
 
 // Convert a legacy KeyboardEvent.key bind (pre-2026 saves) to a layout-independent code.
-function migrateBind(v) {
+// Only the old *defaults* are migrated: a custom bind like "z" on AZERTY must
+// keep matching the key labelled Z, which keyMatches() does for legacy values.
+const LEGACY_DEFAULTS = { up: 'w', left: 'a', down: 's', right: 'd', shoot: ' ', sprint: 'Shift' };
+function migrateBind(action, v) {
   if (typeof v !== 'string' || !v) return v;
-  if (/^[a-z]$/i.test(v)) return 'Key' + v.toUpperCase();
-  if (/^\d$/.test(v)) return 'Digit' + v;
-  if (v === ' ') return 'Space';
-  if (v === 'Shift' || v === 'Control' || v === 'Alt') return v + 'Left';
-  return v; // already a code, or a non-ASCII key we keep matching by value
+  if (LEGACY_DEFAULTS[action] !== undefined && v === LEGACY_DEFAULTS[action]) return DEFAULT_SETTINGS.keybinds[action];
+  return v;
 }
 
 class SettingsManager {
@@ -109,7 +109,7 @@ class SettingsManager {
   _merge(saved) {
     const s = { ...DEFAULT_SETTINGS, ...saved };
     s.keybinds = { ...DEFAULT_SETTINGS.keybinds };
-    for (const [a, v] of Object.entries(saved.keybinds || {})) s.keybinds[a] = migrateBind(v);
+    for (const [a, v] of Object.entries(saved.keybinds || {})) s.keybinds[a] = migrateBind(a, v);
     return s;
   }
   _save() {
@@ -441,7 +441,7 @@ class SettingsManager {
       const cx = c.getContext('2d');
       cx.imageSmoothingEnabled = false;
       const src = tintCache.get(indicatorAtlas, fd, this.settings.spinnerHue);
-      cx.drawImage(src.canvas, src.x, src.y, fd.w, fd.h,
+      if (src) cx.drawImage(src.canvas, src.x, src.y, fd.w, fd.h,
         (40 - fd.w * scale) / 2, (40 - fd.h * scale) / 2,
         fd.w * scale, fd.h * scale);
       const tile = document.createElement('button');
@@ -496,7 +496,8 @@ class SettingsManager {
 }
 
 function toggleFullscreen() {
-  const el = document.getElementById('stage') || document.documentElement;
+  // Fullscreen the whole document so overlays (settings, menu) stay visible.
+  const el = document.documentElement;
   if (document.fullscreenElement || document.webkitFullscreenElement) {
     (document.exitFullscreen || document.webkitExitFullscreen).call(document);
   } else {

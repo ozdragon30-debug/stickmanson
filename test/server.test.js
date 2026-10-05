@@ -69,7 +69,10 @@ test('hits use canonical weapon damage and reject self/bogus hits', async () => 
   assert.strictEqual(hit.damage, app.weaponsData[2].damage);
   assert.strictEqual(hit.attackerId, a.id);
 
-  // Faster than the weapon can fire → dropped.
+  // One jitter-bunched extra hit is tolerated, a third rapid one is dropped.
+  got = next(b, 'playerGotHit', 300);
+  a.emit('playerHit', { playerId: b.id, damage: 13, weaponId: 2 });
+  assert.ok(await got);
   got = next(b, 'playerGotHit', 150);
   a.emit('playerHit', { playerId: b.id, damage: 13, weaponId: 2 });
   assert.strictEqual(await got, null);
@@ -150,6 +153,14 @@ test('spoofed X-Forwarded-For does not grant admin', async () => {
   const kicked = next(b, 'kicked', 400);
   a.emit('chatMessage', { text: '!kick ' + app.players[b.id].name });
   assert.strictEqual(await kicked, null);
+});
+
+test('map pickups with weapon ids missing from the table are still synced', async () => {
+  const a = await connect();
+  const state = next(a, 'pickupState', 500);
+  a.emit('mapLoaded', { weaponSpawns: [{ weaponId: 4, respawnTime: 10000 }, { weaponId: 13, respawnTime: 20000 }] });
+  const st = await state;
+  assert.strictEqual(st.length, 2);
 });
 
 test('admin weapon command no longer crashes the server', async () => {

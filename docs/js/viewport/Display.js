@@ -46,8 +46,12 @@ class Display {
 
   resize() {
     const host = this.canvas.parentElement || document.body;
-    const availW = host.clientWidth  || window.innerWidth;
-    const availH = host.clientHeight || window.innerHeight;
+    // clientWidth/Height include padding (safe-area insets on notched phones).
+    const cs = getComputedStyle(host);
+    const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+    const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const availW = (host.clientWidth  || window.innerWidth)  - padX;
+    const availH = (host.clientHeight || window.innerHeight) - padY;
     // Fit 4:3 inside the available area.
     let cssW = Math.min(availW, availH * VIEW_W / VIEW_H);
     let cssH = cssW * VIEW_H / VIEW_W;

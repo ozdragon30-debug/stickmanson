@@ -40,7 +40,8 @@ class SoundManager {
 
   _ensureContext() {
     if (this.ctx) {
-      if (this.ctx.state === 'suspended' && !document.hidden) this.ctx.resume().catch(() => {});
+      // iOS also reports 'interrupted' (calls, Siri, other audio apps).
+      if (this.ctx.state !== 'running' && !document.hidden) this.ctx.resume().catch(() => {});
       return this.ctx;
     }
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -70,11 +71,21 @@ class SoundManager {
     if (cached !== undefined) return cached instanceof Promise ? cached : Promise.resolve(cached);
     const p = fetch(`sounds/${name}.mp3`)
       .then(r => (r.ok ? r.arrayBuffer() : null))
-      .then(buf => (buf && this.ctx ? this.ctx.decodeAudioData(buf) : null))
+      .then(buf => (buf && this.ctx ? this._decode(buf) : null))
       .catch(() => null)
       .then(decoded => (this.buffers[name] = decoded));
     this.buffers[name] = p;
     return p;
+  }
+
+  // Callback form of decodeAudioData: older Safari has no promise version.
+  _decode(buf) {
+    return new Promise((resolve) => {
+      try {
+        const p = this.ctx.decodeAudioData(buf, resolve, () => resolve(null));
+        if (p && p.catch) p.catch(() => resolve(null));
+      } catch (e) { resolve(null); }
+    });
   }
 
   preload(names) {
@@ -111,6 +122,8 @@ class SoundManager {
   }
 
   _start(name, buffer, pos) {
+    // A suspended context (hidden tab) would queue sounds and blast them on return.
+    if (this.ctx.state !== 'running') return;
     if ((this.voices[name] || 0) >= SoundManager.MAX_VOICES_PER_SOUND) return;
     const ctx = this.ctx;
     const src = ctx.createBufferSource();

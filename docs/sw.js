@@ -1,29 +1,43 @@
-// Service worker: makes the game installable and playable offline (vs bots).
-//  • Navigations: network-first (always get the latest page), cache fallback.
-//  • Code (js/css/json/html): network-first, so a deploy never mixes old and new scripts.
-//  • Heavy assets (sprites, sounds, maps): stale-while-revalidate for instant loads.
-//  • socket.io traffic is never cached.
-const VERSION = 'sar-v2';
-const CORE = [
-  './',
-  'index.html',
-  'css/style.css',
-  'manifest.webmanifest',
-  'icons/icon.svg',
-  'data/weapons.json',
-];
+// Service worker: makes the game installable and fully playable offline (vs bots).
+//
+//  • Code (html/js/css/json outside sprites/): network-first, bypassing the HTTP
+//    cache, so a deploy never mixes old and new scripts; cached copy offline.
+//  • Assets (sprites, sounds, maps): stale-while-revalidate for instant loads;
+//    an atlas image and its JSON are treated the same way so they stay paired.
+//  • On install, everything in precache.json is fetched in the background so
+//    offline play works from the second visit on.
+//  • socket.io traffic is never touched.
+const CACHE = 'sar-cache-v1';
+const SHELL = ['./', 'index.html', 'css/style.css', 'manifest.webmanifest', 'precache.json'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    await cache.addAll(SHELL);
+    self.skipWaiting();
+    // Best-effort full precache; doesn't block activation.
+    precacheAll(cache);
+  })());
 });
 
+async function precacheAll(cache) {
+  try {
+    const list = await (await fetch('precache.json', { cache: 'no-cache' })).json();
+    for (const f of list.files) {
+      if (await cache.match(f)) continue;
+      try { await cache.add(f); } catch (e) { /* skip missing/failed file */ }
+    }
+  } catch (e) { /* offline during install */ }
+}
+
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    for (const k of await caches.keys()) if (k !== CACHE) await caches.delete(k);
+    await self.clients.claim();
+  })());
 });
+
+const isCode = (url) => !url.pathname.includes('/sprites/') && /\.(html|js|css|json|webmanifest)$/.test(url.pathname);
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
@@ -32,31 +46,27 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== location.origin) return;
   if (url.pathname.includes('/socket.io/') || url.pathname.endsWith('/healthz')) return;
 
-  if (req.mode === 'navigate') {
+  if (req.mode === 'navigate' || isCode(url)) {
+    const key = req.mode === 'navigate' ? 'index.html' : req;
     event.respondWith(
-      fetch(req)
-        .then(res => { const copy = res.clone(); caches.open(VERSION).then(c => c.put('index.html', copy)); return res; })
-        .catch(() => caches.match('index.html'))
-    );
-    return;
-  }
-
-  if (/\.(js|css|json|webmanifest)$/.test(url.pathname)) {
-    event.respondWith(
-      fetch(req)
-        .then(res => { if (res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); } return res; })
-        .catch(() => caches.match(req).then(r => r || Response.error()))
+      fetch(req, { cache: 'no-cache' })
+        .then(res => {
+          if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(key, copy)); }
+          return res;
+        })
+        .catch(() => caches.match(key, { ignoreSearch: true }).then(r => r || Response.error()))
     );
     return;
   }
 
   event.respondWith(
-    caches.open(VERSION).then(cache =>
-      cache.match(req).then(cached => {
+    caches.open(CACHE).then(cache =>
+      cache.match(req, { ignoreSearch: true }).then(cached => {
         const network = fetch(req)
           .then(res => { if (res.ok) cache.put(req, res.clone()); return res; })
           .catch(() => cached || Response.error());
-        return cached || network;
+        if (cached) { event.waitUntil(network.catch(() => {})); return cached; }
+        return network;
       })
     )
   );

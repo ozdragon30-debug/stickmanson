@@ -51,9 +51,9 @@ app.get("/healthz", (req, res) => {
 
 app.use(express.static(path.join(__dirname, "docs"), {
   setHeaders(res, filePath) {
-    // HTML, the service worker and its manifest must always revalidate so
-    // updates roll out immediately; game assets can be cached briefly.
-    if (/\.(html|webmanifest)$/.test(filePath) || filePath.endsWith('sw.js')) {
+    // Code must always revalidate so a deploy never mixes old and new scripts;
+    // heavy assets (sprites, sounds, maps) can be cached briefly.
+    if (/\.(html|webmanifest|js|css)$/.test(filePath) || (filePath.endsWith('.json') && !filePath.includes('sprites'))) {
       res.setHeader('Cache-Control', 'no-cache');
     } else {
       res.setHeader('Cache-Control', 'public, max-age=3600');
@@ -164,20 +164,25 @@ const validWeaponId = id => Number.isInteger(id) && id >= 0 && id <= MAX_WEAPON_
 const cleanText = (s, max) => String(s ?? '').replace(/[\u0000-\u001f\u007f​-‏‪-‮⁦-⁩]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
 const RESERVED_NAMES = /^\s*(\[?admin\]?|server)\s*$/i;
 
+// Behind a trusted proxy the real client is the entry the proxy appended, i.e.
+// the right-most one; everything left of it is client-controlled.
 function clientIp(socket) {
   const xff = socket.handshake.headers['x-forwarded-for'];
-  const raw = (TRUST_PROXY && xff) ? String(xff).split(',')[0] : (socket.handshake.address || '');
-  return raw.trim().replace(/^::ffff:/, '');
+  if (TRUST_PROXY && xff) {
+    const hops = String(xff).split(',').map(h => h.trim()).filter(Boolean);
+    if (hops.length) return hops[hops.length - 1].replace(/^::ffff:/, '');
+  }
+  return (socket.handshake.address || '').trim().replace(/^::ffff:/, '');
 }
 
 // Admin = direct LAN/localhost connection (not via a proxy), or logged in with ADMIN_PASSWORD.
 function isAdmin(socket) {
   if (socket.data.isAdmin) return true;
-  // A forwarded request came through a proxy: its socket address says nothing
-  // about the real client, so it never gets LAN trust unless TRUST_PROXY is set.
-  if (socket.handshake.headers['x-forwarded-for'] && !TRUST_PROXY) return false;
+  // Behind a proxy (TRUST_PROXY, or any forwarded request) LAN trust is
+  // meaningless: admins must use ADMIN_PASSWORD.
+  if (TRUST_PROXY || socket.handshake.headers['x-forwarded-for']) return false;
   const ip = clientIp(socket);
-  return !ip || ip === '::1' || ip === '127.0.0.1' || ip === 'localhost'
+  return ip === '::1' || ip === '127.0.0.1' || ip === 'localhost'
     || /^10\./.test(ip)
     || /^172\.(1[6-9]|2\d|3[01])\./.test(ip)
     || /^192\.168\./.test(ip);
@@ -273,10 +278,15 @@ io.on("connection", (socket) => {
     if (!validWeaponId(weaponId)) return;
     const weapon = weaponsData[weaponId];
 
-    const lastHits = socket.data.lastHits || (socket.data.lastHits = {});
+    // Token bucket per victim: refills one hit per weapon cooldown, holds two,
+    // so genuine hits bunched up by network jitter still all count.
+    const buckets = socket.data.hitBuckets || (socket.data.hitBuckets = {});
     const now = Date.now();
-    if (now - (lastHits[victimId] || 0) < weapon.fireCooldown * 0.35) return;
-    lastHits[victimId] = now;
+    const bk = buckets[victimId] || (buckets[victimId] = { tokens: 2, t: now });
+    bk.tokens = Math.min(2, bk.tokens + (now - bk.t) / weapon.fireCooldown);
+    bk.t = now;
+    if (bk.tokens < 1) return;
+    bk.tokens -= 1;
 
     io.emit("playerGotHit", { playerId: victimId, damage: weapon.damage, weaponId, attackerId: socket.id });
   });
@@ -323,7 +333,9 @@ io.on("connection", (socket) => {
   socket.on("mapLoaded", (data) => {
     if (game.pickups.length === 0 && data && Array.isArray(data.weaponSpawns)
         && data.weaponSpawns.length && data.weaponSpawns.length <= 128) {
-      const spawns = data.weaponSpawns.filter(ws => ws && validWeaponId(ws.weaponId) && isNum(ws.respawnTime));
+      // Maps may reference weapon ids the weapon table doesn't define (e.g. 13);
+      // the client simply doesn't render those, so accept any small id here.
+      const spawns = data.weaponSpawns.filter(ws => ws && Number.isInteger(ws.weaponId) && ws.weaponId >= 0 && ws.weaponId < 256 && isNum(ws.respawnTime));
       if (spawns.length === data.weaponSpawns.length) {
         game.pickups = spawns.map(ws => ({
           weaponId:    ws.weaponId,

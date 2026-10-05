@@ -17,6 +17,7 @@ function aimAtViewPoint(vx, vy) {
 // browsers synthesise after a touch don't flip the game into mouse mode.
 function mouseMoveHandler(event) {
   if (event.pointerType && event.pointerType !== 'mouse') return;
+  syncMouseButtons(event);
   const p = display.toView(event.clientX, event.clientY);
   mouseScreenX = p.x;
   mouseScreenY = p.y;
@@ -43,12 +44,18 @@ function onMouseDown(event) {
   mouseLMBDown = true;
 }
 
+// Pointer events only report the first press / last release of a button chord,
+// so the left-button state is re-derived from the buttons bitmask.
+function syncMouseButtons(event) {
+  if (event.pointerType && event.pointerType !== 'mouse') return;
+  if (mouseLMBDown && !(event.buttons & 1)) mouseLMBDown = false;
+}
+
 // Listened for on window: releasing the button outside the canvas used to leave
 // the weapon firing forever.
 function onMouseUp(event) {
   if (event.pointerType && event.pointerType !== 'mouse') return;
-  if (event.button !== Constants.LEFT_MOUSE_BUTTON) return;
-  mouseLMBDown = false;
+  if (event.button === Constants.LEFT_MOUSE_BUTTON || !(event.buttons & 1)) mouseLMBDown = false;
 }
 
 function mouseEvents() {

@@ -326,7 +326,7 @@ class HudManager {
   }
 
   _drawConnection(ctx) {
-    if (!socketManager.wasConnected || socketManager.isConnected) return;
+    if (!socketManager.wasConnected || socketManager.isConnected || socketManager.kicked) return;
     const msg = 'Connection lost — reconnecting…';
     ctx.font = 'bold 13px system-ui, sans-serif';
     ctx.textAlign = 'center';

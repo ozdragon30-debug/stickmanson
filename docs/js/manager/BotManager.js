@@ -336,7 +336,8 @@ class BotManager {
     } else if (this._roundPhase === 'roundEnd' && now >= this._nextRoundAt) {
       this._roundPhase = 'loading';
       const file = BotManager.randomMap(this._currentMap);
-      loadMap(file).then(() => {
+      loadMap(file).then((ok) => {
+        if (!ok) { this._roundPhase = 'roundEnd'; this._nextRoundAt = Date.now() + 1000; return; }
         this._currentMap = file;
         scoreboardManager.hideRoundEnd();
         // Fresh bots sized for the new map; scores reset like a server round.
@@ -425,14 +426,17 @@ class BotManager {
 
   // ── Private ───────────────────────────────────────────────────────────────────
 
-  _startOffline() {
+  _startOffline(attempt = 0) {
     const file = BotManager.randomMap();
     this._currentMap = file;
     // Determine initial status: if socket.io isn't even available we're fully offline;
     // if it is but hasn't connected yet we're still waiting to see.
     this.status = (typeof io === 'undefined' || !socketManager.socket) ? 'no-server' : 'waiting';
-    loadMap(file)
-      .then(() => {
+    // Weapon data must be ready before pickups are built from the map.
+    Constants._weaponsReady.then(() => loadMap(file))
+      .then((ok) => {
+        // Offline with a partially cached game: try a few other maps.
+        if (!ok) { if (attempt < 8) this._startOffline(attempt + 1); return; }
         const pts = (map.ready && map.spawnPoints.length) ? map.spawnPoints : [{ x: 400, y: 300 }];
         const botCount = BotManager.getBotCount(map);
         this.spawn(pts, botCount);

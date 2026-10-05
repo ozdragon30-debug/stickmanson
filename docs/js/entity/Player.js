@@ -126,9 +126,11 @@ class Player {
       const otherPlayer = otherPlayers[playerId];
       if (otherPlayer.isMainPlayer) continue;
       if (otherPlayer.isRespawning) continue;
-      if (Physics.checkForObstacles(playerPos, otherPlayer.getPosition())) continue;
+      // Hit tests use the latest networked position (as the original did), not
+      // the eased on-screen position used for drawing remote players.
+      const targetPos = otherPlayer.getHitPosition();
+      if (Physics.checkForObstacles(playerPos, targetPos)) continue;
 
-      const targetPos = otherPlayer.getPosition();
       let hit = false;
       if (hitShape.type === 'ray') {
         hit = Physics.isRayHit(origin, targetPos, rotation, hitShape.maxRange);
@@ -181,6 +183,11 @@ class Player {
     if (rotation) {
       this.body.setRotation(rotation);
     }
+  }
+
+  getHitPosition() {
+    const t = this._netTarget;
+    return t ? { x: t.x, y: t.y, rotation: this.body.rotation } : this.getPosition();
   }
 
   getPosition() {
@@ -438,6 +445,7 @@ class Player {
     const dh = f.h * scale;
 
     const tinted = tintCache.get(indicatorAtlas, f, this.indicatorHue);
+    if (!tinted) return;
     ctx.save();
     ctx.translate(this.body.x, this.body.y);
     if (!isAnimated) {

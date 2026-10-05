@@ -26,13 +26,25 @@ function drawMap(nowMs) {
   // between neighbouring tiles. Overdraw each tile by ~1 device pixel to hide them.
   const seam = 1 / (display.scale * scaleFactor);
 
+  // Tile codes are parsed once per map instead of for every tile, every frame.
+  if (map._parsedFor !== map.tiles) {
+    map._parsed = map.tiles.map(raw => {
+      const code = (raw || '000000').toUpperCase();
+      return {
+        code,
+        tileType: code.slice(0, 3),
+        rot:  parseInt(code[3] || '0', 10) % 4,  // 0-3 → 0/90/180/270°
+        flip: parseInt(code[4] || '0', 10) % 4,  // 0=none,1=H,2=V,3=H+V
+        cVal: parseInt(code[5] || '0', 10),
+      };
+    });
+    map._parsedFor = map.tiles;
+  }
+  const EMPTY = { code: '000000', tileType: '000', rot: 0, flip: 0, cVal: 0 };
+
   for (let y = startY; y < endY; y++) {
     for (let x = startX; x < endX; x++) {
-      const code = (map.tiles[y * mapWidth + x] || '000000').toUpperCase();
-      const tileType = code.slice(0, 3);
-      const rot  = parseInt(code[3] || '0', 10) % 4;  // 0-3 → 0/90/180/270°
-      const flip = parseInt(code[4] || '0', 10) % 4;  // 0=none,1=H,2=V,3=H+V
-      const cVal = parseInt(code[5] || '0', 10);
+      const { code, tileType, rot, flip, cVal } = map._parsed[y * mapWidth + x] || EMPTY;
 
       const f = mapAtlas.getAnimatedMapTileFrame(tileType, nowMs);
       if (!f) continue;
@@ -286,6 +298,8 @@ let loopStarted = false;
 // Kick off the offline-mode timer.  Must be after all managers are defined.
 botManager.init();
 
+// Resolves true once the map is live, false if it failed to load (callers may
+// retry with another map; e.g. offline with only some maps cached).
 function loadMap(filename) {
   return map.load('data/maps/' + filename).then(() => {
     obstacleGrid = map.collisionMap;
@@ -302,5 +316,6 @@ function loadMap(filename) {
       requestAnimationFrame(loop);
       menu.setReady();
     }
-  }).catch(err => console.error('Failed to load map:', err));
+    return true;
+  }).catch(err => { console.error('Failed to load map:', err); return false; });
 }

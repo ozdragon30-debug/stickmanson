@@ -14,3 +14,9 @@ test('walk collision unchanged', () => assert.strictEqual(actual.walkCollision, 
 for (const file of Object.keys(golden.maps)) {
   test(`map ${file} parses identically`, () => assert.strictEqual(actual.maps[file], golden.maps[file]));
 }
+
+test('service worker precache list matches the files on disk (run: npm run precache)', () => {
+  const { build } = require('../tools/gen-precache');
+  const onDisk = require('../docs/precache.json');
+  assert.deepStrictEqual(onDisk.files, build().files);
+});

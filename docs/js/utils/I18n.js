@@ -1,0 +1,172 @@
+// I18n – tiny translation layer (English + Turkish).
+// Language is chosen from settings ('auto' follows the browser language).
+// DOM text is translated through data-i18n / data-i18n-title attributes; canvas
+// text calls t('key', { vars }) at draw time.
+
+const I18N = {
+  en: {
+    'menu.name': 'Your name',
+    'menu.play': 'Play',
+    'menu.loading': 'Loading… {p}%',
+    'menu.settings': '⚙ Settings',
+    'menu.fullscreen': '⛶ Fullscreen',
+    'menu.install': '⬇ Install',
+    'menu.controls': 'Controls',
+    'menu.about': 'About',
+    'menu.status.online0': 'Server online · no other players yet — bots will keep you company',
+    'menu.status.online1': 'Server online · 1 other player online',
+    'menu.status.onlineN': 'Server online · {n} other players online',
+    'menu.status.connecting': 'Connecting to server…',
+    'menu.status.offline': 'Offline mode — play against bots',
+    'menu.help.1': '<b>WASD / Arrows</b> move · <b>Mouse</b> aim · <b>Click / Space</b> attack',
+    'menu.help.2': '<b>Enter</b> chat · <b>Tab / Shift</b> scoreboard · <b>Esc</b> settings · <b>M</b> mute',
+    'menu.help.3': '<b>Gamepad</b>: left stick move, right stick aim, RT attack',
+    'menu.help.4': '<b>Touch</b>: left thumb move, right thumb aim &amp; attack',
+    'menu.help.5': 'Walk over weapons to pick them up. Most kills when the timer ends wins.',
+    'menu.about.text': '<strong>Stick Arena</strong> was a browser-based multiplayer shooter created by XGenStudios. After Flash was discontinued, the official servers went offline. This is an open-source <strong>HTML5 reimplementation</strong> with all original maps, weapons and sprites. Play offline against bots right here, or host your own server for multiplayer.',
+    'menu.legal': 'Game assets © XGenStudios — non-commercial use only (CC BY-NC-SA 4.0).',
+
+    'set.title': 'Settings',
+    'set.tab.profile': 'Profile', 'set.tab.controls': 'Controls', 'set.tab.audio': 'Audio', 'set.tab.video': 'Video', 'set.tab.hud': 'HUD',
+    'set.name': 'Player Name', 'set.cursor': 'Cursor', 'set.spinner': 'Spinner Shape', 'set.color': 'Spinner Color',
+    'set.language': 'Language', 'set.lang.auto': 'Auto (browser)',
+    'set.keybinds': 'Keybinds', 'set.arrows': '(arrow keys always move too)',
+    'set.touch': 'Touch Controls', 'set.touch.auto': 'Auto (touch screens)', 'set.touch.on': 'Always on', 'set.touch.off': 'Off',
+    'set.gamepad': 'Gamepad',
+    'set.gamepad.help': 'Left stick / D-pad: move · Right stick: aim · RT / A: attack · Back/View: scoreboard · Start: settings',
+    'set.gamepad.none': 'No gamepad detected — press any button on it.',
+    'set.gamepad.on': 'Connected: {name}',
+    'set.volume': 'Volume', 'set.mute': 'Mute all sounds', 'set.spatial': 'Positional audio',
+    'set.spatial.hint': '— pan & soften other players\' sounds by distance',
+    'set.res': 'Render Resolution', 'set.res.auto': 'Auto (sharp, up to 2×)', 'set.res.high': 'High (native, up to 3×)', 'set.res.low': 'Low (1× – fastest)',
+    'set.pixel': 'Pixel-art scaling', 'set.pixel.hint': '— crisp nearest-neighbour sprites',
+    'set.fps': 'Show FPS', 'set.ping': 'Show ping', 'set.fullscreen': 'Toggle Fullscreen',
+    'set.killfeed': 'Kill feed', 'set.hitmarkers': 'Hit markers', 'set.damageflash': 'Damage flash',
+    'set.reset': 'Reset to defaults', 'set.done': 'Done', 'set.press': 'Press a key…',
+    'set.bind.up': 'Move Up', 'set.bind.left': 'Move Left', 'set.bind.down': 'Move Down', 'set.bind.right': 'Move Right', 'set.bind.shoot': 'Attack',
+    'set.keys.extra': 'Mouse: aim & attack · Enter: chat · Tab / Shift: scoreboard · M: mute',
+
+    'hud.died': 'YOU DIED', 'hud.killedBy': 'Killed by {name} — respawning…', 'hud.respawning': 'Respawning…',
+    'hud.eliminated': 'ELIMINATED {name}', 'hud.you': 'You',
+    'hud.streak.2': 'DOUBLE KILL', 'hud.streak.3': 'TRIPLE KILL', 'hud.streak.4': 'MULTI KILL', 'hud.streak.5': 'RAMPAGE',
+    'hud.reconnecting': 'Connection lost — reconnecting…',
+    'hud.soundOn': 'SOUND ON', 'hud.soundOff': 'SOUND OFF', 'hud.disconnected': 'DISCONNECTED',
+    'hud.move': 'MOVE', 'hud.aim': 'AIM + FIRE',
+    'hud.botsOffline': 'Offline — playing against bots', 'hud.botsWaiting': 'Waiting for players — playing against bots',
+
+    'sb.title': 'SCOREBOARD', 'sb.over': 'ROUND OVER', 'sb.player': 'PLAYER', 'sb.kills': 'KILLS', 'sb.deaths': 'DEATHS', 'sb.kd': 'K/D',
+    'sb.youWin': 'You win!', 'sb.wins': '{name} wins!', 'sb.left': '{t} left', 'sb.you': '(you)', 'sb.more': '+{n} more',
+  },
+  tr: {
+    'menu.name': 'Adın',
+    'menu.play': 'Oyna',
+    'menu.loading': 'Yükleniyor… %{p}',
+    'menu.settings': '⚙ Ayarlar',
+    'menu.fullscreen': '⛶ Tam ekran',
+    'menu.install': '⬇ Yükle',
+    'menu.controls': 'Kontroller',
+    'menu.about': 'Hakkında',
+    'menu.status.online0': 'Sunucu çevrimiçi · henüz başka oyuncu yok — botlar sana eşlik edecek',
+    'menu.status.online1': 'Sunucu çevrimiçi · 1 oyuncu daha var',
+    'menu.status.onlineN': 'Sunucu çevrimiçi · {n} oyuncu daha var',
+    'menu.status.connecting': 'Sunucuya bağlanılıyor…',
+    'menu.status.offline': 'Çevrimdışı mod — botlara karşı oyna',
+    'menu.help.1': '<b>WASD / Ok tuşları</b> hareket · <b>Fare</b> nişan · <b>Tık / Boşluk</b> saldırı',
+    'menu.help.2': '<b>Enter</b> sohbet · <b>Tab / Shift</b> skor tablosu · <b>Esc</b> ayarlar · <b>M</b> sessiz',
+    'menu.help.3': '<b>Gamepad</b>: sol çubuk hareket, sağ çubuk nişan, RT saldırı',
+    'menu.help.4': '<b>Dokunmatik</b>: sol başparmak hareket, sağ başparmak nişan &amp; ateş',
+    'menu.help.5': 'Silahları almak için üzerlerinden geç. Süre bittiğinde en çok öldüren kazanır.',
+    'menu.about.text': '<strong>Stick Arena</strong>, XGenStudios\'un yaptığı tarayıcı tabanlı çok oyunculu bir nişancı oyunuydu. Flash kaldırılınca resmi sunucular kapandı. Bu, tüm orijinal haritalar, silahlar ve sprite\'larla açık kaynak bir <strong>HTML5 yeniden yapımı</strong>. Burada botlara karşı çevrimdışı oyna ya da çok oyunculu için kendi sunucunu kur.',
+    'menu.legal': 'Oyun varlıkları © XGenStudios — yalnızca ticari olmayan kullanım (CC BY-NC-SA 4.0).',
+
+    'set.title': 'Ayarlar',
+    'set.tab.profile': 'Profil', 'set.tab.controls': 'Kontroller', 'set.tab.audio': 'Ses', 'set.tab.video': 'Görüntü', 'set.tab.hud': 'Arayüz',
+    'set.name': 'Oyuncu Adı', 'set.cursor': 'İmleç', 'set.spinner': 'Spinner Şekli', 'set.color': 'Spinner Rengi',
+    'set.language': 'Dil', 'set.lang.auto': 'Otomatik (tarayıcı)',
+    'set.keybinds': 'Tuş Atamaları', 'set.arrows': '(ok tuşları her zaman hareket ettirir)',
+    'set.touch': 'Dokunmatik Kontroller', 'set.touch.auto': 'Otomatik (dokunmatik ekranlar)', 'set.touch.on': 'Her zaman açık', 'set.touch.off': 'Kapalı',
+    'set.gamepad': 'Gamepad',
+    'set.gamepad.help': 'Sol çubuk / D-pad: hareket · Sağ çubuk: nişan · RT / A: saldırı · Back/View: skor tablosu · Start: ayarlar',
+    'set.gamepad.none': 'Gamepad bulunamadı — üzerindeki herhangi bir tuşa bas.',
+    'set.gamepad.on': 'Bağlı: {name}',
+    'set.volume': 'Ses Seviyesi', 'set.mute': 'Tüm sesleri kapat', 'set.spatial': 'Konumsal ses',
+    'set.spatial.hint': '— diğer oyuncuların seslerini mesafeye göre yönlendir ve kıs',
+    'set.res': 'Çözünürlük', 'set.res.auto': 'Otomatik (keskin, 2×\'e kadar)', 'set.res.high': 'Yüksek (yerel, 3×\'e kadar)', 'set.res.low': 'Düşük (1× – en hızlı)',
+    'set.pixel': 'Piksel-art ölçekleme', 'set.pixel.hint': '— keskin, yumuşatmasız sprite\'lar',
+    'set.fps': 'FPS göster', 'set.ping': 'Ping göster', 'set.fullscreen': 'Tam Ekranı Aç/Kapat',
+    'set.killfeed': 'Öldürme akışı', 'set.hitmarkers': 'İsabet işareti', 'set.damageflash': 'Hasar flaşı',
+    'set.reset': 'Varsayılana dön', 'set.done': 'Tamam', 'set.press': 'Bir tuşa bas…',
+    'set.bind.up': 'Yukarı', 'set.bind.left': 'Sola', 'set.bind.down': 'Aşağı', 'set.bind.right': 'Sağa', 'set.bind.shoot': 'Saldırı',
+    'set.keys.extra': 'Fare: nişan & saldırı · Enter: sohbet · Tab / Shift: skor tablosu · M: sessiz',
+
+    'hud.died': 'ÖLDÜN', 'hud.killedBy': '{name} öldürdü — yeniden doğuluyor…', 'hud.respawning': 'Yeniden doğuluyor…',
+    'hud.eliminated': '{name} ELENDİ', 'hud.you': 'Sen',
+    'hud.streak.2': 'ÇİFT LEŞ', 'hud.streak.3': 'ÜÇLÜ LEŞ', 'hud.streak.4': 'SERİ LEŞ', 'hud.streak.5': 'KATLİAM',
+    'hud.reconnecting': 'Bağlantı koptu — yeniden bağlanılıyor…',
+    'hud.soundOn': 'SES AÇIK', 'hud.soundOff': 'SES KAPALI', 'hud.disconnected': 'BAĞLANTI KESİLDİ',
+    'hud.move': 'HAREKET', 'hud.aim': 'NİŞAN + ATEŞ',
+    'hud.botsOffline': 'Çevrimdışı — botlara karşı oynanıyor', 'hud.botsWaiting': 'Oyuncu bekleniyor — botlara karşı oynanıyor',
+
+    'sb.title': 'SKOR TABLOSU', 'sb.over': 'TUR BİTTİ', 'sb.player': 'OYUNCU', 'sb.kills': 'LEŞ', 'sb.deaths': 'ÖLÜM', 'sb.kd': 'L/Ö',
+    'sb.youWin': 'Kazandın!', 'sb.wins': '{name} kazandı!', 'sb.left': '{t} kaldı', 'sb.you': '(sen)', 'sb.more': '+{n} oyuncu daha',
+  },
+};
+
+// Server / system chat lines translated on the client (server stays English).
+const I18N_CHAT_TR = [
+  [/^(.+) joined the game\.$/, '$1 oyuna katıldı.'],
+  [/^(.+) left the game\.$/, '$1 oyundan ayrıldı.'],
+  [/^Round over! Next round starting in (\d+(?:\.\d+)?) seconds\.\.\.$/, 'Tur bitti! Yeni tur $1 saniye içinde başlıyor...'],
+  [/^Round started on (.+)!$/, 'Tur başladı: $1!'],
+  [/^Waiting for other players, playing against bots\.$/, 'Diğer oyuncular bekleniyor, botlara karşı oynanıyor.'],
+  [/^No connection to the server, playing against bots\.$/, 'Sunucu bağlantısı yok, botlara karşı oynanıyor.'],
+  [/^No server found — playing offline with bots\.$/, 'Sunucu bulunamadı — botlarla çevrimdışı oynanıyor.'],
+  [/^You are sending messages too fast\.$/, 'Çok hızlı mesaj gönderiyorsun.'],
+  [/^Gamepad connected\.$/, 'Gamepad bağlandı.'],
+  [/^Server is restarting…$/, 'Sunucu yeniden başlatılıyor…'],
+  [/^Unknown map: (.+)$/, 'Bilinmeyen harita: $1'],
+  [/^(.+) was kicked\.$/, '$1 atıldı.'],
+  [/^(.+) was banned\.$/, '$1 yasaklandı.'],
+  [/^Kicked by admin\.$/, 'Yönetici tarafından atıldın.'],
+  [/^Banned by admin\.$/, 'Yönetici tarafından yasaklandın.'],
+  [/^You are banned\.$/, 'Yasaklısın.'],
+];
+
+const i18n = {
+  lang: 'en',
+  listeners: [],
+
+  resolve(pref) {
+    if (pref === 'en' || pref === 'tr') return pref;
+    const langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en'];
+    return langs.some(l => /^tr\b/i.test(l)) ? 'tr' : 'en';
+  },
+
+  setLanguage(pref) {
+    this.lang = this.resolve(pref);
+    document.documentElement.lang = this.lang;
+    this.applyDom();
+    for (const fn of this.listeners) fn(this.lang);
+  },
+
+  onChange(fn) { this.listeners.push(fn); },
+
+  applyDom(root = document) {
+    root.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+    root.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+    root.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
+  },
+
+  chat(text) {
+    if (this.lang !== 'tr' || typeof text !== 'string') return text;
+    for (const [re, rep] of I18N_CHAT_TR) if (re.test(text)) return text.replace(re, rep);
+    return text;
+  },
+};
+
+function t(key, vars) {
+  const s = (I18N[i18n.lang] && I18N[i18n.lang][key]) ?? I18N.en[key] ?? key;
+  return vars ? s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? '')) : s;
+}
+
+i18n.lang = i18n.resolve('auto');

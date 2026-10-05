@@ -19,7 +19,9 @@ class GamepadInput {
 
   _pad() {
     if (!navigator.getGamepads) return null;
-    for (const p of navigator.getGamepads()) if (p && p.connected) return p;
+    // Only the W3C "standard" layout has known stick/trigger positions; other
+    // mappings put triggers on axes 2/3 (resting at -1), which would hijack aim.
+    for (const p of navigator.getGamepads()) if (p && p.connected && p.mapping === 'standard') return p;
     return null;
   }
 
