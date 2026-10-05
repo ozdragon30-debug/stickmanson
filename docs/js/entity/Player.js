@@ -360,8 +360,10 @@ class Player {
 
   showHitsplat(damage, attackerWeaponId, attackerPos = null) {
     const attackerWeapon = Constants.WEAPON_ID_MAP[attackerWeaponId];
-    const impactKey = attackerWeapon?.impactSound ?? 'impact';
-    soundManager.play(impactKey, this._soundPos());
+    // Weapons without an impactSound fell back to 'impact', a file that doesn't
+    // exist (silent + a 404 on every hit); keep them silent without the request.
+    const impactKey = attackerWeapon?.impactSound;
+    if (impactKey) soundManager.play(impactKey, this._soundPos());
     const anims = this.currentWeapon.bloodAnims;
     const anim = anims[Math.floor(Math.random() * anims.length)];
     this.hitsplat.setAnimation(anim, 1);
