@@ -430,7 +430,7 @@ class Player {
     if (this.isRespawning) return;
     if (!indicatorAtlas.ready) return;
 
-    const names = Object.keys(indicatorAtlas.animationMap);
+    const names = indicatorAtlas.animationNames;
     if (!names.length) return;
     const animName = names[this.indicatorShapeIndex % names.length];
     const anim = indicatorAtlas.getAnimation(animName);

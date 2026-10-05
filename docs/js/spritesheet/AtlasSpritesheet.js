@@ -14,6 +14,7 @@ class AtlasSpritesheet {
     }
     this.frames = {};
     this.animationMap = {};  // name -> { fps, frames: [frameKey, ...], offset?: [x, y] }
+    this.animationNames = []; // Object.keys(animationMap), cached (used every frame)
     this.setOrigins = {};
     this.ready = false;
 
@@ -23,6 +24,7 @@ class AtlasSpritesheet {
       for (const anim of (data.animations || [])) {
         this.animationMap[anim.name] = { fps: anim.fps, frames: anim.frames, offset: anim.offset || null, pinned: anim.pinned || false };
       }
+      this.animationNames = Object.keys(this.animationMap);
       this.tileAnimations = data.tileAnimations || {};
       this.setOrigins = data.set_origins || {};
       this.ready = true;

@@ -121,7 +121,7 @@ function drawCursor() {
   if (!cursorAtlas.ready) return;
   if (inputMode.mode === 'touch' || isUiBlocking()) return;
   if (inputMode.mode === 'mouse' && !mouseInView) return;
-  const names = Object.keys(cursorAtlas.animationMap);
+  const names = cursorAtlas.animationNames;
   if (!names.length) return;
   const animName = names[settingsManager.cursorIndex % names.length];
   const f = cursorAtlas.getFrameData(animName, 0);
