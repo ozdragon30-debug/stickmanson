@@ -45,6 +45,13 @@ class GamepadInput {
     const b = i => !!(p.buttons[i] && (p.buttons[i].pressed || p.buttons[i].value > 0.3));
     const edge = i => b(i) && !this._prevButtons[i];
 
+    // A in the main menu = Play.
+    if (edge(0) && typeof menu !== 'undefined' && menu.isOpen && !settingsManager.isOpen()) {
+      menu.play();
+      this._prevButtons = p.buttons.map(x => x.pressed);
+      return;
+    }
+
     // Start → settings (edge-triggered so holding doesn't flicker).
     if (edge(9) && typeof settingsManager !== 'undefined') {
       if (typeof menu !== 'undefined' && menu.isOpen) menu.play();
