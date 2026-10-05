@@ -5,6 +5,8 @@ const assert = require('node:assert');
 
 process.env.PORT = '0';
 process.env.QUIET = '1';
+process.env.MAX_CONNECTIONS_PER_IP = '1000';
+process.env.MAX_PLAYERS = '1000';
 delete process.env.ADMIN_PASSWORD;
 delete process.env.TRUST_PROXY;
 
@@ -208,6 +210,17 @@ test('reconnecting with the same session token replaces the ghost socket', async
   const other = await connect({ query: { room: 'ghosts', session: 'tok_' + 'y'.repeat(20) } });
   await new Promise(r => setTimeout(r, 100));
   assert.ok(room.players[fresh.id] && room.players[other.id]);
+});
+
+test('event floods are dropped', async () => {
+  const a = await connect();
+  const b = await connect();
+  await new Promise(r => setTimeout(r, 1100)); // fresh rate window
+  let relayed = 0;
+  b.on('playerMoved', d => { if (d.playerId === a.id) relayed++; });
+  for (let i = 0; i < 1000; i++) a.emit('playerMovement', { x: i, y: i });
+  await new Promise(r => setTimeout(r, 400));
+  assert.ok(relayed > 50 && relayed <= 200, `relayed ${relayed}`);
 });
 
 test('admin weapon command no longer crashes the server', async () => {

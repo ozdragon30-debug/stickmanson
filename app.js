@@ -25,6 +25,11 @@ const ADMIN_PASSWORD  = process.env.ADMIN_PASSWORD || '';
 const ROUND_DURATION_MS    = (parseInt(process.env.ROUND_SECONDS, 10) || 5 * 60) * 1000; // 5 minutes
 const ROUND_END_DISPLAY_MS = 10 * 1000;    // 10 s scoreboard display
 const MAX_PLAYERS_PER_ROOM = parseInt(process.env.MAX_PLAYERS, 10) || 16;
+const MAX_CONNECTIONS_PER_IP = parseInt(process.env.MAX_CONNECTIONS_PER_IP, 10) || 10;
+// A legitimate client sends ≤ ~60 movement + ~20 leg + a few other events per
+// second. Events beyond EVENTS_PER_SECOND are dropped; a client that keeps
+// flooding (beyond 4× for 3 s) is disconnected.
+const EVENTS_PER_SECOND = 200;
 
 // Shared weapon definitions (same file the client uses).
 const weaponsData = JSON.parse(fs.readFileSync(path.join(__dirname, "docs/data/weapons.json"), "utf8"));
@@ -139,8 +144,39 @@ function allow(socket, key, perWindow, windowMs) {
   return ++b.n <= perWindow;
 }
 
+// ── Abuse limits ─────────────────────────────────────────────────────────────
+const connectionsPerIp = new Map();
+
+io.use((socket, next) => {
+  const ip = clientIp(socket);
+  const n = connectionsPerIp.get(ip) || 0;
+  if (n >= MAX_CONNECTIONS_PER_IP) return next(new Error('Too many connections from your address.'));
+  connectionsPerIp.set(ip, n + 1);
+  socket.once('disconnect', () => {
+    const left = (connectionsPerIp.get(ip) || 1) - 1;
+    if (left <= 0) connectionsPerIp.delete(ip); else connectionsPerIp.set(ip, left);
+  });
+  next();
+});
+
+function installFloodGuard(socket) {
+  let windowStart = Date.now(), count = 0, strikes = 0;
+  socket.use((packet, next) => {
+    const now = Date.now();
+    if (now - windowStart >= 1000) {
+      strikes = count > EVENTS_PER_SECOND * 4 ? strikes + 1 : 0;
+      if (strikes >= 3) { socket.disconnect(true); return; }
+      windowStart = now;
+      count = 0;
+    }
+    if (++count > EVENTS_PER_SECOND) return; // drop silently
+    next();
+  });
+}
+
 // ── Socket handlers ──────────────────────────────────────────────────────────
 io.on("connection", (socket) => {
+  installFloodGuard(socket);
   if (!process.env.QUIET) console.log("a user connected: ", socket.id);
 
   // Reject banned IPs immediately.
