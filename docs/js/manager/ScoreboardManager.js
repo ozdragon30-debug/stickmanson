@@ -91,77 +91,117 @@ class ScoreboardManager {
     ctx.restore();
   }
 
-  _drawOverlay(ctx, canvas) {
-    const padX = 100, padY = 70;
-    const overlayW = VIEW_W  - padX * 2;
-    const overlayH = VIEW_H - padY * 2;
-
-    // Dim background
-    ctx.fillStyle = 'rgba(0,0,0,0.78)';
-    ctx.fillRect(padX, padY, overlayW, overlayH);
-
-    // Thin border
-    ctx.strokeStyle = '#4a6fa5';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(padX, padY, overlayW, overlayH);
-
-    // Title
-    ctx.fillStyle = this.roundEndActive ? '#ff6b6b' : 'white';
-    ctx.font = 'bold 24px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(
-      this.roundEndActive ? 'ROUND OVER' : 'SCOREBOARD',
-      VIEW_W / 2,
-      padY + 40
-    );
-
-    // Column headers
-    const startY   = padY + 70;
-    const rowH     = 28;
-    const colName   = padX + 24;
-    const colKills  = padX + overlayW - 200;
-    const colDeaths = padX + overlayW - 80;
-
-    ctx.fillStyle = '#8899aa';
-    ctx.font = '12px monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('PLAYER', colName, startY);
-    ctx.textAlign = 'center';
-    ctx.fillText('KILLS',  colKills,  startY);
-    ctx.fillText('DEATHS', colDeaths, startY);
-
-    // Separator line
-    ctx.strokeStyle = '#334455';
-    ctx.lineWidth = 1;
+  _roundRect(ctx, x, y, w, h, r) {
     ctx.beginPath();
-    ctx.moveTo(padX + 10, startY + 6);
-    ctx.lineTo(padX + overlayW - 10, startY + 6);
-    ctx.stroke();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+    else ctx.rect(x, y, w, h);
+  }
 
-    // Rows sorted by kills desc
+  _drawOverlay(ctx, canvas) {
     const myId  = (typeof socketManager !== 'undefined')
       ? (socketManager.socket?.id ?? 'local_player')
       : 'local_player';
-    const sorted = Object.entries(this.scores).sort((a, b) => b[1].kills - a[1].kills);
+    const sorted = Object.entries(this.scores).sort((a, b) => b[1].kills - a[1].kills || a[1].deaths - b[1].deaths);
 
-    sorted.forEach(([id, data], i) => {
+    const rowH = 30;
+    const panelW = 620;
+    const panelH = Math.min(VIEW_H - 120, 128 + Math.max(1, sorted.length) * rowH + 20);
+    const px = (VIEW_W - panelW) / 2;
+    const py = Math.max(60, (VIEW_H - panelH) / 2 - 20);
+
+    // Panel
+    ctx.fillStyle = 'rgba(8,13,20,0.86)';
+    this._roundRect(ctx, px, py, panelW, panelH, 12);
+    ctx.fill();
+    ctx.strokeStyle = this.roundEndActive ? 'rgba(255,107,107,0.7)' : 'rgba(74,111,165,0.8)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Title + subtitle (map, time left)
+    ctx.textAlign = 'center';
+    ctx.fillStyle = this.roundEndActive ? '#ff6b6b' : '#ffffff';
+    ctx.font = '900 24px system-ui, sans-serif';
+    ctx.fillText(this.roundEndActive ? 'ROUND OVER' : 'SCOREBOARD', VIEW_W / 2, py + 38);
+
+    const mapName = (typeof map !== 'undefined' && map.ready && map.name) ? map.name : '';
+    const remaining = this.getRemainingTime();
+    const timeTxt = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
+    let sub = mapName;
+    if (this.roundEndActive && sorted.length) {
+      const [winId, win] = sorted[0];
+      sub = (winId === myId ? 'You win!' : `${win.name} wins!`) + (mapName ? `  ·  ${mapName}` : '');
+    } else if (this.roundEndsAt) {
+      sub += (sub ? '  ·  ' : '') + timeTxt + ' left';
+    }
+    ctx.font = '600 13px system-ui, sans-serif';
+    ctx.fillStyle = '#8fa6bf';
+    ctx.fillText(sub, VIEW_W / 2, py + 60);
+
+    // Column headers
+    const startY = py + 94;
+    const colRank = px + 28;
+    const colName = px + 56;
+    const colKills = px + panelW - 210;
+    const colDeaths = px + panelW - 130;
+    const colKd = px + panelW - 52;
+
+    ctx.fillStyle = '#6f86a0';
+    ctx.font = '700 11px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('PLAYER', colName, startY);
+    ctx.textAlign = 'center';
+    ctx.fillText('#', colRank, startY);
+    ctx.fillText('KILLS', colKills, startY);
+    ctx.fillText('DEATHS', colDeaths, startY);
+    ctx.fillText('K/D', colKd, startY);
+
+    ctx.strokeStyle = '#2a3b52';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px + 16, startY + 9);
+    ctx.lineTo(px + panelW - 16, startY + 9);
+    ctx.stroke();
+
+    const maxRows = Math.floor((py + panelH - startY - 16) / rowH);
+    sorted.slice(0, maxRows).forEach(([id, data], i) => {
       const y    = startY + rowH * (i + 1);
       const isMe = id === myId;
-      const displayName = isMe ? 'You' : data.name;
+      const displayName = isMe ? `${data.name} (you)` : data.name;
 
-      // Derive spinner color (sepia+saturate+hue-rotate shifts base by ~36°)
+      if (isMe) {
+        ctx.fillStyle = 'rgba(74,158,255,0.16)';
+        this._roundRect(ctx, px + 12, y - 20, panelW - 24, rowH - 4, 6);
+        ctx.fill();
+      }
+
+      ctx.textAlign = 'center';
+      ctx.font = '700 13px system-ui, sans-serif';
+      ctx.fillStyle = i === 0 ? '#ffd166' : i === 1 ? '#d7dde5' : i === 2 ? '#e0a370' : '#7d93aa';
+      ctx.fillText(i === 0 && this.roundEndActive ? '👑' : String(i + 1), colRank, y);
+
+      // Spinner-matching name colour (sepia+saturate+hue-rotate shifts base by ~36°)
       const nameHue = ((data.indicatorHue ?? 0) + 36) % 360;
-      ctx.fillStyle = `hsl(${nameHue},80%,${isMe ? '75%' : '65%'})`;
-      ctx.font      = isMe ? 'bold 14px monospace' : '14px monospace';
-
+      ctx.fillStyle = `hsl(${nameHue},80%,${isMe ? '75%' : '68%'})`;
+      ctx.font = isMe ? '700 15px system-ui, sans-serif' : '600 15px system-ui, sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText(displayName, colName, y);
 
-      ctx.fillStyle = isMe ? 'white' : '#ccc';
+      ctx.fillStyle = isMe ? '#fff' : '#cfd8e3';
+      ctx.font = '600 15px ui-monospace, monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(data.kills,  colKills,  y);
+      ctx.fillText(data.kills, colKills, y);
       ctx.fillText(data.deaths, colDeaths, y);
+      const kd = data.deaths ? (data.kills / data.deaths).toFixed(2) : (data.kills ? data.kills.toFixed(2) : '–');
+      ctx.fillStyle = '#8fa6bf';
+      ctx.fillText(kd, colKd, y);
     });
+
+    if (sorted.length > maxRows) {
+      ctx.fillStyle = '#6f86a0';
+      ctx.font = '12px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`+${sorted.length - maxRows} more`, VIEW_W / 2, py + panelH - 10);
+    }
   }
 }
 

@@ -154,34 +154,63 @@ class HudManager {
     return h == null ? `rgba(255,255,255,${a})` : `hsla(${(h + 36) % 360},80%,${l}%,${a})`;
   }
 
+  // Bounding box of the opaque pixels of a pickup frame (cached), so weapon
+  // icons in the kill feed aren't tiny inside their padded sprite frames.
+  _trimmed(f) {
+    this._trimCache = this._trimCache || new Map();
+    const key = `${f.x},${f.y}`;
+    if (this._trimCache.has(key)) return this._trimCache.get(key);
+    let r = { x: f.x, y: f.y, w: f.w, h: f.h };
+    try {
+      const c = document.createElement('canvas');
+      c.width = f.w; c.height = f.h;
+      const cx = c.getContext('2d', { willReadFrequently: true });
+      cx.drawImage(pickupAtlas.image, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+      const d = cx.getImageData(0, 0, f.w, f.h).data;
+      let x0 = f.w, y0 = f.h, x1 = -1, y1 = -1;
+      for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) {
+        if (d[(y * f.w + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      }
+      if (x1 >= x0) r = { x: f.x + x0, y: f.y + y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+    } catch (e) { /* tainted canvas: use the full frame */ }
+    if (pickupAtlas.image.complete) this._trimCache.set(key, r);
+    return r;
+  }
+
   _drawKillFeed(ctx, now) {
     if (!this.killFeed.length) return;
     this.killFeed = this.killFeed.filter(k => now - k.t < 6000);
-    let y = 92;
-    ctx.font = 'bold 12px system-ui, sans-serif';
+    let y = 96;
+    ctx.font = 'bold 13px system-ui, sans-serif';
     ctx.textBaseline = 'middle';
     for (const k of this.killFeed) {
       const age = (now - k.t) / 1000;
       const a = Math.min(1, Math.max(0, 6 - age)) * Math.min(1, age * 6 + 0.2);
       const weapon = Constants.WEAPON_ID_MAP[k.weaponId];
-      const f = weapon && weapon.hasPickup && pickupAtlas.ready ? pickupAtlas.getFrameData(weapon.name + '_pickup', 0) : null;
-      const iconH = 16, iconW = f ? Math.min(44, f.w * iconH / f.h) : ctx.measureText('✊').width;
+      const fr = weapon && weapon.hasPickup && pickupAtlas.ready ? pickupAtlas.getFrameData(weapon.name + '_pickup', 0) : null;
+      const f = fr ? this._trimmed(fr) : null;
+      const iconH = 22, iconW = f ? Math.min(56, f.w * iconH / f.h) : ctx.measureText('✊').width;
       const kw = ctx.measureText(k.killer).width, vw = ctx.measureText(k.victim).width;
       const total = kw + vw + iconW + 24;
       let x = VIEW_W - 10 - total;
       ctx.globalAlpha = a;
       ctx.fillStyle = k.mine ? 'rgba(80,30,30,0.75)' : 'rgba(0,0,0,0.55)';
-      ctx.fillRect(x - 6, y - 10, total + 12, 20);
+      ctx.fillRect(x - 6, y - 14, total + 12, 28);
       ctx.textAlign = 'left';
       ctx.fillStyle = this._hueColor(k.killerHue);
       ctx.fillText(k.killer, x, y + 1);
       x += kw + 8;
-      if (f) ctx.drawImage(pickupAtlas.image, f.x, f.y, f.w, f.h, x, y - iconH / 2, iconW, iconH);
+      if (f) {
+        ctx.shadowColor = 'rgba(255,255,255,0.9)';
+        ctx.shadowBlur = 5;
+        ctx.drawImage(pickupAtlas.image, f.x, f.y, f.w, f.h, x, y - iconH / 2, iconW, iconH);
+        ctx.shadowBlur = 0;
+      }
       else { ctx.fillStyle = '#fff'; ctx.fillText('✊', x, y + 1); }
       x += iconW + 8;
       ctx.fillStyle = this._hueColor(k.victimHue);
       ctx.fillText(k.victim, x, y + 1);
-      y += 24;
+      y += 32;
     }
     ctx.globalAlpha = 1;
     ctx.textBaseline = 'alphabetic';
