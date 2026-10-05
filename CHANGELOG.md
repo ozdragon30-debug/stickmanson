@@ -28,9 +28,14 @@ collision and line of sight on every map).
 - English and Turkish UI (auto-detected; server chat lines translated).
 - Chat uses a real text field (IME, paste, mobile keyboards); `!help`.
 - Lifetime stats (kills, K/D, wins, best streak, favourite weapon, time).
+- Offline map picker; touch quick-chat phrases; left-handed touch layout;
+  AFK 💤 marker for players in the menu; tab-title alert when someone joins;
+  settings button fades while the mouse is idle; reduced-motion support.
 
 ### Multiplayer
 - Private rooms with invite links (`?room=code`).
+- The static/GitHub Pages build can play online: `?server=https://host`
+  (validated connection target only; the socket.io client is bundled).
 - Offline/bot mode now plays in rounds with the same rules as the server.
 - Smooth remote players; movement updates capped at ~60 Hz instead of the
   monitor refresh rate (240 Hz monitors used to flood the server).
@@ -49,6 +54,7 @@ collision and line of sight on every map).
   all inputs validated; chat/rename rate limits; event flood guard; per-IP
   connection cap; persistent bans (`BANS_FILE`).
 - gzip, cache + security headers, `/healthz`, graceful shutdown, Docker.
+- Dependencies updated (express 4.22, socket.io 4.8): 10 advisories → 0.
 
 ### Performance
 - Lossless sprite atlas optimisation: downloads 20.7 → 12.3 MB (WebP,
@@ -65,8 +71,20 @@ collision and line of sight on every map).
 - Pickup respawn timers leaked across map changes.
 - Pickup sounds replayed for every player on join and round reset.
 - Debug test map appeared in the normal map rotation.
+- Bots kept the old map's coordinates after a server map change (often
+  stuck in walls); respawned bots followed stale paths.
+- A dead player's body picked up weapons; shot cooldown timers survived
+  death/round reset; animations froze on wall-clock changes; a failed atlas
+  load could leave a player dead forever.
+- Reconnecting left ghost players / a frozen copy of yourself.
+- Offline chat messages vanished; every hit requested a missing sound file.
+
+### Security
+- Fixed: spoofed `X-Forwarded-For` granted admin; `?server=` script
+  injection (found during review, never released).
 
 ### Developer experience
 - `npm test`: golden gameplay lock, server integration (socket.io), input,
   i18n completeness; `npm run lint` (ESLint, undefined-global detection);
-  GitHub Actions CI; `npm run precache` for the offline file list.
+  `npm run e2e` headless-Chromium smoke test; GitHub Actions CI; Dependabot;
+  `npm run precache` for the offline file list; `ARCHITECTURE.md`.
