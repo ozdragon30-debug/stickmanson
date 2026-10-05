@@ -356,9 +356,21 @@ class BotManager {
    * map, everyone respawned, scores reset (same as a server round change).
    */
   startOfflineRound(file) {
+    const previousPhase = this._roundPhase;
+    const gen = this._loadGen = (this._loadGen || 0) + 1;
     this._roundPhase = 'loading';
     return loadMap(file).then((ok) => {
-      if (!ok) { this._roundPhase = 'roundEnd'; this._nextRoundAt = Date.now() + 1000; return false; }
+      // A newer load superseded this one, or a server connected meanwhile
+      // (the server drives maps/rounds from then on).
+      if (gen !== this._loadGen || socketManager.isConnected) return false;
+      if (!ok) {
+        // Unavailable map (e.g. not cached offline): drop the choice and fall
+        // back to the random rotation instead of retrying it forever.
+        if (this.preferredMap === file) this.preferredMap = null;
+        if (previousPhase === 'playing') this._roundPhase = 'playing';
+        else { this._roundPhase = 'roundEnd'; this._nextRoundAt = Date.now() + 1000; }
+        return false;
+      }
       this._currentMap = file;
       scoreboardManager.hideRoundEnd();
       const status = this.status;

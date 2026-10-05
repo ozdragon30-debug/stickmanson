@@ -28,7 +28,9 @@ const ADMIN_PASSWORD  = process.env.ADMIN_PASSWORD || '';
 const ROUND_DURATION_MS    = (parseInt(process.env.ROUND_SECONDS, 10) || 5 * 60) * 1000; // 5 minutes
 const ROUND_END_DISPLAY_MS = 10 * 1000;    // 10 s scoreboard display
 const MAX_PLAYERS_PER_ROOM = parseInt(process.env.MAX_PLAYERS, 10) || 16;
-const MAX_CONNECTIONS_PER_IP = parseInt(process.env.MAX_CONNECTIONS_PER_IP, 10) || 10;
+// Behind a reverse proxy set TRUST_PROXY=1, otherwise every player shares the
+// proxy's address and this becomes a server-wide cap.
+const MAX_CONNECTIONS_PER_IP = parseInt(process.env.MAX_CONNECTIONS_PER_IP, 10) || 32;
 // A legitimate client sends ≤ ~60 movement + ~20 leg + a few other events per
 // second. Events beyond EVENTS_PER_SECOND are dropped; a client that keeps
 // flooding (beyond 4× for 3 s) is disconnected.
@@ -83,11 +85,25 @@ if (BANS_FILE) {
   try { for (const ip of JSON.parse(fs.readFileSync(BANS_FILE, 'utf8'))) bannedIps.add(String(ip)); }
   catch (e) { if (e.code !== 'ENOENT') console.warn(`Could not read ${BANS_FILE}:`, e.message); }
 }
+// Writes are serialised (and atomic via rename) so quick successive bans
+// can't finish out of order and drop an entry.
+let banWriting = false, banDirty = false;
 function saveBans() {
   if (!BANS_FILE) return;
-  fs.mkdir(path.dirname(path.resolve(BANS_FILE)), { recursive: true }, () => {
-    fs.writeFile(BANS_FILE, JSON.stringify([...bannedIps], null, 2), err => {
-      if (err) console.warn(`Could not write ${BANS_FILE}:`, err.message);
+  if (banWriting) { banDirty = true; return; }
+  banWriting = true;
+  banDirty = false;
+  const target = path.resolve(BANS_FILE);
+  const tmp = target + '.tmp';
+  fs.mkdir(path.dirname(target), { recursive: true }, () => {
+    fs.writeFile(tmp, JSON.stringify([...bannedIps], null, 2), err => {
+      const done = (e) => {
+        if (e) console.warn(`Could not write ${BANS_FILE}:`, e.message);
+        banWriting = false;
+        if (banDirty) saveBans();
+      };
+      if (err) return done(err);
+      fs.rename(tmp, target, done);
     });
   });
 }
@@ -344,6 +360,7 @@ io.on("connection", (socket) => {
   // AFK flag (menu open / tab hidden) — purely informational for other players.
   socket.on("playerStatus", (data) => {
     if (!players[socket.id] || !data) return;
+    if (!allow(socket, 'statusBucket', 10, 5000)) return;
     const afk = data.afk === true;
     if (players[socket.id].afk === afk) return;
     players[socket.id].afk = afk;

@@ -48,6 +48,7 @@ class GamepadInput {
     // A in the main menu = Play.
     if (edge(0) && typeof menu !== 'undefined' && menu.isOpen && !settingsManager.isOpen()) {
       menu.play();
+      this._suppressA = true; // don't also attack with the same press
       this._prevButtons = p.buttons.map(x => x.pressed);
       return;
     }
@@ -85,7 +86,8 @@ class GamepadInput {
       aimAtViewPoint(vx, vy);
     }
 
-    this.keys.shoot = b(7) || b(0) || b(5);
+    if (this._suppressA && !b(0)) this._suppressA = false;
+    this.keys.shoot = b(7) || (b(0) && !this._suppressA) || b(5);
     if (this.keys.shoot) active = true;
 
     // View/Back held → scoreboard.

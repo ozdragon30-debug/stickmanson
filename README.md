@@ -60,7 +60,7 @@ Players open `http://your-server:1138` and join the public room automatically. T
 | `HOST` | all interfaces | Bind address |
 | `ROUND_SECONDS` | `300` | Round length |
 | `MAX_PLAYERS` | `16` | Players per room |
-| `MAX_CONNECTIONS_PER_IP` | `10` | Simultaneous connections from one IP |
+| `MAX_CONNECTIONS_PER_IP` | `32` | Simultaneous connections from one IP (needs `TRUST_PROXY` behind a proxy, or it applies to everyone at once) |
 | `BANS_FILE` | – | JSON file where `!ban`s are persisted across restarts |
 | `CORS_ORIGIN` | any | Comma-separated origins allowed to connect from other sites |
 | `TRUST_PROXY` | off | Set to `1` behind nginx/Render/Fly etc. so real client IPs (bans, admin) are used |

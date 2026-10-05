@@ -221,7 +221,9 @@ let _lastAfk = null;
 // menuOpen is passed by the Menu itself (it may call this while `menu` is
 // still being constructed, when even `typeof menu` would throw).
 function reportAfk(menuOpen) {
-  const afk = !!(menuOpen ?? menu.isOpen) || document.hidden;
+  // Timer/event callbacks never run during `new Menu()`, so typeof is safe here
+  // (and protects against firing before Menu.js has loaded).
+  const afk = !!(menuOpen ?? (typeof menu !== 'undefined' && menu.isOpen)) || document.hidden;
   if (afk === _lastAfk) return;
   _lastAfk = afk;
   socketManager.emit('playerStatus', { afk });

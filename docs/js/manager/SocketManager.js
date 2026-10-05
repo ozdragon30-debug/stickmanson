@@ -39,6 +39,16 @@ class SocketManager {
           this.wasConnected = true;
           this._startPing();
         });
+        // Middleware rejections (e.g. too many connections from this address)
+        // are not retried automatically by socket.io: retry slowly ourselves.
+        this.socket.on('connect_error', (err) => {
+          if (this.socket.active) return; // socket.io is already retrying
+          if (err && err.message && !this._warned && typeof chatManager !== 'undefined') {
+            this._warned = true;
+            chatManager.addMessage('Server', err.message, null);
+          }
+          setTimeout(() => { if (!this.socket.connected) this.socket.connect(); }, 10000);
+        });
         this.socket.on('disconnect', () => {
           this.isConnected = false;
           this.ping = null;
