@@ -27,6 +27,13 @@ class Menu {
     document.getElementById('menu-fullscreen').addEventListener('click', () => toggleFullscreen());
 
     const install = document.getElementById('menu-install');
+    // iOS Safari has no install prompt: explain "Add to Home Screen" instead.
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const standalone = window.matchMedia && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
+    if (ios && !standalone && location.protocol === 'https:') {
+      install.hidden = false;
+      install.addEventListener('click', () => { if (!this._installPrompt) alert(t('menu.iosInstall')); });
+    }
     window.addEventListener('beforeinstallprompt', e => {
       e.preventDefault();
       this._installPrompt = e;
@@ -113,9 +120,19 @@ class Menu {
     this._hide();
     if (typeof map !== 'undefined' && map.ready) hudManager.showMapTitle(map.name);
     this._keepAwake();
+    this._firstRunHint();
     canvas.focus({ preventScroll: true });
     // Phones: go fullscreen + landscape on first play for a console-like feel.
     if (inputMode.mode === 'touch' && !document.fullscreenElement) toggleFullscreen();
+  }
+
+  // First game ever: show the controls for the device being used.
+  _firstRunHint() {
+    let seen = false;
+    try { seen = localStorage.getItem('sar_hint_seen') === '1'; localStorage.setItem('sar_hint_seen', '1'); } catch (e) {}
+    if (seen) return;
+    const key = inputMode.mode === 'touch' ? 'hint.touch' : inputMode.mode === 'gamepad' ? 'hint.pad' : 'hint.keys';
+    setTimeout(() => hudManager.flash(t('hint.title'), t(key), '#9fd3ff', 7000), 2800);
   }
 
   // Screen Wake Lock: phones shouldn't dim/sleep mid-match. The lock is
