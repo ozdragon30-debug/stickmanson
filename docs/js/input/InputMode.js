@@ -8,6 +8,7 @@ const inputMode = {
     // Keyboard alone doesn't hide a mouse cursor (people use both together).
     if (m === 'keyboard') return;
     this.mode = m;
+    document.body.classList.toggle('input-gamepad', m === 'gamepad');
     for (const fn of this.listeners) fn(m);
   },
   onChange(fn) { this.listeners.push(fn); },
