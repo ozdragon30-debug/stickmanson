@@ -1,93 +1,76 @@
+// All weapon pickups of the current map: who takes what, and when each one
+// comes back. Respawn timers belong to the pickup object, so a timer from a
+// previous map can never bring back a pickup on the next one.
 class PickupManager {
   static getInstance() {
-    if (!PickupManager.instance) {
-      PickupManager.instance = new PickupManager();
-    }
-    return PickupManager.instance;
+    return PickupManager.instance || (PickupManager.instance = new PickupManager());
   }
 
   constructor() {
     this.pickups = [];
   }
 
-  // Respawn timers are bound to the pickup object (not its array index), so a
-  // timer started on the previous map can't make a pickup on the new map
-  // reappear early. Re-hiding a pickup restarts its timer.
   _scheduleRespawn(pick, ms) {
-    if (pick._respawnTimer) clearTimeout(pick._respawnTimer);
-    pick._respawnTimer = setTimeout(() => {
-      pick._respawnTimer = null;
-      pick.isVisible = true;
-    }, ms);
+    clearTimeout(pick._respawnTimer);
+    pick._respawnTimer = setTimeout(() => { pick._respawnTimer = null; pick.isVisible = true; }, ms);
+  }
+
+  _hide(pick, ms = pick.respawnTime || 10000) {
+    pick.isVisible = false;
+    this._scheduleRespawn(pick, ms);
   }
 
   initFromMap(weaponSpawns) {
-    for (const p of this.pickups) if (p._respawnTimer) clearTimeout(p._respawnTimer);
-    this.pickups = weaponSpawns.map(
-      ws => new WeaponPickup(ws.x, ws.y, ws.weaponId, ws.respawnTime)
-    );
-    // Visible immediately; server state (applyState) will correct any already-taken ones.
+    for (const p of this.pickups) clearTimeout(p._respawnTimer);
+    this.pickups = weaponSpawns.map(w => new WeaponPickup(w.x, w.y, w.weaponId, w.respawnTime));
   }
 
-  // Apply the pickup state array sent by the server (on join / reconnect).
-  // Hides taken pickups and starts local respawn timers based on the server's respawnAt timestamp.
+  // Server snapshot on join / reconnect: [{available, respawnAt}] per pickup.
   applyState(states) {
-    states.forEach((state, i) => {
+    states.forEach((s, i) => {
       const pick = this.pickups[i];
       if (!pick) return;
-      if (state.available) {
-        if (pick._respawnTimer) { clearTimeout(pick._respawnTimer); pick._respawnTimer = null; }
+      if (s.available) {
+        clearTimeout(pick._respawnTimer);
+        pick._respawnTimer = null;
         pick.isVisible = true;
       } else {
-        pick.isVisible = false;
-        const ms = state.respawnAt
-          ? Math.max(0, state.respawnAt - Date.now())
-          : (pick.respawnTime || 10000);
-        this._scheduleRespawn(pick, ms);
+        this._hide(pick, s.respawnAt ? Math.max(0, s.respawnAt - Date.now()) : undefined);
       }
     });
   }
 
-  // Unified pickup: hides the pickup, equips it on playerEntity, starts local respawn timer.
-  // Pass emitToServer=true for the human player when connected.
-  takePickup(index, playerEntity, emitToServer = false) {
+  // `who` walked over pickup `index`: it disappears and they get the weapon.
+  takePickup(index, who, tellServer = false) {
     const pick = this.pickups[index];
-    if (!pick || !pick.isVisible) return false;
+    if (!pick?.isVisible) return false;
     pick.isVisible = false;
-    if (playerEntity) playerEntity.equipWeapon(pick.weaponId);
+    who?.equipWeapon(pick.weaponId);
     this._scheduleRespawn(pick, pick.respawnTime || 10000);
-    if (emitToServer) socketManager.emit('pickupWeapon', { spawnIndex: index });
+    if (tellServer) socketManager.emit('pickupWeapon', { spawnIndex: index });
     return true;
   }
 
-  // Called when the server relays that a remote player picked something up.
+  // Another player took it (relayed by the server).
   takePickupRemote(index, playerId, weaponId) {
     const pick = this.pickups[index];
     if (!pick) return;
-    pick.isVisible = false;
-    this._scheduleRespawn(pick, pick.respawnTime || 10000);
-    const player = playerManager.getPlayer(playerId);
-    if (player) player.equipWeapon(weaponId);
+    this._hide(pick);
+    playerManager.getPlayer(playerId)?.equipWeapon(weaponId);
   }
 
   update() {
-    this.pickups.forEach(p => p.update());
-
-    if (!playerManager.mainPlayer) return;
-    // A dead player's body stays where they died during the death animation;
-    // it must not collect pickups (bots already skip this while respawning).
-    if (playerManager.mainPlayer.isRespawning) return;
-    const px = playerManager.mainPlayer.body.x;
-    const py = playerManager.mainPlayer.body.y;
-    for (let i = 0; i < this.pickups.length; i++) {
-      if (this.pickups[i].isPlayerOverlapping(px, py)) {
-        this.takePickup(i, playerManager.mainPlayer, true);
-      }
-    }
+    for (const p of this.pickups) p.update();
+    const me = playerManager.mainPlayer;
+    if (!me || me.isRespawning) return;          // a corpse collects nothing
+    const { x, y } = me.body;
+    this.pickups.forEach((p, i) => {
+      if (p.isPlayerOverlapping(x, y)) this.takePickup(i, me, true);
+    });
   }
 
   draw(ctx) {
-    this.pickups.forEach(p => p.draw(ctx));
+    for (const p of this.pickups) p.draw(ctx);
   }
 }
 
