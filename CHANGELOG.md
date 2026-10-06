@@ -98,7 +98,14 @@ collision and line of sight on every map).
 
 ### Security
 - Fixed: spoofed `X-Forwarded-For` granted admin; `?server=` script
-  injection (found during review, never released).
+  injection and `__proto__` player ids (found during review, never released).
+- `LAN_ADMIN` switch (off in the Docker image).
+
+### Robustness
+- Reconnect grace (12 s) keeps your round score after a network blip; slow
+  connections can't leave the client on a different map than the server;
+  refused connections (room full/banned) fall back to an offline match with
+  the reason shown; service worker only caches the game page as offline shell.
 
 ### Developer experience
 - `npm test`: golden gameplay lock, server integration (socket.io), input,
