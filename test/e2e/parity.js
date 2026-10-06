@@ -132,7 +132,11 @@ async function run(url) {
       }
     }
     let hitEvents = 0, hitDiff = 0;
+    // The sledgehammer was redesigned on request (one-hit kill, narrower
+    // strike, longer recovery: see data/weapons.json), so it is not compared.
+    const REDESIGNED = new Set(['11']);
     for (const m of MAPS) for (const w in A.out.hits[m]) {
+      if (REDESIGNED.has(w)) continue;
       hitEvents += A.out.hits[m][w] ? A.out.hits[m][w].split(',').length : 0;
       if (A.out.hits[m][w] !== B.out.hits[m][w]) { hitDiff++; console.log('HIT DIFF', m, w, A.out.hits[m][w], '|', B.out.hits[m][w]); }
     }

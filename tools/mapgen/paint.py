@@ -61,7 +61,7 @@ def tint(img, color, alpha):
 
 # ── materials (continuous textures over a region) ──────────────────────────
 def mat_asphalt(n, h, w, X, Y):
-    v = 62 + n.fbm(h, w, 5, 2) * 9 + n.fbm(h, w, 90, 3) * 9
+    v = 62 + n.fbm(h, w, 2.5, 2) * 10 + n.fbm(h, w, 90, 3) * 4
     img = np.stack([v, v + 2, v + 6], -1)
     speck = n.value(h, w, 1.6) > 0.82
     img[speck] += 30
@@ -69,7 +69,7 @@ def mat_asphalt(n, h, w, X, Y):
 
 
 def mat_concrete(n, h, w, X, Y):
-    v = 148 + n.fbm(h, w, 6, 3) * 10 + n.fbm(h, w, 120, 3) * 12
+    v = 148 + n.fbm(h, w, 2.5, 2) * 8 + n.fbm(h, w, 120, 3) * 4
     img = np.stack([v, v, v - 4], -1)
     slab = PX * 2
     seam = ((X % slab) < 2) | ((Y % slab) < 2)
@@ -92,29 +92,30 @@ def mat_sidewalk(n, h, w, X, Y):
 
 
 def mat_sand(n, h, w, X, Y):
-    v = n.fbm(h, w, 160, 4)
-    img = np.stack([206 + v * 16, 176 + v * 15, 122 + v * 12], -1)
-    warp = n.fbm(h, w, 120, 2) * 40
-    rip = np.sin((Y + warp) / 7.0 + X / 40.0)
-    img -= (np.clip(rip, 0.6, 1) - 0.6)[..., None] * 40
-    img += n.fbm(h, w, 2, 1)[..., None] * 8
+    v = n.fbm(h, w, 160, 3)
+    img = np.stack([204 + v * 7, 174 + v * 7, 122 + v * 5], -1)
+    img += n.value(h, w, 1.5)[..., None] * 9                     # grain
+    peb = n.value(h, w, 2.2) > 0.86
+    img[peb] -= rgb(40, 38, 30)
     return img
 
 
 def mat_grass(n, h, w, X, Y):
-    big = n.fbm(h, w, 140, 4)
-    blades = n.stretched(h, w, 1.6, 6)
-    img = np.stack([62 + big * 18, 112 + big * 26, 44 + big * 12], -1)
-    img += blades[..., None] * rgb(10, 22, 8)
-    clump = n.fbm(h, w, 22, 2) > 0.35
-    img[clump] *= 0.82
+    big = n.fbm(h, w, 140, 3)
+    blades = n.stretched(h, w, 1.4, 5)
+    img = np.stack([62 + big * 7, 112 + big * 10, 44 + big * 5], -1)
+    img += blades[..., None] * rgb(12, 26, 9)
+    img += n.value(h, w, 1.5)[..., None] * rgb(6, 10, 4)
+    clump = n.fbm(h, w, 14, 2) > 0.4
+    img[clump] *= 0.86
     return img
 
 
 def mat_dirt(n, h, w, X, Y):
-    v = n.fbm(h, w, 70, 4)
-    img = np.stack([118 + v * 22, 88 + v * 18, 60 + v * 12], -1)
-    img += n.fbm(h, w, 3, 2)[..., None] * 12
+    v = n.fbm(h, w, 70, 3)
+    img = np.stack([118 + v * 9, 88 + v * 8, 60 + v * 6], -1)
+    img += n.value(h, w, 1.6)[..., None] * 12
+    img[n.value(h, w, 2.4) > 0.84] -= rgb(36, 30, 22)
     return img
 
 
@@ -128,7 +129,7 @@ def mat_gravel(n, h, w, X, Y):
 
 
 def mat_metal(n, h, w, X, Y):
-    v = 110 + n.fbm(h, w, 40, 3) * 8
+    v = 110 + n.fbm(h, w, 40, 3) * 4 + n.value(h, w, 1.5) * 4
     img = np.stack([v, v + 5, v + 12], -1)
     # Diamond tread.
     a = ((X + Y) % 22 < 4) & ((X % 22) < 13)
@@ -137,19 +138,19 @@ def mat_metal(n, h, w, X, Y):
     plate = PX
     seam = ((X % plate) < 3) | ((Y % plate) < 3)
     img[seam] = rgb(58, 62, 70)
-    rust = np.clip(n.fbm(h, w, 70, 4) - 0.25, 0, 1) * 1.6
-    tint(img, (122, 70, 38), rust * 0.55)
+    rust = (n.fbm(h, w, 50, 4) > 0.32).astype(np.float32)
+    tint(img, (122, 70, 38), cv2.GaussianBlur(rust, (0, 0), 0.8) * 0.35)
     return img
 
 
 def mat_carpet(color):
     def f(n, h, w, X, Y):
-        v = n.fbm(h, w, 2, 1) * 10 + n.fbm(h, w, 160, 3) * 10
+        v = n.value(h, w, 1.5) * 9 + n.fbm(h, w, 160, 3) * 4
         img = np.broadcast_to(rgb(*color), (h, w, 3)) + v[..., None]
         pat = ((X % 40) < 3) | ((Y % 40) < 3)
         img = img.copy(); img[pat] *= 0.84
         wear = np.clip(n.fbm(h, w, 90, 3), 0, 1)
-        img += wear[..., None] * 22                             # walked-on paths
+        img += wear[..., None] * 8                              # walked-on paths
         return img
     return f
 
@@ -194,7 +195,7 @@ def mat_stone(n, h, w, X, Y):
             idv = np.where(closer, (cx * 7 + cy * 13) % 11, idv)
             best = np.where(closer, d, best)
     edge = (second - best) < 3
-    v = 126 + n.fbm(h, w, 8, 2) * 8 + (idv - 5) * 3
+    v = 126 + n.value(h, w, 1.6) * 7 + (idv - 5) * 4
     img = np.stack([v, v - 4, v - 12], -1)
     img[edge] = rgb(70, 66, 60)
     return img
@@ -373,7 +374,25 @@ def draw_prop(canvas, shadow, kind, x0, y0, wt, ht, rnd):
             rect((x - 18, m + 12), (x + 18, m + 34), (40, 36, 32)); rect((x - 15, m + 15), (x + 15, m + 31), (200, 150, 70))
             rect((x - 20, m + 44), (x + 20, m + 52), (210, 210, 210))
             circ((x + 26, m + 48), 4, (200, 200, 200))
-    elif kind in ('plant', 'tree'):
+    elif kind == 'table':
+        c = (W // 2, H // 2)
+        for k in range(4):                                          # chairs
+            a = k * math.pi / 2 + math.pi / 4
+            px, py = int(c[0] + math.cos(a) * PX * 0.33), int(c[1] + math.sin(a) * PX * 0.33)
+            rect((px - 9, py - 9), (px + 9, py + 9), (40, 52, 70))
+            rect((px - 7, py - 7), (px + 7, py + 7), (64, 84, 112))
+            rect((px - 9, py - 9), (px + 9, py + 9), (18, 22, 30), 2)
+        circ(c, PX * 0.25, (40, 74, 118)); circ(c, PX * 0.22, (58, 104, 156))
+        cv2.ellipse(lay, c, (int(PX * 0.17), int(PX * 0.17)), 0, 200, 290, (120, 170, 210, 255), 2, aa)
+        circ(c, PX * 0.25, (16, 26, 40), 2)
+        circ((c[0] + 6, c[1] - 4), 5, (230, 230, 230)); circ((c[0] - 7, c[1] + 6), 4, (60, 120, 200))
+    elif kind == 'tree':
+        region = np.zeros((H, W, 4), np.uint8)
+        for i in range(wt):
+            for j in range(ht):
+                tree_layer(region, i * PX + PX // 2, j * PX + PX // 2, PX * 0.47, rnd)
+        lay[:] = region
+    elif kind == 'plant':
         for i in range(wt):
             for j in range(ht):
                 cx, cy = i * PX + PX // 2, j * PX + PX // 2
@@ -434,6 +453,105 @@ def draw_prop(canvas, shadow, kind, x0, y0, wt, ht, rnd):
     shadow[y0:y0 + H, x0:x0 + W] = np.maximum(shadow[y0:y0 + H, x0:x0 + W], a[..., 0])
 
 
+def tree_layer(lay, cx, cy, r, rnd, bush=False):
+    """Draws a crisp layered canopy (BGRA, OpenCV colour order) into `lay`."""
+    h, w = lay.shape[:2]
+    blobs = [(cx + math.cos(a) * r * 0.42, cy + math.sin(a) * r * 0.42, r * rnd.uniform(0.5, 0.62))
+             for a in [k * 6.283 / 7 + rnd.random() * 0.5 for k in range(7)]] + [(cx, cy, r * 0.6)]
+    base = np.zeros((h, w), np.uint8)
+    for x, y, rr in blobs:
+        cv2.circle(base, (int(x), int(y)), int(rr), 255, -1, cv2.LINE_AA)
+    lit = np.zeros((h, w), np.uint8)
+    for x, y, rr in blobs:
+        cv2.circle(lit, (int(x - rr * 0.22), int(y - rr * 0.25)), int(rr * 0.72), 255, -1, cv2.LINE_AA)
+    lit = cv2.bitwise_and(lit, base)
+    top = np.zeros((h, w), np.uint8)
+    for x, y, rr in blobs:
+        if rnd.random() < 0.7:
+            cv2.circle(top, (int(x - rr * 0.35), int(y - rr * 0.4)), int(rr * 0.3), 255, -1, cv2.LINE_AA)
+    top = cv2.bitwise_and(top, lit)
+    edge = cv2.subtract(base, cv2.erode(base, np.ones((3, 3), np.uint8)))
+    g = (rnd.randint(-8, 8), rnd.randint(-10, 10))
+    dark, mid, light, hi = ((26, 58 + g[1], 24), (36, 92 + g[1], 46 + g[0]), (52, 128 + g[1], 70 + g[0]), (90, 170, 112))
+    if bush:
+        dark, mid, light, hi = ((24, 52, 26), (34, 84, 48), (48, 116, 70), (80, 156, 104))
+    col = np.zeros((h, w, 3), np.float32) + dark
+    for m, c in ((lit, mid), (top, light)):
+        a = (m.astype(np.float32) / 255)[..., None]
+        col = col * (1 - a) + np.array(c, np.float32) * a
+    # leaf texture: small clumps of light and shade
+    rs = np.random.RandomState(rnd.randint(0, 1 << 30))
+    leaf = cv2.resize(rs.rand(h // 4 + 2, w // 4 + 2).astype(np.float32), (w + 8, h + 8), interpolation=cv2.INTER_NEAREST)[:h, :w]
+    col *= (0.86 + leaf * 0.26)[..., None]
+    a = (top.astype(np.float32) / 255) * (leaf > 0.8)
+    col = col * (1 - a[..., None]) + np.array(hi, np.float32) * a[..., None]
+    col[edge > 0] *= 0.55
+    alpha = base.astype(np.float32) / 255
+    cur_a = lay[..., 3:].astype(np.float32) / 255
+    out_a = alpha[..., None] + cur_a * (1 - alpha[..., None])
+    rgbv = (col * alpha[..., None] + lay[..., :3].astype(np.float32) * cur_a * (1 - alpha[..., None])) / np.maximum(out_a, 1e-4)
+    lay[..., :3] = np.clip(rgbv, 0, 255).astype(np.uint8)
+    lay[..., 3] = np.clip(out_a[..., 0] * 255, 0, 255).astype(np.uint8)
+
+
+def rock_layer(lay, cx, cy, r, rnd):
+    pts = []
+    for k in range(7):
+        a = k / 7 * 6.283 + rnd.uniform(-0.25, 0.25)
+        rr = r * rnd.uniform(0.7, 1.0)
+        pts.append((int(cx + math.cos(a) * rr), int(cy + math.sin(a) * rr * 0.8)))
+    pts = np.array(pts, np.int32)
+    g = rnd.randint(100, 130)
+    cv2.fillPoly(lay, [pts], (g - 8, g, g + 4, 255), cv2.LINE_AA)
+    hi = ((pts - (cx, cy)) * 0.55 + (cx - r * 0.18, cy - r * 0.2)).astype(np.int32)
+    cv2.fillPoly(lay, [hi], (g + 28, g + 34, g + 38, 255), cv2.LINE_AA)
+    cv2.polylines(lay, [pts], True, (40, 42, 44, 255), 2, cv2.LINE_AA)
+
+
+def paste(canvas, shadow, lay, x0, y0):
+    """Alpha-composites a BGRA layer at (x0, y0), clipped to the canvas; marks its shadow."""
+    H, W = canvas.shape[:2]
+    h, w = lay.shape[:2]
+    ax0, ay0, ax1, ay1 = max(0, x0), max(0, y0), min(W, x0 + w), min(H, y0 + h)
+    if ax0 >= ax1 or ay0 >= ay1: return
+    sub = lay[ay0 - y0:ay1 - y0, ax0 - x0:ax1 - x0]
+    rgba = sub[..., [2, 1, 0, 3]].astype(np.float32)
+    a = rgba[..., 3:] / 255
+    reg = canvas[ay0:ay1, ax0:ax1]
+    reg[:] = reg * (1 - a) + rgba[..., :3] * a
+    shadow[ay0:ay1, ax0:ax1] = np.maximum(shadow[ay0:ay1, ax0:ax1], a[..., 0])
+
+
+def outside_decor(canvas, shadow, theme, rnd, h0, w0, h, w):
+    """Trees, bushes, rocks and parked props scattered around the map."""
+    kinds = theme.get('outdecor')
+    if not kinds: return
+    lo, hi_x, hi_y = (P + 1) * PX, (P + w0 - 1) * PX, (P + h0 - 1) * PX
+    taken = set()
+    for ty in range(h):
+        for tx in range(w):
+            inside = P <= tx < P + w0 and P <= ty < P + h0
+            if inside or rnd.random() > theme.get('outdensity', 0.45): continue
+            kind = rnd.choice(kinds)
+            cx, cy = tx * PX + PX // 2 + rnd.randint(-14, 14), ty * PX + PX // 2 + rnd.randint(-14, 14)
+            r = {'tree': PX * rnd.uniform(0.6, 0.95), 'bush': PX * rnd.uniform(0.25, 0.36), 'rock': PX * rnd.uniform(0.16, 0.3)}.get(kind, PX * 0.5)
+            # keep the playable area clear (only the border wall may be overhung)
+            if lo - r < cx < hi_x + r and lo - r < cy < hi_y + r: continue
+            if kind in ('tree', 'bush', 'rock'):
+                S = int(r * 2 + 8)
+                lay = np.zeros((S, S, 4), np.uint8)
+                if kind == 'rock': rock_layer(lay, S // 2, S // 2, r, rnd)
+                else: tree_layer(lay, S // 2, S // 2, r, rnd, bush=kind == 'bush')
+                paste(canvas, shadow, lay, cx - S // 2, cy - S // 2)
+            else:
+                if (tx, ty) in taken or (tx + 1, ty) in taken: continue
+                wt = 2 if kind.startswith('car') else 1
+                if P - 1 <= tx + wt - 1 and tx <= P + w0 and P - 1 <= ty <= P + h0: continue
+                if tx + wt > w: continue
+                taken.update({(tx, ty), (tx + 1, ty)})
+                draw_prop(canvas, shadow, kind, tx * PX, ty * PX, wt, 1, rnd)
+
+
 # ── the map ────────────────────────────────────────────────────────────────
 def paint_map(cells, theme, seed=1):
     """cells[y][x] = dict(kind='floor'|'wall'|'void'|'water'|'prop', mat=…, prop=(kind, wt, ht, i, j), floor=…)."""
@@ -443,6 +561,9 @@ def paint_map(cells, theme, seed=1):
     h0, w0 = len(cells), len(cells[0])
     # Surroundings: copy the nearest edge cell.
     grid = [[cells[min(h0 - 1, max(0, y - P))][min(w0 - 1, max(0, x - P))] for x in range(w0 + 2 * P)] for y in range(h0 + 2 * P)]
+    if theme.get('outside'):
+        ground = dict(kind='floor', mat=theme['outside'])
+        grid = [[c if P <= x < P + w0 and P <= y < P + h0 else ground for x, c in enumerate(row)] for y, row in enumerate(grid)]
     h, w = len(grid), len(grid[0])
     H, W = h * PX, w * PX
     Y, X = np.mgrid[0:H, 0:W].astype(np.float32)
@@ -498,11 +619,11 @@ def paint_map(cells, theme, seed=1):
             k = grid[y][x]['kind']
             if k == 'wall':
                 wallmask[y * PX:(y + 1) * PX, x * PX:(x + 1) * PX] = 1
-    g1 = np.clip(n.fbm(H, W, 140, 5) * 1.1 + 0.05, 0, 1)
-    g2 = np.clip(n.fbm(H, W, 30, 3) * 1.4 - 0.2, 0, 1)
-    grime = g1 * 0.38 + g2 * 0.16
-    near = cv2.GaussianBlur(wallmask, (0, 0), PX * 0.3)
-    grime += near * 0.35
+    g1 = np.clip(n.fbm(H, W, 140, 3) + 0.1, 0, 1)
+    patches = cv2.GaussianBlur((n.fbm(H, W, 45, 4) > 0.36).astype(np.float32), (0, 0), 0.9)
+    grime = g1 * 0.1 + patches * 0.2
+    near = cv2.GaussianBlur(wallmask, (0, 0), PX * 0.14)
+    grime += near * 0.3
     dirt_col = rgb(*theme.get('dirt', (70, 58, 44)))
     blend(canvas, np.broadcast_to(dirt_col, canvas.shape), np.clip(grime, 0, 0.62))
 
@@ -588,14 +709,15 @@ def paint_map(cells, theme, seed=1):
             done.add((ox, oy, kind))
             if 0 <= ox and 0 <= oy and ox + wt <= w and oy + ht <= h:
                 draw_prop(canvas, shadow, kind, ox * PX, oy * PX, wt, ht, rnd)
+    outside_decor(canvas, shadow, theme, rnd, h0, w0, h, w)
 
     # Soft shadows down-right of walls and props, onto everything below them.
-    sh = cv2.GaussianBlur(shadow, (0, 0), 7)
-    M = np.float32([[1, 0, 10], [0, 1, 14]])
+    sh = cv2.GaussianBlur(shadow, (0, 0), 3)
+    M = np.float32([[1, 0, 9], [0, 1, 12]])
     sh = cv2.warpAffine(sh, M, (W, H))
-    canvas *= (1 - np.clip(sh - shadow, 0, 1) * 0.5)[..., None]
-    ao = cv2.GaussianBlur(shadow, (0, 0), 16)
-    canvas *= (1 - np.clip(ao - shadow, 0, 1) * 0.35)[..., None]
+    canvas *= (1 - np.clip(sh - shadow, 0, 1) * 0.42)[..., None]
+    ao = cv2.GaussianBlur(shadow, (0, 0), 9)
+    canvas *= (1 - np.clip(ao - shadow, 0, 1) * 0.22)[..., None]
 
     # Lighting: broad soft light variation + optional lamp pools.
     light = 1 + n.fbm(H, W, 400, 2) * 0.08
@@ -611,10 +733,12 @@ def paint_map(cells, theme, seed=1):
 
     # Surroundings outside the map: darkened.
     out = np.ones((H, W), np.float32)
-    out[:P * PX] = out[-P * PX:] = 0.42
-    out[:, :P * PX] = out[:, -P * PX:] = 0.42
+    dim = 0.62 if theme.get('outside') else 0.42
+    out[:P * PX] = out[-P * PX:] = dim
+    out[:, :P * PX] = out[:, -P * PX:] = dim
     out = cv2.GaussianBlur(out, (0, 0), PX * 0.3)
     canvas *= out[..., None]
+    canvas = cv2.addWeighted(canvas, 1.35, cv2.GaussianBlur(canvas, (0, 0), 1.2), -0.35, 0)
     return np.clip(canvas, 0, 255).astype(np.uint8)
 
 
@@ -708,7 +832,7 @@ def decal_layer(canvas, n, rnd, grid, theme, H, W):
                 aa_ = a + bend * k
                 pts.append((px_ + math.cos(aa_) * k * 9 - math.sin(a) * off, py_ + math.sin(aa_) * k * 9 + math.cos(a) * off))
             cv2.polylines(lay, [np.array(pts, np.int32)], False, 0.32, 5, cv2.LINE_AA)
-    lay = cv2.GaussianBlur(lay, (0, 0), 1.2)
+    lay = cv2.GaussianBlur(lay, (0, 0), 0.6)
     canvas *= (1 - np.clip(lay, 0, 0.6))[..., None]
     if wet.any():
         wet = cv2.GaussianBlur(wet, (0, 0), 2.5)
@@ -729,11 +853,11 @@ def decal_layer(canvas, n, rnd, grid, theme, H, W):
         sx_, sy_ = x * PX + rnd.choice((0, q)), y * PX + rnd.choice((0, q))
         canvas[sy_ + 3:sy_ + q - 3, sx_ + 3:sx_ + q - 3] *= rnd.uniform(0.72, 0.88)
     # Leaves / litter specks.
-    cols = theme.get('specks', [(150, 90, 40), (190, 140, 50), (90, 110, 40), (225, 225, 215)])
-    for _ in range(int(area * 0.9)):
+    cols = theme.get('specks', [(46, 42, 38), (70, 64, 56), (96, 90, 80)])
+    for _ in range(int(area * 0.35)):
         x, y = rnd.choice(floor_cells)
         if grid[y][x].get('floor') in ('carpet_red', 'carpet_blue', 'labtile'): continue
         cxp, cyp = int(x * PX + rnd.random() * PX), int(y * PX + rnd.random() * PX)
         col = rnd.choice(cols)
-        r_ = rnd.randint(1, 3)
+        r_ = rnd.randint(1, 2)
         cv2.circle(canvas, (cxp, cyp), r_, tuple(float(c) for c in col), -1, cv2.LINE_AA)

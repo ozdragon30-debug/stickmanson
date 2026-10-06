@@ -171,13 +171,18 @@ const WeaponArt = (() => {
       return 60;
     },
 
-    sledgehammer(c) {
-      rect(c, -1.8, -86, 3.6, 100, vgrad(c, -2, 2, '#7a522c', '#5a3a1d', '#a87a4c'), OUT, 1.5); // handle
+    // k < 1 foreshortens the hammer (seen from above while it is raised or
+    // resting on the shoulder): the handle shortens, the head stays readable.
+    sledgehammer(c, time, k = 1) {
+      const L = 86 * k, hy = -90.5 * k, ky = Math.max(0.62, k);
+      rect(c, -1.8, -L, 3.6, L + 14, vgrad(c, -2, 2, '#7a522c', '#5a3a1d', '#a87a4c'), OUT, 1.5); // handle
       rect(c, -2.2, 6, 4.4, 8, '#202226', OUT, 1);
-      rect(c, -15, -98, 30, 15, vgrad(c, -15, 15, '#6f757d', '#4a4f56', '#c2c8cf'), OUT, 2);    // head
-      rect(c, -15, -98, 4, 15, '#3a3e44', null);
-      rect(c, 11, -98, 4, 15, '#3a3e44', null);
-      return 98;
+      c.save(); c.translate(0, hy); c.scale(1, ky);
+      rect(c, -15, -7.5, 30, 15, vgrad(c, -15, 15, '#6f757d', '#4a4f56', '#c2c8cf'), OUT, 2);    // head
+      rect(c, -15, -7.5, 4, 15, '#3a3e44', null);
+      rect(c, 11, -7.5, 4, 15, '#3a3e44', null);
+      c.restore();
+      return -hy + 7.5 * ky;
     },
 
     // Worn on the head (drawn by the figure); this is the floor/HUD version.

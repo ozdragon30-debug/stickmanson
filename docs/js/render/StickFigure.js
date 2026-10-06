@@ -236,20 +236,40 @@ const StickFigure = (() => {
     arms(c, [gx + 6, gy + 4], [gx - 6, gy + 5]);
   }
 
+  // Sledgehammer: rests on the right shoulder; on attack it is lifted over the
+  // head and slammed straight ahead with the arms fully extended (the hit
+  // lands ~0.13 s in), held a moment, then hauled back onto the shoulder.
+  // p spans the 74-frame shoot animation (~6 s), so 0.01 ≈ 60 ms.
+  const SLEDGE_REST = { g: [14, -9], a: 2.75, k: 0.42 };
+  const SLEDGE_HIT = { g: [3, -25], a: 0, k: 0.65 };
+  function sledgePose(from, to, u) {
+    // Over-the-head arc: shorten towards vertical, flip direction, lengthen.
+    const half = u < 0.5, v = half ? u * 2 : (u - 0.5) * 2;
+    const k = half ? lerp(from.k, 0.06, v) : lerp(0.06, to.k, v);
+    const a = half ? from.a : to.a;
+    const gx = lerp(from.g[0], to.g[0], u), gy = lerp(from.g[1], to.g[1], u) - 8 * Math.sin(Math.PI * u);
+    return { gx, gy, a, k };
+  }
   function drawSledge(c, kind, p) {
-    let a = 2.5 + 0.03 * Math.sin(now() * 1.6), gx = 16, gy = -8 + breathe();
+    const sway = 0.03 * Math.sin(now() * 1.6), b = breathe();
+    let pose = { gx: SLEDGE_REST.g[0], gy: SLEDGE_REST.g[1] + b, a: SLEDGE_REST.a + sway, k: SLEDGE_REST.k };
+    if (kind === 'walk') pose.gy += 1.5 * Math.sin(now() * 9);
     if (kind === 'shoot') {
-      const up = seg(p, 0, 0.12), slam = seg(p, 0.12, 0.18), back = seg(p, 0.5, 0.75);
-      if (p < 0.12) a = lerp(2.5, 3.5, easeOut(up));
-      else if (p < 0.5) a = lerp(3.5, Math.PI * 2, easeOut(slam));
-      else a = lerp(Math.PI * 2, 2.5 + Math.PI * 2, easeInOut(back));
-      const reach = p < 0.12 ? 18 : p < 0.5 ? lerp(18, 26, slam) : lerp(26, 18, back);
-      [gx, gy] = swingPose(a, reach);
-      if (p >= 0.12 && p < 0.24) trail(c, 0, -3, 3.5, a, 20, 112, '230,230,230', 0.3 * (1 - seg(p, 0.18, 0.24)));
+      if (p < 0.022) pose = sledgePose(SLEDGE_REST, SLEDGE_HIT, Math.pow(seg(p, 0, 0.022), 1.6));
+      else if (p < 0.09) {
+        const j = 1 - seg(p, 0.022, 0.035);            // impact jolt
+        pose = { gx: SLEDGE_HIT.g[0], gy: SLEDGE_HIT.g[1] + 2 * j, a: 0.04 * j * Math.sin(p * 900), k: SLEDGE_HIT.k };
+      } else if (p < 0.25) pose = sledgePose(SLEDGE_HIT, SLEDGE_REST, easeInOut(seg(p, 0.09, 0.25)));
+      if (p > 0.012 && p < 0.03) {                    // brief motion streak on the way down
+        const k = 1 - seg(p, 0.022, 0.03);
+        c.save(); c.globalAlpha = 0.18 * k;
+        c.fillStyle = '#e8e8e8'; c.beginPath(); c.ellipse(2, -60, 16, 34, 0, 0, Math.PI * 2); c.fill();
+        c.restore();
+      }
     }
-    weaponAt(c, 'sledgehammer', gx, gy, a);
-    const [lx, ly] = along(gx, gy, a, -9);
-    arms(c, [gx, gy], [lx, ly]);
+    weaponAt(c, 'sledgehammer', pose.gx, pose.gy, pose.a, pose.k);
+    const [lx, ly] = along(pose.gx, pose.gy, pose.a, -8);
+    arms(c, [pose.gx, pose.gy], [lx, ly]);
   }
 
   function drawTesla(c, kind, p) {
@@ -393,8 +413,8 @@ const StickFigure = (() => {
   const particles = {
     draw(c, anim, p) {
       if (anim === 'sledgehammer_particle') {
-        // Impact on landing (the hammer hits ~1/3 into this effect).
-        const q = seg(p, 0.33, 0.75);
+        // Impact as the hammer lands (~0.13 s in).
+        const q = seg(p, 0.04, 0.3);
         if (q <= 0 || q >= 1) return;
         const k = 1 - q;
         c.beginPath(); c.arc(0, 0, 10 + 60 * easeOut(q), 0, Math.PI * 2);

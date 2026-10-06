@@ -4,25 +4,25 @@
     "HEAD_RADIUS": 17,
     "TO_RADIANS": 0.017453292519943295
   },
-  "weapons": "76e32d7606a1cf87e8be6eee9566f04e7f63702ea2d5b15fbbf42057232691d6",
+  "weapons": "9e6b4cafa4ceb4ac913ffd7cfca53b8fecd8e7386247b0d658332d1b18a53d44",
   "hitShapes": "c06495d51fa118899bb507771351afb258e2b304daaed27fcb223fe9c22626c3",
   "walkCollision": "9379caed2f4e9aef454b8a06811d84542ea90a384a7aa70fb4d132b7e514f32e",
   "maps": {
-    "asphaltstreets.dat": "fb4c4a36cd480a85430c2ee00763c0aedb04142da8a0e4392f38bf04e7c03802",
-    "biolab.dat": "f6eeb386b9a10c21a51cb8866c667269198b40412ae85276f2ff6bcda7e729c8",
+    "asphaltstreets.dat": "745603f89af89f611b3b2b3e588d0cd3c8898a8cee49a6fb6ca237237bc4d198",
+    "biolab.dat": "cc9c3c3d0ed356b8db106fb951d199e7176083428afdb10762e5a93f47b6ea1e",
     "containerport.dat": "079c3fd37e8e01c8f1f1a6d656151b302b489bf0d7e442dfb6c8283bdf5ceee9",
     "debug.dat": "3ad6e440f812babc99da105d747f894311766f9fbfedf6b638ebb45615ca73be",
     "foundry.dat": "1aaa9cfef3ac377c5f49e5fe884f7fdbbde005396c1559fa14949e143e2017b6",
     "hedgemaze.dat": "3c57d304109241e174f22143adddde3f902617aee5a04c4373396f8bcb92bd56",
     "metroline.dat": "0b9a41edeb225715ebf640f93d10be0d6208c797916e615c6d4a573cf8d69cd2",
-    "officefloor.dat": "973c6f3fa2c34bfd8d753cf70cb468925a18c8a1dcc4f8e94292ccc27ced9baf",
+    "officefloor.dat": "c50c51432fc139cffdb68b6648bbdac89d1d11870d53ed17b12e6b147f1f30be",
     "orbitstation.dat": "c0c982f9addba01fdefee9902630da45df20cf2b58d8b2ad472a9898475b3274",
     "rooftops.dat": "14da98bc7a669042452fef5b19a8cede9698d2ae26b7162bdb531631457e6120",
-    "sandbase.dat": "238a5a70cafa3011592c6f8c754d37d31298af972559b1ff6a60e6171e10e311",
+    "sandbase.dat": "35a7c0fa48f00041fe92e6a1ae1c97728f40ba0ac26be9d327bf9d49f0667f09",
     "shipyard.dat": "9162fbddfadd7786306c728be3d5c1aa39dba0fdd1eacafd945dcddce084eefe",
     "stonekeep.dat": "3c6196650c6e5af0b5d2ccc0fda3a5fd1a8e8a4be3310969c0d99e090a26e44a",
     "stormchannel.dat": "9ac23056a04b6b2c8b2e250623716ef1ae9ccf51ae2e6b04cf0232581b3f0a04",
     "thepitarena.dat": "cd54dbfe6f379dc62dd280879d3a4717c1395325dfcbc9bc49100e8c1cdb6a17",
-    "trailerpark.dat": "2ade11f32d7a059e209e385216ee988ffb7f1d95f6b34293a5ccc7037c0f8a60"
+    "trailerpark.dat": "55ab4167fe6f2ee3f00d681662dd8ac929ea5fd8c78bcccb2edcec6791674b26"
   }
 }
