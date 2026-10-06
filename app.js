@@ -344,7 +344,9 @@ io.on("connection", (socket) => {
       // Hold the score (and the room) briefly in case this was a network blip.
       const timer = setTimeout(() => {
         departed.delete(graceKey);
-        room.emit("chatMessage", { name: 'Server', text: `${leavingName} left the game.` });
+        // Only announce into the room they actually left (not a newer room
+        // that has since been created under the same code).
+        if (rooms.get(room.id) === room) room.emit("chatMessage", { name: 'Server', text: `${leavingName} left the game.` });
         releaseRoom(room);
       }, RECONNECT_GRACE_MS);
       if (timer.unref) timer.unref();

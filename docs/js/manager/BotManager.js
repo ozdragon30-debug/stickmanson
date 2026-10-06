@@ -205,7 +205,7 @@ class BotManager {
       if (!this.active) return;
       this.status = 'no-server';
       // The server's round clock no longer applies: run local rounds until it returns.
-      if (!this._offlineRounds) this._beginOfflineRound();
+      if (!this._offlineRounds) { scoreboardManager.hideRoundEnd(); this._beginOfflineRound(); }
     });
 
     // A real player joined — bots are no longer needed.
