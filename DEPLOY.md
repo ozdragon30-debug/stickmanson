@@ -27,7 +27,9 @@ docker compose up -d          # http://SUNUCU_IP:1138
 ```
 
 `docker-compose.yml` içinde `ADMIN_PASSWORD` satırını açıp bir şifre koy;
-oyunda sohbete `!login şifre` yazınca admin olursun. Ban listesi kalıcıdır.
+oyunda sohbete `!login şifre` yazınca admin olursun (Docker içinde "aynı ağ =
+admin" kuralı kapalıdır, çünkü Docker'ın NAT'ı herkesi yerel gösterebilir).
+Ban listesi kalıcıdır.
 
 ### Alan adı + HTTPS (nginx)
 
@@ -51,7 +53,8 @@ server {
 HTTPS için: `sudo certbot --nginx -d stick.ornek.com`.
 
 **Önemli:** proxy arkasında `TRUST_PROXY=1` ayarla (compose dosyasında
-yorumlu satır). Ayarlamazsan herkes nginx'in adresinden geliyor görünür:
+yorumlu satır) ve compose'daki portu `"127.0.0.1:1138:1138"` yap; böylece kimse
+nginx'i atlayıp doğrudan 1138'e bağlanarak sahte IP başlığı gönderemez. Ayarlamazsan herkes nginx'in adresinden geliyor görünür:
 IP başına bağlantı sınırı tüm sunucuya uygulanır ve ban'lar herkesi etkiler.
 
 ## 3) Render / Railway / Fly.io (sunucu yönetmeden)
@@ -89,6 +92,7 @@ adresini yaz, ya da linke `?server=https://stick.ornek.com` ekle.
 |---|---|---|
 | `PORT` | `1138` | Port |
 | `ADMIN_PASSWORD` | – | `!login <şifre>` ile uzaktan admin |
+| `LAN_ADMIN` | açık (Docker'da `0`) | Aynı ağdan doğrudan bağlananları admin say |
 | `TRUST_PROXY` | kapalı | nginx/Render vb. arkasında `1` yap |
 | `ROUND_SECONDS` | `300` | Tur süresi |
 | `MAX_PLAYERS` | `16` | Oda başına oyuncu |

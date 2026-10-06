@@ -64,6 +64,7 @@ Players open `http://your-server:1138` and join the public room automatically. T
 | `CORS_ORIGIN` | any | Comma-separated origins allowed to connect from other sites |
 | `TRUST_PROXY` | off | Set to `1` behind nginx/Render/Fly etc. so real client IPs (bans, admin) are used |
 | `ADMIN_PASSWORD` | – | Enables `!login <password>` for remote admins |
+| `LAN_ADMIN` | on (`0` in Docker) | Treat direct LAN/localhost players as admins |
 
 Health check: `GET /healthz` (JSON). Status page for hosts: `GET /status`.
 
