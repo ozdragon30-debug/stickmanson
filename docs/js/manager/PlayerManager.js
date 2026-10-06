@@ -35,7 +35,8 @@ class PlayerManager {
   }
 
   getPlayer(id) {
-    return this.players[id];
+    // Own properties only: ids like "constructor" must never resolve to Object members.
+    return Object.prototype.hasOwnProperty.call(this.players, id) ? this.players[id] : undefined;
   }
 
   getPlayers() {

@@ -3,9 +3,11 @@ services:
   stick-arena:
     build: .
     ports:
+      # Behind nginx (with TRUST_PROXY=1) publish on localhost only, so nobody can
+      # bypass the proxy and spoof X-Forwarded-For:   "127.0.0.1:1138:1138"
       - "1138:1138"
     environment:
-      # ADMIN_PASSWORD: change-me      # enables "!login <password>" in chat
+      # ADMIN_PASSWORD: change-me      # enables "!login <password>" in chat (LAN admin is off in Docker)
       # TRUST_PROXY: "1"               # set when running behind a reverse proxy
       BANS_FILE: /data/bans.json
     volumes:

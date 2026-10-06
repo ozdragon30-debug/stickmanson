@@ -202,7 +202,10 @@ class BotManager {
 
     // Server disconnected while bots are running.
     socketManager.on('disconnect', () => {
-      if (this.active) this.status = 'no-server';
+      if (!this.active) return;
+      this.status = 'no-server';
+      // The server's round clock no longer applies: run local rounds until it returns.
+      if (!this._offlineRounds) this._beginOfflineRound();
     });
 
     // A real player joined — bots are no longer needed.
@@ -479,7 +482,10 @@ class BotManager {
     Constants._weaponsReady.then(() => loadMap(file))
       .then((ok) => {
         // Offline with a partially cached game: try a few other maps.
-        if (!ok) { if (attempt < 8) this._startOffline(attempt + 1); return; }
+        // A server connected meanwhile (its map load superseded ours): stand down.
+        if (loopStarted && !this.active && socketManager.isConnected) return;
+        if (socketManager.isConnected) return;
+        if (!ok) { if (attempt < 8 && !loopStarted) this._startOffline(attempt + 1); return; }
         const pts = (map.ready && map.spawnPoints.length) ? map.spawnPoints : [{ x: 400, y: 300 }];
         const botCount = BotManager.getBotCount(map);
         this.spawn(pts, botCount);

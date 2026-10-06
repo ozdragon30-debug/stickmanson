@@ -23,6 +23,10 @@ const HOST            = process.env.HOST || undefined;
 // so client IPs are read from X-Forwarded-For. Never trust that header otherwise:
 // anyone can send it.
 const TRUST_PROXY     = /^(1|true|yes)$/i.test(process.env.TRUST_PROXY || '');
+// Direct LAN/localhost connections are admins (original behaviour). Disable
+// with LAN_ADMIN=0 — the Docker image does, because Docker's NAT can make
+// every player appear to come from the bridge gateway (a private address).
+const LAN_ADMIN       = !/^(0|false|no)$/i.test(process.env.LAN_ADMIN || '');
 // Optional admin password: "!login <password>" in chat grants admin commands.
 const ADMIN_PASSWORD  = process.env.ADMIN_PASSWORD || '';
 const ROUND_DURATION_MS    = (parseInt(process.env.ROUND_SECONDS, 10) || 5 * 60) * 1000; // 5 minutes
@@ -160,6 +164,9 @@ function getRoom(id) {
 }
 
 function releaseRoom(room) {
+  // A stale reference (the code was released and re-created meanwhile) must
+  // never delete the newer room registered under the same id.
+  if (rooms.get(room.id) !== room) { if (room.size === 0) room.dispose(); return; }
   if (room.id !== PUBLIC_ROOM && room.size === 0) {
     room.dispose();
     rooms.delete(room.id);
@@ -192,7 +199,7 @@ function isAdmin(socket) {
   if (socket.data.isAdmin) return true;
   // Behind a proxy (TRUST_PROXY, or any forwarded request) LAN trust is
   // meaningless: admins must use ADMIN_PASSWORD.
-  if (TRUST_PROXY || socket.handshake.headers['x-forwarded-for']) return false;
+  if (!LAN_ADMIN || TRUST_PROXY || socket.handshake.headers['x-forwarded-for']) return false;
   const ip = clientIp(socket);
   return ip === '::1' || ip === '127.0.0.1' || ip === 'localhost'
     || /^10\./.test(ip)
@@ -310,6 +317,12 @@ io.on("connection", (socket) => {
   const announceJoin = () => {
     if (socket.data.announced || !players[socket.id]) return;
     socket.data.announced = true;
+    // A page reload gets a new session token: quietly drop the previous
+    // tab's pending "left the game" for the same name in this room.
+    const myName = players[socket.id].name;
+    for (const [key, d] of departed) {
+      if (key.startsWith(room.id + '|') && d.name === myName) { clearTimeout(d.timer); departed.delete(key); return; }
+    }
     room.emit("chatMessage", { name: 'Server', text: `${players[socket.id].name} joined the game.` });
   };
   setTimeout(announceJoin, 30000);
@@ -324,7 +337,8 @@ io.on("connection", (socket) => {
     delete players[socket.id];
     room.emit("playerDisconnected", socket.id);
     room.emit("scoreUpdate", { scores: room.getScores() });
-    if (socket.data.replaced) { releaseRoom(room); return; }
+    // Replaced by the same player's new socket: the room is about to get them back.
+    if (socket.data.replaced) return;
     const graceKey = socket.data.session ? `${room.id}|${socket.data.session}` : null;
     if (graceKey && leaving) {
       // Hold the score (and the room) briefly in case this was a network blip.
@@ -370,14 +384,14 @@ io.on("connection", (socket) => {
   socket.on("playerHit", (data) => {
     if (!data || !players[socket.id]) return;
     const { playerId: victimId, weaponId } = data;
-    if (typeof victimId !== 'string' || !(victimId in players) || victimId === socket.id) return;
+    if (typeof victimId !== 'string' || !Object.hasOwn(players, victimId) || victimId === socket.id) return;
     if (game.phase !== 'playing') return;
     if (!validWeaponId(weaponId)) return;
     const weapon = weaponsData[weaponId];
 
     // Token bucket per victim: refills one hit per weapon cooldown, holds two,
     // so genuine hits bunched up by network jitter still all count.
-    const buckets = socket.data.hitBuckets || (socket.data.hitBuckets = {});
+    const buckets = socket.data.hitBuckets || (socket.data.hitBuckets = Object.create(null));
     const now = Date.now();
     const bk = buckets[victimId] || (buckets[victimId] = { tokens: 2, t: now });
     bk.tokens = Math.min(2, bk.tokens + (now - bk.t) / weapon.fireCooldown);
@@ -394,7 +408,7 @@ io.on("connection", (socket) => {
     if (game.phase !== 'playing') return;
     players[socket.id].deaths  += 1;
     players[socket.id].weaponId = 0; // reset to fist on death
-    const killerId = (data && typeof data.killerId === 'string' && data.killerId !== socket.id && players[data.killerId])
+    const killerId = (data && typeof data.killerId === 'string' && data.killerId !== socket.id && Object.hasOwn(players, data.killerId))
       ? data.killerId : null;
     const weaponId = validWeaponId(data?.weaponId) ? data.weaponId : 0;
     if (killerId) players[killerId].kills += 1;

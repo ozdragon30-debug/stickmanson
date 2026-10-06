@@ -32,6 +32,9 @@ class SocketManager {
           reconnectionAttempts: Infinity,
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,
+          // Connected at the end of game.js, once every handler script has run
+          // (otherwise a fast server could deliver gameState before they exist).
+          autoConnect: false,
         };
         this.socket = window.GAME_SERVER ? io(window.GAME_SERVER, opts) : io(opts);
         this.socket.on('connect', () => {

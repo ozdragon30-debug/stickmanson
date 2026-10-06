@@ -278,6 +278,10 @@ socketManager.on("kicked", (data) => {
   hudManager.flash(t('hud.disconnected'), i18n.chat(data.reason || 'You have been removed from the server.'), '#ff6b6b', 8000);
   socketManager.socket.io.opts.reconnection = false;
   socketManager.kicked = true;
+  socketManager.kickReason = i18n.chat(data.reason || 'You have been removed from the server.');
+  // Refused before the game started (room full, banned): explain it in the
+  // menu and fall back to an offline bot match instead of hanging on "Loading".
+  if (!loopStarted) botManager._startOffline();
   socketManager.socket.disconnect();
 });
 

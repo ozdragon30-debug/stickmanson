@@ -46,8 +46,12 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== location.origin) return;
   if (url.pathname.includes('/socket.io/') || url.pathname.endsWith('/healthz')) return;
 
-  if (req.mode === 'navigate' || isCode(url)) {
-    const key = req.mode === 'navigate' ? 'index.html' : req;
+  // Only the game page itself is the offline shell (not /status or others).
+  const isShell = req.mode === 'navigate' && /\/(index\.html)?$/.test(url.pathname);
+  if (req.mode === 'navigate' && !isShell) return;
+
+  if (isShell || isCode(url)) {
+    const key = isShell ? 'index.html' : req;
     event.respondWith(
       fetch(req, { cache: 'no-cache' })
         .then(res => {

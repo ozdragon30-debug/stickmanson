@@ -207,6 +207,7 @@ class Menu {
                 : others === 1 ? t('menu.status.online1') : t('menu.status.onlineN', { n: others });
       return `<span class="dot online"></span>${msg}`;
     }
+    if (socketManager.kicked && socketManager.kickReason) return `<span class="dot offline"></span>${socketManager.kickReason.replace(/[<>&"]/g, '')}`;
     if (socketManager.socket && !botManager.active) return `<span class="dot"></span>${t('menu.status.connecting')}`;
     return `<span class="dot offline"></span>${t('menu.status.offline')}`;
   }

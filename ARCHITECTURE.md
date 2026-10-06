@@ -80,7 +80,7 @@ locally.
 
 ## Offline / PWA
 
-With no server (static hosting, file://, server down) the client starts a bot
+With no server (static hosting or server down; browsers block file:// fetches, so serve the folder over http) the client starts a bot
 match after 2 s. `sw.js` precaches everything in `precache.json` after the
 first visit: code is network-first (never mixes versions), assets are
 stale-while-revalidate.

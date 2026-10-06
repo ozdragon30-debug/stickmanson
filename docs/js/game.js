@@ -324,6 +324,8 @@ let loopStarted = false;
 
 // Kick off the offline-mode timer.  Must be after all managers are defined.
 botManager.init();
+// All scripts have run: now it is safe to receive server events.
+if (socketManager.socket) socketManager.socket.connect();
 
 // Resolves true once the map is live, false if it failed to load (callers may
 // retry with another map; e.g. offline with only some maps cached).

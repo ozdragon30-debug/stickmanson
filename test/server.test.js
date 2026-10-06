@@ -286,6 +286,17 @@ test('a brief disconnect keeps the round score and stays quiet', async () => {
   assert.strictEqual(app.player(back.id).kills, 1, 'score restored');
 });
 
+test('prototype keys are not valid player ids', async () => {
+  const a = await connect();
+  const relayed = next(a, 'playerGotHit', 300);
+  for (const id of ['__proto__', 'constructor', 'toString']) a.emit('playerHit', { playerId: id, weaponId: 0 });
+  a.emit('iDied', { killerId: '__proto__', weaponId: 0 });
+  assert.strictEqual(await relayed, null);
+  await new Promise(r => setTimeout(r, 100));
+  assert.strictEqual(Object.prototype.kills, undefined);
+  assert.strictEqual(Object.prototype.tokens, undefined);
+});
+
 test('admin weapon command no longer crashes the server', async () => {
   const a = await connect(); // direct localhost connection = LAN admin
   const forced = next(a, 'forceWeapon', 400);

@@ -67,10 +67,11 @@ function submitChat(text) {
   } else if (text === '!next' && botManager.active && !socketManager.isConnected) {
     // Offline: end the current round now (same as the server's !next).
     if (botManager._offlineRounds && botManager._roundPhase === 'playing') scoreboardManager.roundEndsAt = Date.now();
-    else loadMap(BotManager.randomMap());
-  } else if (text.startsWith('!map ') && (botManager.active || !socketManager.isConnected)) {
+    else botManager.startOfflineRound(BotManager.randomMap(botManager._currentMap));
+  } else if (text.startsWith('!map ') && !socketManager.isConnected && botManager.active) {
+    // Offline only (online the server owns the map); a fresh round on that map.
     const mapFile = findMapFile(text.substring(5).trim());
-    if (mapFile) loadMap(mapFile);
+    if (mapFile) { botManager.preferredMap = mapFile; botManager.startOfflineRound(mapFile); }
     else chatManager.addMessage('Server', `Unknown map: ${text.substring(5).trim()}`, null);
   } else if (socketManager.isConnected) {
     socketManager.emit('chatMessage', { text });

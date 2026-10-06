@@ -27,7 +27,7 @@ class Room {
     this.mapFiles = mapFiles;
     this.roundMs = roundMs;
     this.roundEndMs = roundEndMs;
-    this.players = {};
+    this.players = Object.create(null); // socket ids only — no prototype keys like "__proto__"
     this.roundId = 0;   // increments every round (reconnect grace restores scores only within a round)
     this.debugMapEnabled = false;
     this.roundEndTimeout = null;
