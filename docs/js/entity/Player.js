@@ -574,8 +574,9 @@ class Player {
     const tinted = tintCache.get(indicatorAtlas, frame, this.indicatorHue);
     if (!tinted) return;
 
-    const w = frame.w * 0.8;
-    const h = frame.h * 0.8;
+    // Drawn snug around the player, like the classic game's spinners.
+    const w = frame.w * 0.66;
+    const h = frame.h * 0.66;
     ctx.save();
     ctx.translate(this.body.x, this.body.y);
     if (spins) ctx.rotate((now % 3000) / 3000 * Math.PI * 2);

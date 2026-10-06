@@ -2,6 +2,13 @@
 
 ## 2026 modernisation
 
+### Closer to the classic look
+
+- Spinners are dark and dense and sit snug around the player again (the
+  classic silhouette); slimmer weapons, a short club-sized bat, thinner arms.
+- Melee swings show a brief crescent instead of a long glowing arc; hit
+  effects are small and quick; the sledgehammer kicks up dust.
+
 ### Engine rewritten
 
 - All remaining engine code from the original import was rewritten in a new

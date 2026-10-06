@@ -13,8 +13,8 @@ const StickFigure = (() => {
   const SHOULDER = 13;        // shoulder half-width (just outside the head)
   const SEG = 13;             // upper / lower arm length
   const INK = '#07090c';
-  const LIMB = 3.9;           // limb line width
-  const SIZE = 1.15;          // weapon drawing scale
+  const LIMB = 3.2;           // limb line width
+  const SIZE = 0.95;          // weapon drawing scale (slim, like the classic game)
 
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const seg = (p, a, b) => clamp((p - a) / (b - a), 0, 1);
@@ -60,9 +60,12 @@ const StickFigure = (() => {
     if (lh) { limb(c, -SHOULDER, 2, lh[0], lh[1], 1); hand(c, lh[0], lh[1]); }
   }
 
+  // Per-weapon size on top of SIZE (the bat is a short club, as in the classic game).
+  const WSCALE = { bat: 0.68 };
   function weaponAt(c, name, gx, gy, ang, ...args) {
-    c.save(); c.translate(gx, gy); c.rotate(ang); c.scale(SIZE, SIZE);
-    const len = WeaponArt.draw[name](c, now(), ...args) * SIZE;
+    const k = SIZE * (WSCALE[name] || 1);
+    c.save(); c.translate(gx, gy); c.rotate(ang); c.scale(k, k);
+    const len = WeaponArt.draw[name](c, now(), ...args) * k;
     c.restore();
     return len;
   }
@@ -194,39 +197,26 @@ const StickFigure = (() => {
   // Slash effect: a bright crescent swept by the blade tip out to the weapon's
   // reach, with a softer wedge behind it.
   const SLASH = {
-    katana: { rgb: '230,240,255', core: '255,255,255', add: false },
-    laser_sword: { rgb: '255,50,50', core: '255,235,235', add: true },
-    bat: { rgb: '255,230,180', core: '255,250,235', add: false },
+    katana: { rgb: '205,205,205', core: '255,255,255', add: false },
+    laser_sword: { rgb: '255,60,60', core: '255,235,235', add: true },
+    bat: { rgb: '214,190,120', core: '255,250,235', add: false },
   };
+  // The swing shows as a short crescent sweep (like the classic game): a
+  // moon-shaped band along the blade tip's path, thickest mid-swing, that
+  // flashes for a moment and is gone.
   function slash(c, w, a0, a1, r1, k) {
     if (k <= 0.01 || Math.abs(a1 - a0) < 0.05) return;
-    const S = SLASH[w], px = 0, py = -3;
+    const S = SLASH[w], py = -3;
     const s0 = Math.min(a0, a1) - Math.PI / 2, s1 = Math.max(a0, a1) - Math.PI / 2;
-    const lead = a1 - Math.PI / 2, ccw = a1 < a0;
+    const mid = (s0 + s1) / 2, shift = r1 * 0.22;
     c.save();
     if (S.add) c.globalCompositeOperation = 'lighter';
-    // Wedge.
-    const g = c.createRadialGradient(px, py, r1 * 0.3, px, py, r1 + 6);
-    g.addColorStop(0, `rgba(${S.rgb},0)`); g.addColorStop(0.8, `rgba(${S.rgb},${0.22 * k})`); g.addColorStop(1, `rgba(${S.rgb},0)`);
-    c.beginPath(); c.arc(px, py, r1 + 6, s0, s1); c.arc(px, py, r1 * 0.3, s1, s0, true); c.closePath();
-    c.fillStyle = g; c.fill();
-    // Crescent at the tip: thick at the blade, thinning towards the start.
-    const N = 14;
-    for (let i = 0; i < N; i++) {
-      const u0 = i / N, u1 = (i + 1) / N;
-      const t0 = ccw ? s1 - (s1 - s0) * u0 : s0 + (s1 - s0) * u0;
-      const t1 = ccw ? s1 - (s1 - s0) * u1 : s0 + (s1 - s0) * u1;
-      const near = ccw ? u1 : 1 - u0;   // 0 at the start of the swing, 1 at the blade
-      const wv = (1 - Math.abs(near - 1)) ;
-      c.beginPath(); c.arc(px, py, r1 - 3, Math.min(t0, t1), Math.max(t0, t1));
-      c.strokeStyle = `rgba(${S.rgb},${0.75 * k * wv})`; c.lineWidth = 2 + 7 * wv * k; c.lineCap = 'round'; c.stroke();
-      c.strokeStyle = `rgba(${S.core},${0.9 * k * wv})`; c.lineWidth = 1 + 2.5 * wv * k; c.stroke();
-    }
-    // Sparkle at the leading tip.
-    const tx = px + Math.cos(lead) * (r1 - 3), ty = py + Math.sin(lead) * (r1 - 3);
-    const sg = c.createRadialGradient(tx, ty, 0, tx, ty, 10 + 6 * k);
-    sg.addColorStop(0, `rgba(${S.core},${0.9 * k})`); sg.addColorStop(1, `rgba(${S.rgb},0)`);
-    c.fillStyle = sg; c.beginPath(); c.arc(tx, ty, 10 + 6 * k, 0, Math.PI * 2); c.fill();
+    c.beginPath();
+    c.arc(0, py, r1, s0, s1);
+    c.arc(Math.cos(mid) * shift, py + Math.sin(mid) * shift, r1 - shift * 0.2, s1, s0, true);
+    c.closePath();
+    c.fillStyle = `rgba(${S.rgb},${0.5 * k})`;
+    c.fill();
     c.restore();
   }
 
@@ -253,7 +243,7 @@ const StickFigure = (() => {
         const [px, py] = swingPose(a1, REACH);
         gx = lerp(px, idle.g[0], back); gy = lerp(py, idle.g[1], back);
       }
-      if (s >= 0.05 && s < 0.34) { trailFrom = a0; swingK = 1 - seg(s, 0.15, 0.34); }
+      if (s >= 0.05 && s < 0.2) { trailFrom = a0; swingK = 1 - seg(s, 0.1, 0.2); }
     } else if (kind === 'shoot') {
       // Thrust (katana/laser 3rd variant): straight out to full reach and back.
       const e = easeOut(seg(s, 0.02, 0.08)) * (1 - easeInOut(seg(s, 0.2, 0.32)));
@@ -264,7 +254,7 @@ const StickFigure = (() => {
     }
     const len = { bat: 72, katana: 88, laser_sword: 86 }[w];
     // Tip radius ≈ the hit range (bat 138, katana/laser 125 world px).
-    const tipR = REACH + 3 + len * SIZE;
+    const tipR = REACH + 3 + len * SIZE * (WSCALE[w] || 1);
     if (trailFrom !== null) slash(c, w, trailFrom, a, tipR, swingK);
     else if (kind === 'shoot' && swingK > 0) {      // thrust streak
       c.save(); if (SLASH[w].add) c.globalCompositeOperation = 'lighter';
@@ -362,7 +352,7 @@ const StickFigure = (() => {
 
   // ── Hit effects on the victim (melee) ─────────────────────────────────────
   // u: 0 → 1 over HIT_TIME; ang: direction the blow came from (radians, world).
-  const HIT_TIME = { katana: 0.32, laser_sword: 0.4, bat: 0.3, fist: 0.22, sledgehammer: 0.45, chainsaw: 0.3 };
+  const HIT_TIME = { katana: 0.18, laser_sword: 0.22, bat: 0.16, fist: 0.12, sledgehammer: 0.25, chainsaw: 0.2 };
   function hit(c, w, u, ang, seed) {
     if (u >= 1) return;
     const k = 1 - u;
@@ -372,7 +362,7 @@ const StickFigure = (() => {
       const laser = w === 'laser_sword';
       if (laser) c.globalCompositeOperation = 'lighter';
       const rgb = laser ? '255,60,50' : '220,235,255', core = laser ? '255,230,220' : '255,255,255';
-      const L = 46 * Math.min(1, u * 6);         // the cut opens fast
+      const L = 24 * Math.min(1, u * 6);         // the cut opens fast
       for (const [off, tilt] of [[0, 0.55], [5, -0.5]].slice(0, laser ? 1 : 2)) {
         c.save(); c.rotate(Math.PI / 2 + tilt); c.translate(0, off);
         c.beginPath(); c.moveTo(-L, 0); c.quadraticCurveTo(0, -4 * k, L, 0); c.quadraticCurveTo(0, 4 * k, -L, 0);
@@ -380,7 +370,7 @@ const StickFigure = (() => {
         c.lineWidth = laser ? 7 * k : 3 * k; c.strokeStyle = `rgba(${rgb},${0.6 * k})`; c.stroke();
         c.restore();
       }
-      for (let i = 0; i < 9; i++) {              // sparks / embers flying on
+      for (let i = 0; i < (laser ? 5 : 0); i++) {  // embers (laser only)
         const a = (hash(seed + i) - 0.5) * 1.6, d = 10 + 44 * easeOut(u) * (0.5 + hash(seed * 3 + i));
         c.beginPath(); c.arc(Math.cos(a) * d, Math.sin(a) * d, 1.8 * k + 0.4, 0, Math.PI * 2);
         c.fillStyle = `rgba(${laser ? '255,150,90' : '255,245,200'},${k})`; c.fill();
@@ -393,21 +383,14 @@ const StickFigure = (() => {
         c.strokeStyle = `rgba(255,${180 + 60 * hash(i)},80,${k})`; c.lineWidth = 1.6; c.stroke();
       }
     } else {
-      // Blunt: a star burst, a dust ring and speed lines.
-      const big = w === 'sledgehammer' ? 1.6 : w === 'bat' ? 1.15 : 0.8;
+      // Blunt: a small, quick impact star.
+      const big = w === 'sledgehammer' ? 1.2 : w === 'bat' ? 0.9 : 0.65;
       c.beginPath();
-      for (let i = 0; i < 16; i++) {
-        const a = i * Math.PI / 8, r = (i % 2 ? 7 : 18) * big * (0.6 + 0.6 * easeOut(Math.min(1, u * 4)));
+      for (let i = 0; i < 12; i++) {
+        const a = i * Math.PI / 6, r = (i % 2 ? 4 : 11) * big * (0.7 + 0.5 * easeOut(Math.min(1, u * 4)));
         c.lineTo(Math.cos(a) * r, Math.sin(a) * r);
       }
-      c.closePath(); c.fillStyle = `rgba(255,240,200,${0.85 * k * k})`; c.fill();
-      c.beginPath(); c.arc(0, 0, (14 + 36 * easeOut(u)) * big, 0, Math.PI * 2);
-      c.strokeStyle = `rgba(235,225,205,${0.6 * k})`; c.lineWidth = 3 * k + 1; c.stroke();
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6 - 0.5) * 1.6, r0 = (16 + 30 * u) * big;
-        c.beginPath(); c.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); c.lineTo(Math.cos(a) * (r0 + 12 * big), Math.sin(a) * (r0 + 12 * big));
-        c.strokeStyle = `rgba(255,255,255,${0.8 * k})`; c.lineWidth = 2; c.stroke();
-      }
+      c.closePath(); c.fillStyle = `rgba(255,245,215,${0.75 * k * k})`; c.fill();
     }
     c.restore();
   }
@@ -490,7 +473,7 @@ const StickFigure = (() => {
   // Shot effects. Non-pinned effects are drawn from the head (the muzzle
   // distance comes from the firing pose); the sledgehammer impact is pinned
   // to where the hammer lands.
-  const MUZZLE = { glock_particle: 66, shotgun_particle: 75, ak47_particle: 80, railgun_particle: 86 };
+  const MUZZLE = { glock_particle: 59, shotgun_particle: 67, ak47_particle: 71, railgun_particle: 76 };
   const RANGE = { glock_particle: 538, shotgun_particle: 338, ak47_particle: 525, railgun_particle: 475 };
 
   function flash(c, y, k, size) {
@@ -518,16 +501,15 @@ const StickFigure = (() => {
   const particles = {
     draw(c, anim, p) {
       if (anim === 'sledgehammer_particle') {
-        // Impact as the hammer lands (~0.13 s in).
-        const q = seg(p, 0.04, 0.3);
+        // Dust kicked up where the hammer lands (~0.13 s in).
+        const q = seg(p, 0.04, 0.42);
         if (q <= 0 || q >= 1) return;
         const k = 1 - q;
-        c.beginPath(); c.arc(0, 0, 10 + 60 * easeOut(q), 0, Math.PI * 2);
-        c.strokeStyle = `rgba(235,225,205,${0.7 * k})`; c.lineWidth = 4 * k + 1; c.stroke();
-        for (let i = 0; i < 10; i++) {
-          const a = i * 0.63 + 0.3, r = 8 + 46 * easeOut(q) * (0.6 + hash(i) * 0.6);
-          c.beginPath(); c.arc(Math.cos(a) * r, Math.sin(a) * r, 2.4 * k + 0.5, 0, Math.PI * 2);
-          c.fillStyle = `rgba(160,140,115,${0.8 * k})`; c.fill();
+        for (let i = 0; i < 7; i++) {
+          const a = i * 0.9 + 0.4, d = 6 + 30 * easeOut(q) * (0.5 + hash(i) * 0.7);
+          const r = (7 + 9 * easeOut(q)) * (0.7 + hash(i + 9) * 0.6);
+          c.beginPath(); c.arc(Math.cos(a) * d, Math.sin(a) * d, r, 0, Math.PI * 2);
+          c.fillStyle = `rgba(150,145,138,${0.45 * k})`; c.fill();
         }
         return;
       }

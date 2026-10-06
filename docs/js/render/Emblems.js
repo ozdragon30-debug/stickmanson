@@ -18,7 +18,7 @@ const Emblems = (() => {
   const INK = 'rgba(20,20,22,0.9)';
   function shade(c, r0, r1) {
     const g = c.createRadialGradient(0, 0, r0, 0, 0, r1);
-    g.addColorStop(0, '#bdbdbd'); g.addColorStop(0.55, '#9a9a9a'); g.addColorStop(1, '#6e6e6e');
+    g.addColorStop(0, '#6e6e6e'); g.addColorStop(0.55, '#363636'); g.addColorStop(1, '#181818');
     return g;
   }
   function finish(c, fill, lw = 1.4) {
@@ -78,7 +78,7 @@ const Emblems = (() => {
   // shaded in greys so the player's hue tints them; outlined for contrast.
   function metal(c, r) {
     const g = c.createLinearGradient(-r, -r, r, r);
-    g.addColorStop(0, '#f0f0f0'); g.addColorStop(0.45, '#a8a8a8'); g.addColorStop(1, '#5c5c5c');
+    g.addColorStop(0, '#787878'); g.addColorStop(0.4, '#3c3c3c'); g.addColorStop(1, '#161616');
     return g;
   }
   function done(c, r, lw = 1.3) {
@@ -222,13 +222,12 @@ const Emblems = (() => {
 
   function spinner(c, i) {
     if (i < 4) {                                       // free starters: plain shapes
-      ring(c, i, [6, 4, 4, 3][i], R - 4, 1.1);
+      ring(c, i, [8, 6, 6, 6][i], R - 8, 1.45);
       return;
     }
     if (i < 28) {                                      // tier 1: one motif orbiting
-      const m = MOTIF_NAMES[(i - 4) % 16], n = i - 4 < 16 ? 3 : 4;
-      track(c, R - 8, 1, 0.35);
-      orbit(c, m, n, R - 8, 1.05);
+      const m = MOTIF_NAMES[(i - 4) % 16], n = i - 4 < 16 ? 6 : 8;
+      orbit(c, m, n, R - 10, 1.3);
       return;
     }
     if (i < 48) {                                      // tier 2: motifs + bead ring + inner counter ring
