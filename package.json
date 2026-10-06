@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "e2e": "node test/e2e/smoke.js",
     "maps": "node tools/gen-map-index.js",
-    "parity": "node test/e2e/parity.js"
+    "parity": "node test/e2e/parity.js",
+    "regression": "node test/e2e/regression.js"
   },
   "author": "",
   "license": "CC-BY-NC-SA-4.0",
