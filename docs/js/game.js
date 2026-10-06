@@ -68,7 +68,8 @@ const mapCache = {
   draw(c, x0, x1, y0, y1, nowMs) {
     const res = Math.min(2.5, display.scale * worldScale()); // chunk pixels per world unit
     const smooth = !settingsManager.get('pixelArt');
-    if (this._for !== map.tiles || this._res !== res || this._smooth !== smooth) {
+    if (this._for !== map.tiles || this._res !== res || this._smooth !== smooth || this._bg !== map.bgImage) {
+      this._bg = map.bgImage;
       this._chunks.clear();
       this._for = map.tiles; this._res = res; this._smooth = smooth;
     }
@@ -107,8 +108,10 @@ const mapCache = {
     canvas.width = canvas.height = Math.ceil(size * res);
     const c = canvas.getContext('2d');
     c.imageSmoothingEnabled = smooth;
+    c.imageSmoothingQuality = 'high';
     c.setTransform(res, 0, 0, res, -cx * size * res, -cy * size * res);
     const parsed = parsedTiles();
+    if (map.bgImage) return this._buildFromBackground(c, cx, cy, canvas, parsed);
     const animated = [], outside = [];
     for (let y = cy * C; y < (cy + 1) * C; y++) {
       for (let x = cx * C; x < (cx + 1) * C; x++) {
@@ -129,6 +132,29 @@ const mapCache = {
     }
     c.fillStyle = 'rgba(4,8,14,0.62)';
     for (const [x, y] of outside) c.fillRect(x * TILE - 0.5, y * TILE - 0.5, TILE + 1, TILE + 1);
+    return { canvas, animated };
+  },
+
+  // Painted maps: the chunk is a piece of the background picture (which also
+  // covers a few tiles of surroundings); animated tiles still go on top.
+  _buildFromBackground(c, cx, cy, canvas, parsed) {
+    const C = this.CHUNK, size = C * TILE;
+    const img = map.bgImage, k = map.bgPx / TILE, pad = map.bgPad * map.bgPx;
+    // Source rectangle, clipped to the picture.
+    let sx = cx * size * k + pad, sy = cy * size * k + pad, sw = size * k, sh = size * k;
+    let dx = cx * size, dy = cy * size, dw = size, dh = size;
+    if (sx < 0) { dx -= sx / k; dw += sx / k; sw += sx; sx = 0; }
+    if (sy < 0) { dy -= sy / k; dh += sy / k; sh += sy; sy = 0; }
+    if (sx + sw > img.width) { const cut = sx + sw - img.width; sw -= cut; dw -= cut / k; }
+    if (sy + sh > img.height) { const cut = sy + sh - img.height; sh -= cut; dh -= cut / k; }
+    if (sw > 0 && sh > 0) c.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+    const animated = [];
+    for (let y = Math.max(0, cy * C); y < Math.min(map.height, (cy + 1) * C); y++) {
+      for (let x = Math.max(0, cx * C); x < Math.min(map.width, (cx + 1) * C); x++) {
+        const cell = parsed[y * map.width + x];
+        if (cell && isAnimatedTile(cell.tileType)) animated.push([x, y]);
+      }
+    }
     return { canvas, animated };
   },
 };
@@ -477,8 +503,7 @@ settingsManager.onChange((key, value) => {
     i18n.setLanguage(value);
     if (menu._ready) menu.playBtn.textContent = t('menu.play');
     menu._renderRecentRooms();
-    const groups = document.querySelectorAll('#menu-map-select optgroup');
-    if (groups[1]) groups[1].label = t('menu.map.featured');
+    menu.labelMaps();
     if (settingsManager.isOpen()) settingsManager._refresh();
   }
 });

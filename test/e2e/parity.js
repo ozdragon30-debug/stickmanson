@@ -16,13 +16,17 @@ const { chromium } = require('playwright');
 const ORIGINAL = process.env.PARITY_BASE || '1f035b2';
 const ROOT = path.join(__dirname, '..', '..');
 
-function serve(dir) {
+// `fallback`: files missing from `dir` are served from there. The current game
+// has its own (new) maps; the engine is compared on the original maps.
+function serve(dir, fallback) {
   const types = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.webp': 'image/webp', '.css': 'text/css', '.mp3': 'audio/mpeg' };
   const server = http.createServer((req, res) => {
     const p = path.join(dir, decodeURIComponent(new URL(req.url, 'http://x').pathname));
     if (!p.startsWith(dir)) { res.writeHead(403); return res.end(); }
     const file = req.url.split('?')[0].endsWith('/') ? path.join(p, 'index.html') : p;
-    fs.readFile(file, (err, data) => {
+    const rel = path.relative(dir, file);
+    const pick = (fallback && rel.startsWith(path.join('data', 'maps')) && !fs.existsSync(file)) ? path.join(fallback, rel) : file;
+    fs.readFile(pick, (err, data) => {
       if (err) { res.writeHead(404); return res.end(); }
       res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
       res.end(data);
@@ -114,7 +118,7 @@ async function run(url) {
   fs.writeFileSync(path.join(tmp, 'orig.tar'), tar);
   execFileSync('tar', ['-xf', 'orig.tar'], { cwd: tmp });
   const origSrv = await serve(path.join(tmp, 'docs'));
-  const curSrv = await serve(path.join(ROOT, 'docs'));
+  const curSrv = await serve(path.join(ROOT, 'docs'), path.join(tmp, 'docs'));
   try {
     const A = await run(`http://127.0.0.1:${origSrv.address().port}/`);
     const B = await run(`http://127.0.0.1:${curSrv.address().port}/?play`);

@@ -236,10 +236,31 @@ function splitMapName(name) {
   return { title, author: m ? m[2] : null };
 }
 
-// Localised one-line map label: "Paris Streets · by Warjag" / "… · yapan: Warjag".
+// Turkish names of the maps (files carry the English name).
+const MAP_NAMES_TR = {
+  'Asphalt Streets': 'Asfalt Sokaklar',
+  'Office Floor': 'Ofis Katı',
+  'Storm Channel': 'Yağmur Kanalı',
+  'Trailer Park': 'Karavan Parkı',
+  'Orbit Station': 'Yörünge İstasyonu',
+  'Bio Lab': 'Biyo Laboratuvar',
+  'Container Port': 'Konteyner Limanı',
+  'The Pit Arena': 'Arena Çukuru',
+  'Hedge Maze': 'Çit Labirenti',
+  'Shipyard': 'Tersane',
+  'Foundry': 'Döküm Fabrikası',
+  'Sand Base': 'Kum Üssü',
+  'Stone Keep': 'Taş Kale',
+  'Rooftops': 'Çatılar',
+  'Metro Line': 'Metro Hattı',
+  'Test Room': 'Test Odası',
+};
+
+// Localised one-line map label ("… · by Author" when the name credits one).
 function mapLabelLocal(name) {
   const { title, author } = splitMapName(name);
-  return author ? `${title} · ${t('hud.mapBy', { name: author })}` : title;
+  const local = i18n.lang === 'tr' ? (MAP_NAMES_TR[title] || title) : title;
+  return author ? `${local} · ${t('hud.mapBy', { name: author })}` : local;
 }
 
 function t(key, vars) {

@@ -7,6 +7,8 @@
 //   &ws=  X Y WeaponId RespawnSec ...  (weapon spawns, 0 0 0 0 = unused)
 //   &rt=  Seconds               (round time, optional)
 //   &ts=  0|1                   (team setting, 0=FFA)
+//   &bg=  file.webp             (optional painted background for the whole map,
+//   &bgpad= N  &bgpx= PX         painted with N tiles of surroundings at PX px/tile)
 //
 // Tile code: TTT R F C
 //   TTT = 3-char tile image key (looked up in atlas as "TTT.png")
@@ -23,6 +25,9 @@ class MapLoader {
     this.collisionMap = [];   // 0=walkable, 1=solid (based on 6th char == '3')
     this.spawnPoints = [];    // [{x, y}]
     this.weaponSpawns = [];   // [{x, y, weaponId, respawnTime (ms)}]
+    this.bgImage = null;      // painted background (drawing only)
+    this.bgPad = 0;
+    this.bgPx = 0;
   }
 
   async load(url) {
@@ -30,6 +35,13 @@ class MapLoader {
     if (!resp.ok) throw new Error(`Failed to load map: ${url}`);
     const text = await resp.text();
     this._parse(text);
+    if (this.bgFile) {
+      // Decode before the map goes live so the first frames don't stall.
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = url.slice(0, url.lastIndexOf('/') + 1) + this.bgFile;
+      try { await img.decode(); this.bgImage = img; } catch (e) { console.error('Map background failed to load:', e); }
+    }
     this.ready = true;
   }
 
@@ -68,6 +80,11 @@ class MapLoader {
         }
       }
     }
+
+    const bg = s.match(/&bg=\s*([\w.-]+)/i);
+    this.bgFile = bg ? bg[1] : null;
+    this.bgPad = parseInt((s.match(/&bgpad=\s*(\d+)/i) || [])[1] || '0', 10);
+    this.bgPx = parseInt((s.match(/&bgpx=\s*(\d+)/i) || [])[1] || '0', 10);
 
     // &ws=  X Y WeaponId RespawnSec …  (groups of 4, 0 0 * * = unused)
     this.weaponSpawns = [];
