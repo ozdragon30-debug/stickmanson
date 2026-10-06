@@ -2,6 +2,19 @@
 
 ## 2026 modernisation
 
+### Bigger view on phones, faster kills
+
+- Screen → "Fill screen" (new default): the whole display is the play view,
+  zoomed so it shows the same map *area* as the original 4:3 view (wider and
+  shorter on phones, everything ~32% bigger on a 21:9 screen; also fills tall
+  screens such as unfolded foldables). "Classic 4:3" options remain.
+- Outside the map edge the nearest edge tiles continue, darkened, instead of
+  black void (decoration only).
+- **Gameplay change (requested):** damage taken ×1.15
+  (`Constants.DAMAGE_MULTIPLIER`), so everyone dies 15% easier (e.g. AK47
+  10 → 8 hits, glock 8 → 7). Movement and hit detection are unchanged —
+  `npm run parity` still matches the original game exactly.
+
 ### Phone performance pass
 
 - Sprite sheets trimmed and repacked (`tools/trim-atlases.py`): player
@@ -68,7 +81,8 @@
   emulated phone). In-between sheets are decoded off the main thread before
   first use (previously a one-off freeze the first time a weapon was drawn).
 
-Everything below keeps **gameplay and physics identical** to the original —
+Everything below keeps **gameplay and physics identical** to the original
+(except the requested damage multiplier, noted below) —
 proven by `npm run parity`, which runs the original game and this one side by
 side (fake clock, seeded randomness) on 10 maps: 10,100 frames of movement and
 285 weapon hit events, all identical. In addition

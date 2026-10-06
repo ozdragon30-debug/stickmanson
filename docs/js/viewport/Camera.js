@@ -10,8 +10,9 @@ class Camera {
   // (aim is measured from the view centre), so gameplay is unchanged.
   setPos(player) {
     const s = (typeof display !== 'undefined' && display.scale) || 1;
-    this.x = Math.round(((player.x * scaleFactor) - VIEW_W / 2) * s) / s;
-    this.y = Math.round(((player.y * scaleFactor) - VIEW_H / 2) * s) / s;
+    const ws = worldScale();
+    this.x = Math.round(((player.x * ws) - VIEW_W / 2) * s) / s;
+    this.y = Math.round(((player.y * ws) - VIEW_H / 2) * s) / s;
   }
 }
 

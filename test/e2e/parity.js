@@ -137,7 +137,7 @@ async function run(url) {
     assert.strictEqual(hitDiff, 0, 'hit detection differs from the original');
     assert.ok(hitEvents > 50, 'the hit test actually produced hits');
     assert.deepStrictEqual(B.errors, []);
-    console.log('parity: OK — identical to the original game');
+    console.log('parity: OK — movement and hit detection identical to the original game (damage taken ×' + 1.15 + ' by design, see Constants.DAMAGE_MULTIPLIER)');
   } finally {
     origSrv.close(); curSrv.close();
     fs.rmSync(tmp, { recursive: true, force: true });

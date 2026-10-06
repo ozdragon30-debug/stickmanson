@@ -1,4 +1,7 @@
 class Constants {
+  // Damage taken is multiplied by this: 1.15 = everyone dies 15% easier
+  // (requested change; the original game used 1).
+  static DAMAGE_MULTIPLIER = 1.15;
   static SPEED = 210;  // px/s  (was 1.4 px/frame × 2.5 × 60 fps = 210 px/s)
   static STICK_FIGURE_HEAD_RADIUS = 17;
   static TO_RADIANS = Math.PI / 180;

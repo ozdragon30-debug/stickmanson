@@ -15,7 +15,7 @@ const DEFAULT_SETTINGS = {
   spatialAudio:      true,
   // Video
   renderQuality:     'auto',   // auto | high | low
-  wideScreen:        true,     // fill wide screens (side margins show the map only)
+  viewMode:          'wide',   // wide | classic | off — see Display.js
   fpsLimit:          'auto',   // auto | unlimited | 240 | 144 | 120 | 60 | 30
   pixelArt:          false,    // nearest-neighbour sprite scaling
   modernFx:          true,     // shadows, glow, lights (render-only)
@@ -66,6 +66,8 @@ class SettingsManager {
 
     // 'off' was the earlier default frame-rate mode; 'auto' replaces it.
     if (saved.fpsLimit === 'off') saved.fpsLimit = 'auto';
+    if (saved.wideScreen === false && saved.viewMode == null) saved.viewMode = 'off';
+    delete saved.wideScreen;
     this.settings   = this._merge(saved);
     this.isFirstRun = !saved.name;
     this._isOpen    = false;
@@ -334,8 +336,14 @@ class SettingsManager {
             <option value="30" data-i18n="set.fpsLimit.30">30 FPS (battery saver)</option>
           </select>
         </div>
-        <label class="sar-check"><input type="checkbox" data-setting="wideScreen"> <span data-i18n="set.wide">Fill wide screens</span>
-          <span class="sar-hint" data-i18n="set.wide.hint">— extra width shows the map only; the play area stays 4:3</span></label>
+        <div class="sar-sec">
+          <label class="sar-lbl" for="sar-view" data-i18n="set.view">Screen</label>
+          <select id="sar-view" class="sar-select" data-setting="viewMode">
+            <option value="wide" data-i18n="set.view.wide">Fill screen (bigger, same view area)</option>
+            <option value="classic" data-i18n="set.view.classic">Classic 4:3 (dimmed map at the sides)</option>
+            <option value="off" data-i18n="set.view.off">Classic 4:3 (black bars)</option>
+          </select>
+        </div>
         <label class="sar-check"><input type="checkbox" data-setting="smoothAnim"> <span data-i18n="set.smooth">Smooth animations (60 fps)</span>
           <span class="sar-hint" data-i18n="set.smooth.hint">— in-between drawings; game speed unchanged</span></label>
         <label class="sar-check"><input type="checkbox" data-setting="modernFx"> <span data-i18n="set.fx">Modern effects</span>

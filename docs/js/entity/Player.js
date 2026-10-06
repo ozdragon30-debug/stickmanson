@@ -370,7 +370,7 @@ class Player {
     this.hitsplat.setPosition(this.body.x, this.body.y);
     this.hitsplat.isVisible = true;
     this._hitFxAt = performance.now(); // render-only (hit rim flash)
-    this.health -= (damage ?? this.currentWeapon.damage);
+    this.health -= (damage ?? this.currentWeapon.damage) * Constants.DAMAGE_MULTIPLIER;
 
     if (this.isMainPlayer) {
       if (typeof hudManager !== 'undefined') hudManager.onDamaged(attackerPos);
@@ -469,7 +469,7 @@ class Player {
   _nameTag() {
     const u = display.uiScale || 1;
     const label = this.afk ? `💤 ${this.name}` : this.name;
-    const res = Math.max(1, display.scale * scaleFactor);
+    const res = Math.max(1, display.scale * worldScale());
     const key = label + '|' + u + '|' + res;
     if (this._tag && this._tag.key === key) return this._tag;
     const font = `bold ${Math.round(11 * u)}px monospace`;

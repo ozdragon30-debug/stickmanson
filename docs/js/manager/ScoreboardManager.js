@@ -87,7 +87,7 @@ class ScoreboardManager {
       const cy = VIEW_H / 2;
       const u = Math.max(1, Math.min(display.uiScale || 1, VIEW_W / 660, cy / (cy - py), cy / (py + panelH - cy)));
       const s = display.scale;
-      ctx.setTransform(s * u, 0, 0, s * u, s * (display.extraX + (VIEW_W / 2) * (1 - u)), s * (VIEW_H / 2) * (1 - u));
+      ctx.setTransform(s * u, 0, 0, s * u, s * (display.extraX + (VIEW_W / 2) * (1 - u)), s * (display.extraY + (VIEW_H / 2) * (1 - u)));
       this._drawOverlay(ctx, canvas);
     }
 

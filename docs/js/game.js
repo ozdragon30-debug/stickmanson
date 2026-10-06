@@ -5,6 +5,8 @@ const ctx = canvas.getContext("2d", { alpha: false });
 
 // World zoom: the original 960×720 canvas rendered the 800×600 Flash stage at 1.2×.
 const scaleFactor = Math.min(VIEW_W / 800, VIEW_H / 600);
+// Logical px per world unit, including the wide-screen zoom (display.zoom).
+function worldScale() { return scaleFactor * display.zoom; }
 let debugTiles = false;  // toggle with !debug command
 
 const map = new MapLoader();
@@ -64,14 +66,14 @@ const mapCache = {
   _smooth: null,
 
   draw(c, x0, x1, y0, y1, nowMs) {
-    const res = Math.min(2.5, display.scale * scaleFactor); // chunk pixels per world unit
+    const res = Math.min(2.5, display.scale * worldScale()); // chunk pixels per world unit
     const smooth = !settingsManager.get('pixelArt');
     if (this._for !== map.tiles || this._res !== res || this._smooth !== smooth) {
       this._chunks.clear();
       this._for = map.tiles; this._res = res; this._smooth = smooth;
     }
     const C = this.CHUNK, size = C * TILE;
-    const seam = 1 / (display.scale * scaleFactor);
+    const seam = 1 / (display.scale * worldScale());
     const cx0 = Math.floor(x0 / C), cx1 = Math.floor((x1 - 1) / C);
     const cy0 = Math.floor(y0 / C), cy1 = Math.floor((y1 - 1) / C);
     const visible = [];
@@ -107,29 +109,45 @@ const mapCache = {
     c.imageSmoothingEnabled = smooth;
     c.setTransform(res, 0, 0, res, -cx * size * res, -cy * size * res);
     const parsed = parsedTiles();
-    const animated = [];
-    for (let y = cy * C; y < Math.min(map.height, (cy + 1) * C); y++) {
-      for (let x = cx * C; x < Math.min(map.width, (cx + 1) * C); x++) {
+    const animated = [], outside = [];
+    for (let y = cy * C; y < (cy + 1) * C; y++) {
+      for (let x = cx * C; x < (cx + 1) * C; x++) {
+        const inside = x >= 0 && y >= 0 && x < map.width && y < map.height;
+        if (!inside) {
+          // Beyond the map edge: continue the nearest edge tile, darkened, so
+          // wide screens never show an empty void (decor only: nothing can
+          // go there — the map's own walls still bound it).
+          const ex = Math.min(map.width - 1, Math.max(0, x)), ey = Math.min(map.height - 1, Math.max(0, y));
+          drawTile(c, parsed[ey * map.width + ex] || EMPTY_TILE, x, y, 0, 1 / res);
+          outside.push([x, y]);
+          continue;
+        }
         const cell = parsed[y * map.width + x] || EMPTY_TILE;
         if (isAnimatedTile(cell.tileType)) animated.push([x, y]);
         else drawTile(c, cell, x, y, 0, 1 / res);
       }
     }
+    c.fillStyle = 'rgba(4,8,14,0.62)';
+    for (const [x, y] of outside) c.fillRect(x * TILE - 0.5, y * TILE - 0.5, TILE + 1, TILE + 1);
     return { canvas, animated };
   },
 };
 
-// Draws the map tiles visible in logical view columns [viewX0, viewX1).
-function drawMap(nowMs, viewX0 = 0, viewX1 = VIEW_W) {
+// Draws the map tiles visible in the logical view rectangle (the 4:3 area by
+// default; wider/taller when the screen is filled).
+const OUTSIDE_TILES = 24; // how far past the map edge the decorative fill goes
+function drawMap(nowMs, viewX0 = 0, viewX1 = VIEW_W, viewY0 = 0, viewY1 = VIEW_H) {
   if (!mapAtlas.ready || !map.ready) return;
   const mapWidth = map.width;
   const mapHeight = map.height;
-  const tileView = TILE * scaleFactor; // logical px per tile
+  const tileView = TILE * worldScale(); // logical px per tile
 
-  const startX = Math.max(0, Math.floor((camera.x + viewX0) / tileView));
-  const startY = Math.max(0, Math.floor(camera.y / tileView));
-  const endX = Math.min(mapWidth, Math.floor((camera.x + viewX1) / tileView) + 1);
-  const endY = Math.min(mapHeight, Math.floor((camera.y + VIEW_H) / tileView) + 1);
+  // Debug view stays within the map; the normal view also fills around it.
+  const pad = debugTiles ? 0 : OUTSIDE_TILES;
+  const startX = Math.max(-pad, Math.floor((camera.x + viewX0) / tileView));
+  const startY = Math.max(-pad, Math.floor((camera.y + viewY0) / tileView));
+  const endX = Math.min(mapWidth + pad, Math.floor((camera.x + viewX1) / tileView) + 1);
+  const endY = Math.min(mapHeight + pad, Math.floor((camera.y + viewY1) / tileView) + 1);
   if (endX <= startX || endY <= startY) return;
 
   if (!debugTiles) {
@@ -139,7 +157,7 @@ function drawMap(nowMs, viewX0 = 0, viewX1 = VIEW_W) {
 
   // Debug view (!debug): per-tile drawing with collision overlays and labels.
   const tileSize = TILE;
-  const seam = 1 / (display.scale * scaleFactor);
+  const seam = 1 / (display.scale * worldScale());
   const parsed = parsedTiles();
   for (let y = startY; y < endY; y++) {
     for (let x = startX; x < endX; x++) {
@@ -221,20 +239,20 @@ function drawCursor() {
 }
 
 function draw(nowMs) {
-  const ex = display.extraX;
+  const ex = display.extraX, ey = display.extraY, ws = worldScale();
   resetScreenTransform(ctx);
   ctx.fillStyle = "#000";
-  ctx.fillRect(-ex, 0, VIEW_W + 2 * ex, VIEW_H);
+  ctx.fillRect(-ex, -ey, VIEW_W + 2 * ex, VIEW_H + 2 * ey);
   ctx.translate(-camera.x, -camera.y);
-  ctx.scale(scaleFactor, scaleFactor);
+  ctx.scale(ws, ws);
 
   ctx.imageSmoothingEnabled = !settingsManager.get('pixelArt');
 
-  drawMap(nowMs, -ex, VIEW_W + ex);
+  drawMap(nowMs, -ex, VIEW_W + ex, -ey, VIEW_H + ey);
   ctx.save();
-  if (ex > 0) {
-    // Wide-screen margins show the map only, dimmed; everything else is clipped
-    // to the original 4:3 view so no one sees more of the action than before.
+  if (display.mode === 'classic' && ex > 0) {
+    // Classic mode: margins show the map only, dimmed; everything else is
+    // clipped to the original 4:3 view.
     resetScreenTransform(ctx);
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillRect(-ex, 0, ex, VIEW_H);
@@ -246,7 +264,7 @@ function draw(nowMs) {
     ctx.rect(0, 0, VIEW_W, VIEW_H);
     ctx.clip();
     ctx.translate(-camera.x, -camera.y);
-    ctx.scale(scaleFactor, scaleFactor);
+    ctx.scale(ws, ws);
   }
   pickupManager.draw(ctx);
   playerManager.drawPlayers(ctx);
@@ -451,7 +469,7 @@ settingsManager.onChange((key, value) => {
   else if (key === 'muted') soundManager.setMuted(value);
   else if (key === 'spatialAudio') soundManager.setSpatial(value);
   else if (key === 'renderQuality') display.setQuality(value);
-  else if (key === 'wideScreen') display.setWide(value);
+  else if (key === 'viewMode') display.setViewMode(value);
   else if (key === 'fpsLimit') setFpsLimit(value);
   else if (key === 'pixelArt') document.body.classList.toggle('pixel-art', !!value);
   else if (key === 'touchControls') updateTouchControls();
@@ -486,7 +504,7 @@ Constants._weaponsReady.then(() => {
 
 
 setFpsLimit(settingsManager.get('fpsLimit'));
-display.setWide(settingsManager.get('wideScreen'));
+display.setViewMode(settingsManager.get('viewMode'));
 
 let loopStarted = false;
 
