@@ -8,6 +8,9 @@
   limit in Settings → Video (240/144/120/60/30). Movement uses elapsed time,
   so speed is identical at any frame rate; a low cap no longer triggers
   adaptive resolution.
+- Smoother scrolling: the camera snaps to device pixels instead of whole
+  logical pixels, which on HiDPI screens moved the world in uneven 1–2 px
+  steps per frame (judder at 120 Hz). Drawing only; aim is unaffected.
 
 ### Modern effects (render-only, Settings → Video → Modern effects)
 

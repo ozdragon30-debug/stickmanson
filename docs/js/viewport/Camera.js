@@ -4,9 +4,14 @@ class Camera {
     this.y = 0;
   }
   
+  // Snapped to *device* pixels, not logical ones: on a 2× screen the old
+  // whole-logical-pixel snap moved the world in uneven 2-pixel steps (1 then 2
+  // px per frame at 120 Hz), which reads as judder. Camera only affects drawing
+  // (aim is measured from the view centre), so gameplay is unchanged.
   setPos(player) {
-    this.x = Math.floor((player.x * scaleFactor) - VIEW_W / 2);
-    this.y = Math.floor((player.y * scaleFactor) - VIEW_H / 2);
+    const s = (typeof display !== 'undefined' && display.scale) || 1;
+    this.x = Math.round(((player.x * scaleFactor) - VIEW_W / 2) * s) / s;
+    this.y = Math.round(((player.y * scaleFactor) - VIEW_H / 2) * s) / s;
   }
 }
 
