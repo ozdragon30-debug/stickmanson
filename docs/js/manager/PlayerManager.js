@@ -26,10 +26,7 @@ class PlayerManager {
 
     // Broadcast this player's name and visual identity to the server.
     socketManager.emit('setName', { name: settingsManager.name });
-    socketManager.emit('playerIdentity', {
-      hue:        settingsManager.spinnerHue,
-      shapeIndex: settingsManager.spinnerShapeIndex,
-    });
+    socketManager.emit('playerIdentity', shopManager.identity());
 
     socketManager.emit("playerMovement", { x: x, y: y });
   }

@@ -12,6 +12,8 @@ socketManager.on("currentPlayers", (players) => {
     if (info.weaponId        != null) player.equipWeapon(info.weaponId, true);
     if (info.indicatorHue        != null) player.indicatorHue        = info.indicatorHue;
     if (info.indicatorShapeIndex != null) player.indicatorShapeIndex = info.indicatorShapeIndex;
+    if (info.petId != null) player.petId = info.petId;
+    player.vip = !!info.vip;
     player.afk = !!info.afk;
     playerManager.addPlayer(playerId, player);
   }
@@ -88,7 +90,7 @@ socketManager.on("playerGotHit", (data) => {
 
   const attacker = playerManager.getPlayer(attackerId);
   // Attacker's spinner perk (bots have none).
-  const atk = attacker && !botManager.isBot(attackerId) ? ShopManager.attackFactorFor(attacker.indicatorShapeIndex) : 1;
+  const atk = attacker && !botManager.isBot(attackerId) ? ShopManager.attackFactorFor(attacker.indicatorShapeIndex, attacker.petId ?? -1) : 1;
   player.showHitsplat((damage ?? Constants.WEAPON_ID_MAP[weaponId]?.damage ?? 5) * atk, weaponId, attacker ? { x: attacker.body.x, y: attacker.body.y } : null);
 
   // Only the victim's own client triggers death, to avoid every player calling it.
@@ -129,7 +131,7 @@ socketManager.on("connect", () => {
   // everyone sees the same weapon.
   me.equipWeapon(0, true);
   socketManager.emit('setName', { name: settingsManager.name });
-  socketManager.emit('playerIdentity', { hue: settingsManager.spinnerHue, shapeIndex: settingsManager.spinnerShapeIndex });
+  socketManager.emit('playerIdentity', shopManager.identity());
   socketManager.emit('playerMovement', me.getPosition());
 });
 
@@ -253,6 +255,8 @@ socketManager.on("playerIdentityUpdate", (data) => {
   if (!player) return;
   player.indicatorHue        = data.indicatorHue;
   player.indicatorShapeIndex = data.indicatorShapeIndex;
+  player.petId = data.petId ?? -1;
+  player.vip = !!data.vip;
 });
 
 socketManager.on("pickupState", (states) => {

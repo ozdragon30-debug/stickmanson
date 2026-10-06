@@ -46,7 +46,8 @@ class HudManager {
   // Coins from the spinner shop economy: a small counter under the health bar
   // and a "+n" pop when some are earned.
   onCoins(n, alreadyEarned = false) {
-    if (!alreadyEarned) shopManager.earn(n);
+    if (!alreadyEarned) n = shopManager.earn(n);
+    if (!n) return;
     this.coinPop = { n, t: performance.now() };
   }
 

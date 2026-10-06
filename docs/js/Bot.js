@@ -30,6 +30,7 @@ class Bot {
     // Randomize spinner appearance
     this.player.indicatorHue        = Math.floor(Math.random() * 360);
     this.player.indicatorShapeIndex = Math.floor(Math.random() * 64);
+    this.player.petId = Math.random() < 0.3 ? Math.floor(Math.random() * Pets.count) : -1; // cosmetic only
 
     // Local kill/death counters (displayed on the offline scoreboard).
     this.kills  = 0;

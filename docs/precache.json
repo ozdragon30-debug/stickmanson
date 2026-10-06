@@ -68,6 +68,7 @@
   "js/map/MapLoader.js",
   "js/pwa.js",
   "js/render/Emblems.js",
+  "js/render/Pets.js",
   "js/render/StickFigure.js",
   "js/render/WeaponArt.js",
   "js/spritesheet/AtlasSpritesheet.js",

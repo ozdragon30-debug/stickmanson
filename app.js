@@ -450,12 +450,18 @@ io.on("connection", (socket) => {
     if (!players[socket.id] || !data) return;
     const hue   = (((data.hue | 0) % 360) + 360) % 360;
     const shape = Math.max(0, Math.min(255, data.shapeIndex | 0));
+    const pet   = Math.max(-1, Math.min(31, (data.pet ?? -1) | 0));
+    const vip   = !!data.vip;
     players[socket.id].indicatorHue        = hue;
     players[socket.id].indicatorShapeIndex = shape;
+    players[socket.id].petId               = pet;
+    players[socket.id].vip                 = vip;
     socket.to(room.id).emit("playerIdentityUpdate", {
       playerId:            socket.id,
       indicatorHue:        hue,
       indicatorShapeIndex: shape,
+      petId:               pet,
+      vip,
     });
     room.emit("scoreUpdate", { scores: room.getScores() }); // scoreboard name colours
   });

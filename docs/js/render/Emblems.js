@@ -74,27 +74,179 @@ const Emblems = (() => {
     }
   }
 
-  const COUNTS = [3, 4, 5, 6, 3, 8, 4, 6];
+  // Figurative motifs (drawn upright in a ~20 px box, centred, "up" = -Y),
+  // shaded in greys so the player's hue tints them; outlined for contrast.
+  function metal(c, r) {
+    const g = c.createLinearGradient(-r, -r, r, r);
+    g.addColorStop(0, '#f0f0f0'); g.addColorStop(0.45, '#a8a8a8'); g.addColorStop(1, '#5c5c5c');
+    return g;
+  }
+  function done(c, r, lw = 1.3) {
+    c.fillStyle = metal(c, r); c.fill();
+    c.lineWidth = lw; c.strokeStyle = INK; c.lineJoin = 'round'; c.stroke();
+  }
+  function shine(c, x, y, rx, ry, a = -0.6) {
+    c.beginPath(); c.ellipse(x, y, rx, ry, a, 0, TAU); c.fillStyle = 'rgba(255,255,255,0.55)'; c.fill();
+  }
+  function hole(c, x, y, rx, ry = rx) {
+    c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fillStyle = 'rgba(25,25,28,0.92)'; c.fill();
+  }
+  const MOTIFS = {
+    star(c) {
+      c.beginPath();
+      for (let k = 0; k < 10; k++) { const r = k % 2 ? 4.2 : 10, a = k * Math.PI / 5; c.lineTo(Math.sin(a) * r, -Math.cos(a) * r); }
+      c.closePath(); done(c, 10); shine(c, -2, -3, 2.2, 1.2);
+    },
+    heart(c) {
+      c.beginPath(); c.moveTo(0, 8);
+      c.bezierCurveTo(-12, 0, -8, -11, 0, -4.5); c.bezierCurveTo(8, -11, 12, 0, 0, 8);
+      done(c, 10); shine(c, -4, -4, 2.4, 1.4);
+    },
+    skull(c) {
+      c.beginPath(); c.arc(0, -2, 8.5, Math.PI * 0.85, Math.PI * 0.15);
+      c.lineTo(5, 6); c.lineTo(-5, 6); c.closePath(); done(c, 9);
+      hole(c, -3.2, -1.5, 2.6, 3); hole(c, 3.2, -1.5, 2.6, 3);
+      c.beginPath(); c.moveTo(0, 2); c.lineTo(-1.3, 4); c.lineTo(1.3, 4); c.closePath(); c.fillStyle = 'rgba(25,25,28,0.9)'; c.fill();
+      for (const x of [-2.5, 0, 2.5]) { c.beginPath(); c.moveTo(x, 6); c.lineTo(x, 8.5); c.strokeStyle = INK; c.lineWidth = 1; c.stroke(); }
+      shine(c, -3.5, -7, 2.4, 1.2);
+    },
+    flame(c) {
+      c.beginPath(); c.moveTo(0, 9);
+      c.bezierCurveTo(-9, 7, -8, -2, -2, -6); c.bezierCurveTo(-2, -2, 0, -1, 1, -3);
+      c.bezierCurveTo(1, -7, 3, -9, 2, -11); c.bezierCurveTo(9, -5, 9, 6, 0, 9);
+      done(c, 10);
+      c.beginPath(); c.moveTo(0, 7); c.bezierCurveTo(-4, 5, -3, 0, 0, -2); c.bezierCurveTo(3, 1, 4, 5, 0, 7);
+      c.fillStyle = 'rgba(255,255,255,0.65)'; c.fill();
+    },
+    bolt(c) {
+      c.beginPath(); c.moveTo(3, -11); c.lineTo(-6, 1); c.lineTo(-0.5, 1); c.lineTo(-3, 11); c.lineTo(6, -2); c.lineTo(0.5, -2); c.closePath();
+      done(c, 10); shine(c, 0, -6, 1.2, 2.4, 0.5);
+    },
+    leaf(c) {
+      c.beginPath(); c.moveTo(0, 10); c.quadraticCurveTo(-10, 0, 0, -10); c.quadraticCurveTo(10, 0, 0, 10); done(c, 10);
+      c.beginPath(); c.moveTo(0, 9); c.lineTo(0, -8);
+      for (const y of [-4, 0, 4]) { c.moveTo(0, y + 2); c.lineTo(-4, y - 1); c.moveTo(0, y + 2); c.lineTo(4, y - 1); }
+      c.strokeStyle = 'rgba(30,30,32,0.7)'; c.lineWidth = 0.9; c.stroke();
+    },
+    crown(c) {
+      c.beginPath(); c.moveTo(-9, 6); c.lineTo(-10, -6); c.lineTo(-5, -1); c.lineTo(0, -9); c.lineTo(5, -1); c.lineTo(10, -6); c.lineTo(9, 6); c.closePath();
+      done(c, 10); c.beginPath(); c.rect(-9, 3, 18, 4); done(c, 9, 1);
+      for (const [x, y] of [[-10, -6], [0, -9], [10, -6]]) { c.beginPath(); c.arc(x, y, 1.8, 0, TAU); c.fillStyle = '#fff'; c.fill(); }
+      hole(c, 0, 5, 1.4);
+    },
+    wing(c) {
+      c.beginPath(); c.moveTo(-8, 8); c.bezierCurveTo(-10, -4, 0, -11, 10, -10);
+      c.bezierCurveTo(7, -6, 8, -4, 5, -2); c.bezierCurveTo(6, 0, 5, 2, 2, 3); c.bezierCurveTo(2, 6, 0, 7, -8, 8); done(c, 10);
+      c.beginPath(); c.moveTo(-6, 6); c.quadraticCurveTo(-4, -3, 7, -8); c.moveTo(-5, 7); c.quadraticCurveTo(0, 0, 4, -2);
+      c.strokeStyle = 'rgba(30,30,32,0.6)'; c.lineWidth = 0.9; c.stroke();
+    },
+    gem(c) {
+      c.beginPath(); c.moveTo(-9, -3); c.lineTo(-5, -8); c.lineTo(5, -8); c.lineTo(9, -3); c.lineTo(0, 10); c.closePath(); done(c, 10);
+      c.beginPath(); c.moveTo(-9, -3); c.lineTo(9, -3); c.moveTo(-3, -8); c.lineTo(-4, -3); c.lineTo(0, 10); c.lineTo(4, -3); c.lineTo(3, -8);
+      c.strokeStyle = 'rgba(30,30,32,0.6)'; c.lineWidth = 0.8; c.stroke();
+      c.beginPath(); c.moveTo(-5, -7); c.lineTo(-3, -7); c.lineTo(-4, -4); c.closePath(); c.fillStyle = '#fff'; c.fill();
+    },
+    snow(c) {
+      c.lineCap = 'round';
+      for (let k = 0; k < 6; k++) {
+        c.save(); c.rotate(k * Math.PI / 3);
+        c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -10); c.moveTo(0, -6); c.lineTo(-3, -9); c.moveTo(0, -6); c.lineTo(3, -9);
+        c.strokeStyle = INK; c.lineWidth = 3.4; c.stroke(); c.strokeStyle = '#d8d8d8'; c.lineWidth = 1.6; c.stroke();
+        c.restore();
+      }
+    },
+    moon(c) {
+      c.beginPath(); c.arc(0, 0, 10, -2.2, 2.2, false); c.arc(4, 0, 8, 1.9, -1.9, true); c.closePath(); done(c, 10);
+      shine(c, -6, -2, 1.4, 3, 0.2);
+    },
+    clover(c) {
+      for (let k = 0; k < 4; k++) { c.save(); c.rotate(k * Math.PI / 2); c.beginPath(); c.arc(-2.6, -5, 3.8, 0, TAU); c.arc(2.6, -5, 3.8, 0, TAU); done(c, 9); c.restore(); }
+      hole(c, 0, 0, 1.5);
+    },
+    paw(c) {
+      c.beginPath(); c.ellipse(0, 4, 6, 5, 0, 0, TAU); done(c, 8);
+      for (const [x, y] of [[-7, -2], [-3, -7], [3, -7], [7, -2]]) { c.beginPath(); c.ellipse(x, y, 2.4, 3, x * 0.06, 0, TAU); done(c, 4, 1); }
+    },
+    butterfly(c) {
+      for (const sx of [-1, 1]) {
+        c.save(); c.scale(sx, 1);
+        c.beginPath(); c.moveTo(0, -1); c.bezierCurveTo(4, -12, 12, -10, 10, -3); c.bezierCurveTo(9, 0, 5, 0, 0, 0); done(c, 10);
+        c.beginPath(); c.moveTo(0, 1); c.bezierCurveTo(6, 1, 9, 5, 7, 8); c.bezierCurveTo(5, 10, 2, 7, 0, 2); done(c, 8);
+        hole(c, 6, -5, 1.6);
+        c.restore();
+      }
+      c.beginPath(); c.ellipse(0, 0, 1.4, 6, 0, 0, TAU); c.fillStyle = INK; c.fill();
+    },
+    sword(c) {
+      c.beginPath(); c.moveTo(0, -11); c.lineTo(2, -8); c.lineTo(2, 3); c.lineTo(-2, 3); c.lineTo(-2, -8); c.closePath(); done(c, 10, 1.1);
+      c.beginPath(); c.rect(-6, 3, 12, 2.4); done(c, 6, 1);
+      c.beginPath(); c.rect(-1.3, 5.4, 2.6, 4.5); c.fillStyle = '#3a3a3e'; c.fill();
+      c.beginPath(); c.arc(0, 10.6, 1.8, 0, TAU); done(c, 2, 1);
+      c.beginPath(); c.moveTo(-0.6, -8); c.lineTo(-0.6, 2); c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 0.8; c.stroke();
+    },
+    eye(c) {
+      c.beginPath(); c.moveTo(-11, 0); c.quadraticCurveTo(0, -11, 11, 0); c.quadraticCurveTo(0, 11, -11, 0); done(c, 10);
+      c.beginPath(); c.arc(0, 0, 4.6, 0, TAU); c.fillStyle = '#6a6a6a'; c.fill(); c.strokeStyle = INK; c.lineWidth = 1; c.stroke();
+      hole(c, 0, 0, 2.2); shine(c, -1.6, -1.8, 1.2, 0.9);
+    },
+  };
+  const MOTIF_NAMES = Object.keys(MOTIFS);
+
+  function motif(c, name, x, y, ang, sc) {
+    c.save(); c.translate(x, y); c.rotate(ang); c.scale(sc, sc);
+    MOTIFS[name](c);
+    c.restore();
+  }
+  function orbit(c, name, n, r, sc, phase = 0) {
+    for (let k = 0; k < n; k++) {
+      const a = phase + k * TAU / n;
+      motif(c, name, Math.sin(a) * r, -Math.cos(a) * r, a, sc);
+    }
+  }
+  function track(c, r, w = 1.4, alpha = 0.55) {
+    c.beginPath(); c.arc(0, 0, r, 0, TAU);
+    c.strokeStyle = INK; c.lineWidth = w + 2; c.stroke();
+    c.strokeStyle = `rgba(200,200,200,${alpha})`; c.lineWidth = w; c.stroke();
+  }
+  function beads(c, n, r, size) {
+    for (let k = 0; k < n; k++) {
+      const a = k * TAU / n;
+      c.beginPath(); c.arc(Math.sin(a) * r, -Math.cos(a) * r, size, 0, TAU); done(c, size, 1);
+    }
+  }
+  function halo(c, r) {
+    const g = c.createRadialGradient(0, 0, r * 0.5, 0, 0, r + 6);
+    g.addColorStop(0, 'rgba(210,210,210,0)'); g.addColorStop(0.78, 'rgba(225,225,225,0.4)'); g.addColorStop(1, 'rgba(225,225,225,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(0, 0, r + 6, 0, TAU); c.fill();
+  }
+
   function spinner(c, i) {
-    const f = i % 8, v = i >> 3;
-    const n = f === 5 ? 10 + v : COUNTS[(v + f) % 8];
-    const tier = i < 4 ? 0 : i < 28 ? 1 : i < 48 ? 2 : 3;
-    if (tier === 3) {                                  // soft halo
-      const g = c.createRadialGradient(0, 0, R * 0.55, 0, 0, R + 6);
-      g.addColorStop(0, 'rgba(200,200,200,0)'); g.addColorStop(0.75, 'rgba(210,210,210,0.35)'); g.addColorStop(1, 'rgba(210,210,210,0)');
-      c.fillStyle = g; c.beginPath(); c.arc(0, 0, R + 6, 0, TAU); c.fill();
+    if (i < 4) {                                       // free starters: plain shapes
+      ring(c, i, [6, 4, 4, 3][i], R - 4, 1.1);
+      return;
     }
-    ring(c, f, n, R - 4, 1 + (v % 3) * 0.12);
-    if (tier >= 2) {                                   // counter ring inside
-      c.save(); c.rotate(Math.PI / n);
-      ring(c, (f + 3) % 8, Math.max(3, n - 1), R * 0.62, 0.7);
-      c.restore();
+    if (i < 28) {                                      // tier 1: one motif orbiting
+      const m = MOTIF_NAMES[(i - 4) % 16], n = i - 4 < 16 ? 3 : 4;
+      track(c, R - 8, 1, 0.35);
+      orbit(c, m, n, R - 8, 1.05);
+      return;
     }
-    if (tier === 3) {                                  // core sparks
-      c.save(); c.rotate(0.3);
-      ring(c, (f + 5) % 8, 3, R * 0.34, 0.5);
-      c.restore();
+    if (i < 48) {                                      // tier 2: motifs + bead ring + inner counter ring
+      const j = i - 28, m = MOTIF_NAMES[(j * 5 + 3) % 16], m2 = MOTIF_NAMES[(j * 7 + 9) % 16];
+      track(c, R - 6, 1.6, 0.5);
+      beads(c, 12, R - 6, 1.7);
+      orbit(c, m, j % 2 ? 4 : 5, R - 6, 1.0);
+      orbit(c, m2, 3, R * 0.42, 0.62, Math.PI / 3);
+      return;
     }
+    // tier 3: legendary — halo, ornate double ring, big motifs, core emblem.
+    const j = i - 48, m = MOTIF_NAMES[j], m2 = MOTIF_NAMES[(j + 8) % 16];
+    halo(c, R);
+    track(c, R - 3, 2.2, 0.7); track(c, R - 10, 1, 0.4);
+    beads(c, 16, R - 3, 1.5);
+    orbit(c, m, 3, R - 7, 1.35);
+    orbit(c, m2, 6, R * 0.5, 0.55, Math.PI / 6);
+    motif(c, m, 0, 0, 0, 0.75);
   }
 
   function buildSpinnerSheet() {

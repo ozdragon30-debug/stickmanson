@@ -183,8 +183,7 @@ class SettingsManager {
     p.indicatorShapeIndex = this.settings.spinnerShapeIndex;
     if (typeof socketManager !== 'undefined') {
       socketManager.emit('setName',        { name:       this.settings.name });
-      socketManager.emit('playerIdentity', { hue:        this.settings.spinnerHue,
-                                             shapeIndex: this.settings.spinnerShapeIndex });
+      socketManager.emit('playerIdentity', shopManager.identity());
     }
   }
 
@@ -194,8 +193,7 @@ class SettingsManager {
     playerManager.mainPlayer.indicatorHue        = this.settings.spinnerHue;
     playerManager.mainPlayer.indicatorShapeIndex = this.settings.spinnerShapeIndex;
     if (typeof socketManager !== 'undefined') {
-      socketManager.emit('playerIdentity', { hue:        this.settings.spinnerHue,
-                                             shapeIndex: this.settings.spinnerShapeIndex });
+      socketManager.emit('playerIdentity', shopManager.identity());
     }
   }
 
@@ -277,6 +275,21 @@ class SettingsManager {
           <div class="sar-hint" data-i18n="shop.hint"></div>
           <div id="sar-spin-grid" class="sar-grid sar-scroll"></div>
           <div id="sar-spin-info" class="sar-spin-info"></div>
+        </div>
+        <div class="sar-sec">
+          <div class="sar-lbl" data-i18n="shop.pet">Pet</div>
+          <div class="sar-hint" data-i18n="shop.petHint"></div>
+          <div id="sar-pet-grid" class="sar-grid"></div>
+          <div id="sar-pet-info" class="sar-spin-info"></div>
+        </div>
+        <div class="sar-sec sar-vip">
+          <div class="sar-lbl">VIP <span class="sar-vip-badge">★</span></div>
+          <ul class="sar-vip-list">
+            <li data-i18n="vip.coins">+20% coins from every kill and round</li>
+            <li data-i18n="vip.name">Gold name above your player</li>
+            <li data-i18n="vip.more">More VIP spinners and pets are coming</li>
+          </ul>
+          <button class="sar-btn sar-buy" id="sar-vip-btn" disabled></button>
         </div>
         <div class="sar-sec">
           <label class="sar-lbl" for="sar-hue"><span data-i18n="set.color">Spinner Color</span> — <span id="sar-hue-lbl"></span></label>
@@ -452,6 +465,7 @@ class SettingsManager {
     this._syncControls();
     this._buildCursorPicker();
     this._buildSpinnerPicker();
+    this._buildPetPicker();
     this._buildKeybinds();
     this._showTab();
   }
@@ -563,6 +577,69 @@ class SettingsManager {
       grid.appendChild(tile);
     });
     this._renderSpinInfo();
+  }
+
+  // ── Pet picker (shop) ─────────────────────────────────────────────────────
+  _buildPetPicker() {
+    const grid = this._panel.querySelector('#sar-pet-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    if (this._petFocus == null) this._petFocus = shopManager.pet;
+    for (let id = -1; id < ShopManager.PETS.length; id++) {
+      const tile = document.createElement('button');
+      const owned = id === -1 || shopManager.ownsPet(id);
+      tile.className = 'sar-tile sar-tile-pet' + (id === shopManager.pet ? ' sel' : '') + (owned ? '' : ' locked') + (id === this._petFocus ? ' focus' : '');
+      const c = document.createElement('canvas');
+      c.width = 46; c.height = 46;
+      const cx = c.getContext('2d');
+      if (id >= 0) {
+        cx.translate(23, 25); cx.scale(1.45, 1.45);
+        if (!owned) cx.globalAlpha = 0.55;
+        Pets.draw(cx, id, 0.4, false);
+      } else {
+        cx.strokeStyle = '#556677'; cx.lineWidth = 2;
+        cx.beginPath(); cx.arc(23, 23, 10, 0, Math.PI * 2); cx.moveTo(16, 30); cx.lineTo(30, 16); cx.stroke();
+      }
+      tile.appendChild(c);
+      if (!owned) {
+        const tag = document.createElement('span');
+        tag.className = 'sar-price'; tag.textContent = ShopManager.PETS[id].price;
+        tile.appendChild(tag);
+      }
+      tile.setAttribute('aria-label', id < 0 ? t('shop.none') : t(ShopManager.PETS[id].name));
+      tile.onclick = () => {
+        this._petFocus = id;
+        if (id === -1 || shopManager.ownsPet(id)) { shopManager.equipPet(id); this._syncIdentity(); }
+        this._buildPetPicker();
+      };
+      grid.appendChild(tile);
+    }
+    this._renderPetInfo();
+  }
+
+  _renderPetInfo() {
+    const box = this._panel.querySelector('#sar-pet-info');
+    const vipBtn = this._panel.querySelector('#sar-vip-btn');
+    if (vipBtn) vipBtn.textContent = shopManager.vip ? '★ ' + t('vip.active') : t('vip.soon');
+    if (!box) return;
+    box.innerHTML = '';
+    const id = this._petFocus;
+    const lbl = document.createElement('span');
+    lbl.textContent = id < 0 ? t('shop.none') : `${t(ShopManager.PETS[id].name)} · ${ShopManager.petLabel(id)}`;
+    box.appendChild(lbl);
+    if (id < 0 || shopManager.ownsPet(id)) return;
+    const price = ShopManager.PETS[id].price, afford = shopManager.coins >= price;
+    const btn = document.createElement('button');
+    btn.className = 'sar-btn sar-buy';
+    btn.textContent = afford ? `${t('shop.buy')} — ${price}` : `${t('shop.need')} (${price})`;
+    btn.disabled = !afford;
+    btn.onclick = () => {
+      if (!shopManager.buyPet(id)) return;
+      this._syncIdentity();
+      this._buildPetPicker();
+      this._renderSpinInfo();
+    };
+    box.appendChild(btn);
   }
 
   // Coins + the focused spinner's perk, with a Buy button when it isn't owned.
