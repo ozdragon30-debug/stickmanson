@@ -1,5 +1,6 @@
 {
  "files": [
+  ".nojekyll",
   "css/style.css",
   "data/maps/abandonedcity.dat",
   "data/maps/alientestlab.dat",
