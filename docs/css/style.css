@@ -48,6 +48,7 @@ html, body {
   outline: none;
 }
 
+#canvas.fill { border-radius: 0; box-shadow: none; }
 body.pixel-art #canvas { image-rendering: pixelated; }
 body.ui-open #canvas { cursor: default; }
 

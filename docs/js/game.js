@@ -9,24 +9,11 @@ const map = new MapLoader();
 let obstacleGrid = [];
 
 
-function drawMap(nowMs) {
-  if (!mapAtlas.ready || !map.ready) return;
+const TILE = 50; // world units per map tile
 
-  const tileSize = 50;
-  const mapWidth = map.width;
-  const mapHeight = map.height;
-
-  const startX = Math.max(0, Math.floor(camera.x / (tileSize * scaleFactor)));
-  const startY = Math.max(0, Math.floor(camera.y / (tileSize * scaleFactor)));
-
-  const endX = Math.min(mapWidth, startX + Math.ceil(VIEW_W / (tileSize * scaleFactor)) + 1);
-  const endY = Math.min(mapHeight, startY + Math.ceil(VIEW_H / (tileSize * scaleFactor)) + 1);
-
-  // At non-integer render scales, anti-aliased tile edges leave hairline seams
-  // between neighbouring tiles. Overdraw each tile by ~1 device pixel to hide them.
-  const seam = 1 / (display.scale * scaleFactor);
-
-  // Tile codes are parsed once per map instead of for every tile, every frame.
+// Tile codes are parsed once per map instead of for every tile, every frame.
+const EMPTY_TILE = { code: '000000', tileType: '000', rot: 0, flip: 0, cVal: 0 };
+function parsedTiles() {
   if (map._parsedFor !== map.tiles) {
     map._parsed = map.tiles.map(raw => {
       const code = (raw || '000000').toUpperCase();
@@ -40,32 +27,127 @@ function drawMap(nowMs) {
     });
     map._parsedFor = map.tiles;
   }
-  const EMPTY = { code: '000000', tileType: '000', rot: 0, flip: 0, cVal: 0 };
+  return map._parsed;
+}
 
+function isAnimatedTile(tileType) {
+  const a = mapAtlas.tileAnimations[tileType];
+  return !!(a && a.frames.length > 1);
+}
+
+// Draws one tile in world coordinates. `seam` overdraws by ~1 device pixel so
+// anti-aliased edges at non-integer scales leave no hairline gaps.
+function drawTile(c, cell, x, y, nowMs, seam) {
+  const f = mapAtlas.getAnimatedMapTileFrame(cell.tileType, nowMs);
+  if (!f) return;
+  const half = TILE / 2;
+  c.save();
+  c.translate(x * TILE + half, y * TILE + half);
+  c.rotate(cell.rot * Math.PI / 2);
+  if (cell.flip !== 0) {
+    c.scale((cell.flip === 1 || cell.flip === 3) ? -1 : 1, (cell.flip === 2 || cell.flip === 3) ? -1 : 1);
+  }
+  c.drawImage(mapAtlas.image, f.x, f.y, f.w, f.h, -half - seam / 2, -half - seam / 2, TILE + seam, TILE + seam);
+  c.restore();
+}
+
+// The static part of the map is rendered once into 8×8-tile chunks; a frame
+// then draws a handful of chunk images plus the animated tiles, instead of
+// ~250 individually transformed tiles (the single biggest per-frame cost).
+const mapCache = {
+  CHUNK: 8,
+  _chunks: new Map(), // "cx,cy" → { canvas, animated: [[x, y], …] }
+  _for: null,
+  _res: 0,
+  _smooth: null,
+
+  draw(c, x0, x1, y0, y1, nowMs) {
+    const res = Math.min(2.5, display.scale * scaleFactor); // chunk pixels per world unit
+    const smooth = !settingsManager.get('pixelArt');
+    if (this._for !== map.tiles || this._res !== res || this._smooth !== smooth) {
+      this._chunks.clear();
+      this._for = map.tiles; this._res = res; this._smooth = smooth;
+    }
+    const C = this.CHUNK, size = C * TILE;
+    const seam = 1 / (display.scale * scaleFactor);
+    const cx0 = Math.floor(x0 / C), cx1 = Math.floor((x1 - 1) / C);
+    const cy0 = Math.floor(y0 / C), cy1 = Math.floor((y1 - 1) / C);
+    const visible = [];
+    for (let cy = cy0; cy <= cy1; cy++) {
+      for (let cx = cx0; cx <= cx1; cx++) {
+        const key = cx + ',' + cy;
+        let chunk = this._chunks.get(key);
+        if (chunk) this._chunks.delete(key);    // re-insert: most recently used last
+        else chunk = this._build(cx, cy, res, smooth);
+        this._chunks.set(key, chunk);
+        c.drawImage(chunk.canvas, cx * size, cy * size, size + seam, size + seam);
+        visible.push(chunk);
+      }
+    }
+    // Animated tiles (water, lights…) on top, every frame.
+    const parsed = parsedTiles();
+    for (const chunk of visible) {
+      for (const [x, y] of chunk.animated) {
+        if (x >= x0 && x < x1 && y >= y0 && y < y1) drawTile(c, parsed[y * map.width + x], x, y, nowMs, seam);
+      }
+    }
+    // Keep at most ~80 MB of chunk images (but always every visible chunk).
+    const perChunk = Math.pow(Math.ceil(size * res), 2) * 4;
+    const max = Math.max(visible.length + 4, Math.floor(80e6 / perChunk));
+    while (this._chunks.size > max) this._chunks.delete(this._chunks.keys().next().value);
+  },
+
+  _build(cx, cy, res, smooth) {
+    const C = this.CHUNK, size = C * TILE;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = Math.ceil(size * res);
+    const c = canvas.getContext('2d');
+    c.imageSmoothingEnabled = smooth;
+    c.setTransform(res, 0, 0, res, -cx * size * res, -cy * size * res);
+    const parsed = parsedTiles();
+    const animated = [];
+    for (let y = cy * C; y < Math.min(map.height, (cy + 1) * C); y++) {
+      for (let x = cx * C; x < Math.min(map.width, (cx + 1) * C); x++) {
+        const cell = parsed[y * map.width + x] || EMPTY_TILE;
+        if (isAnimatedTile(cell.tileType)) animated.push([x, y]);
+        else drawTile(c, cell, x, y, 0, 1 / res);
+      }
+    }
+    return { canvas, animated };
+  },
+};
+
+// Draws the map tiles visible in logical view columns [viewX0, viewX1).
+function drawMap(nowMs, viewX0 = 0, viewX1 = VIEW_W) {
+  if (!mapAtlas.ready || !map.ready) return;
+  const mapWidth = map.width;
+  const mapHeight = map.height;
+  const tileView = TILE * scaleFactor; // logical px per tile
+
+  const startX = Math.max(0, Math.floor((camera.x + viewX0) / tileView));
+  const startY = Math.max(0, Math.floor(camera.y / tileView));
+  const endX = Math.min(mapWidth, Math.floor((camera.x + viewX1) / tileView) + 1);
+  const endY = Math.min(mapHeight, Math.floor((camera.y + VIEW_H) / tileView) + 1);
+  if (endX <= startX || endY <= startY) return;
+
+  if (!debugTiles) {
+    mapCache.draw(ctx, startX, endX, startY, endY, nowMs);
+    return;
+  }
+
+  // Debug view (!debug): per-tile drawing with collision overlays and labels.
+  const tileSize = TILE;
+  const seam = 1 / (display.scale * scaleFactor);
+  const parsed = parsedTiles();
   for (let y = startY; y < endY; y++) {
     for (let x = startX; x < endX; x++) {
-      const { code, tileType, rot, flip, cVal } = map._parsed[y * mapWidth + x] || EMPTY;
-
-      const f = mapAtlas.getAnimatedMapTileFrame(tileType, nowMs);
-      if (!f) continue;
-
+      const cell = parsed[y * mapWidth + x] || EMPTY_TILE;
+      const { code, rot, flip, cVal } = cell;
+      drawTile(ctx, cell, x, y, nowMs, seam);
       const half = tileSize / 2;
-      const cx = x * tileSize + half;  // tile centre in world coords
+      const cx = x * tileSize + half;
       const cy = y * tileSize + half;
-
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(rot * Math.PI / 2);
-      if (flip !== 0) {
-        ctx.scale(
-          (flip === 1 || flip === 3) ? -1 : 1,
-          (flip === 2 || flip === 3) ? -1 : 1
-        );
-      }
-      ctx.drawImage(mapAtlas.image, f.x, f.y, f.w, f.h, -half - seam / 2, -half - seam / 2, tileSize + seam, tileSize + seam);
-      ctx.restore();
-
-      if (debugTiles) {
+      {
         // Collision overlay — draw the ColX sprite at 50% opacity with the same
         // rotation/flip as the tile so the blocked zone transforms correctly.
         const colFrame = mapAtlas.getMapTileFrame(`Col${cVal}`);
@@ -137,18 +219,37 @@ function drawCursor() {
 }
 
 function draw(nowMs) {
+  const ex = display.extraX;
   resetScreenTransform(ctx);
   ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  ctx.fillRect(-ex, 0, VIEW_W + 2 * ex, VIEW_H);
   ctx.translate(-camera.x, -camera.y);
   ctx.scale(scaleFactor, scaleFactor);
 
   ctx.imageSmoothingEnabled = !settingsManager.get('pixelArt');
 
-  drawMap(nowMs);
+  drawMap(nowMs, -ex, VIEW_W + ex);
+  ctx.save();
+  if (ex > 0) {
+    // Wide-screen margins show the map only, dimmed; everything else is clipped
+    // to the original 4:3 view so no one sees more of the action than before.
+    resetScreenTransform(ctx);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(-ex, 0, ex, VIEW_H);
+    ctx.fillRect(VIEW_W, 0, ex, VIEW_H);
+    ctx.fillStyle = 'rgba(143,166,191,0.25)';
+    ctx.fillRect(-1, 0, 1, VIEW_H);
+    ctx.fillRect(VIEW_W, 0, 1, VIEW_H);
+    ctx.beginPath();
+    ctx.rect(0, 0, VIEW_W, VIEW_H);
+    ctx.clip();
+    ctx.translate(-camera.x, -camera.y);
+    ctx.scale(scaleFactor, scaleFactor);
+  }
   pickupManager.draw(ctx);
   playerManager.drawPlayers(ctx);
   if (debugTiles) drawDebugHitshape(ctx);
+  ctx.restore();
   hudManager.draw(ctx);
   scoreboardManager.draw(ctx, canvas);
   // Chat history would draw over the scoreboard; keep it while typing.
@@ -305,6 +406,7 @@ settingsManager.onChange((key, value) => {
   else if (key === 'muted') soundManager.setMuted(value);
   else if (key === 'spatialAudio') soundManager.setSpatial(value);
   else if (key === 'renderQuality') display.setQuality(value);
+  else if (key === 'wideScreen') display.setWide(value);
   else if (key === 'fpsLimit') setFpsLimit(value);
   else if (key === 'pixelArt') document.body.classList.toggle('pixel-art', !!value);
   else if (key === 'touchControls') updateTouchControls();
@@ -339,6 +441,7 @@ Constants._weaponsReady.then(() => {
 
 
 setFpsLimit(settingsManager.get('fpsLimit'));
+display.setWide(settingsManager.get('wideScreen'));
 
 let loopStarted = false;
 

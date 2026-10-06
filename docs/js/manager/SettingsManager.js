@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS = {
   spatialAudio:      true,
   // Video
   renderQuality:     'auto',   // auto | high | low
+  wideScreen:        true,     // fill wide screens (side margins show the map only)
   fpsLimit:          'off',    // off (monitor refresh rate) | 240 | 144 | 120 | 60 | 30
   pixelArt:          false,    // nearest-neighbour sprite scaling
   modernFx:          true,     // shadows, glow, lights (render-only)
@@ -330,6 +331,8 @@ class SettingsManager {
             <option value="30" data-i18n="set.fpsLimit.30">30 FPS (battery saver)</option>
           </select>
         </div>
+        <label class="sar-check"><input type="checkbox" data-setting="wideScreen"> <span data-i18n="set.wide">Fill wide screens</span>
+          <span class="sar-hint" data-i18n="set.wide.hint">— extra width shows the map only; the play area stays 4:3</span></label>
         <label class="sar-check"><input type="checkbox" data-setting="smoothAnim"> <span data-i18n="set.smooth">Smooth animations (60 fps)</span>
           <span class="sar-hint" data-i18n="set.smooth.hint">— in-between drawings; game speed unchanged</span></label>
         <label class="sar-check"><input type="checkbox" data-setting="modernFx"> <span data-i18n="set.fx">Modern effects</span>

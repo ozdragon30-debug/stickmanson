@@ -2,6 +2,18 @@
 
 ## 2026 modernisation
 
+### Full screen and smoother frames
+
+- Fill wide screens (default on, Settings → Video): phones in landscape and
+  16:9 monitors use the whole screen. The extra width shows the map only,
+  dimmed; players, pickups and effects stay clipped to the original 4:3 view,
+  so nobody sees more of the action. HUD corners and touch sticks move out to
+  the screen edges. Aiming is unchanged (measured from the view centre).
+- Map rendering cached in 8×8-tile chunks; animated tiles still drawn every
+  frame. Previously ~250 transformed tile draws per frame (≈80% of the frame).
+- Android app: immersive full screen (status and navigation bars hidden,
+  drawn under the camera cutout).
+
 ### 60 fps animations
 
 - The hand-drawn 12 fps player animations are shown at 60 fps: 4 in-between

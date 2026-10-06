@@ -158,7 +158,9 @@ class TouchInput {
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
       const swap = settingsManager.get('touchLeftHanded');
       const inset = 70 + R, hy = VIEW_H - 80 - R;
-      const mx = swap ? VIEW_W - inset : inset, ax = swap ? inset : VIEW_W - inset;
+      // In the side margins when the screen is filled (out of the action's way).
+      const ex = display.extraX || 0;
+      const mx = swap ? VIEW_W + ex - inset : inset - ex, ax = swap ? inset - ex : VIEW_W + ex - inset;
       ctx.beginPath(); ctx.arc(mx, hy, R, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath(); ctx.arc(ax, hy, R, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 0.7; ctx.fillStyle = '#fff';

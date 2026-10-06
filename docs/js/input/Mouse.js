@@ -21,7 +21,7 @@ function mouseMoveHandler(event) {
   const p = display.toView(event.clientX, event.clientY);
   mouseScreenX = p.x;
   mouseScreenY = p.y;
-  mouseInView  = p.x >= 0 && p.y >= 0 && p.x <= VIEW_W && p.y <= VIEW_H;
+  mouseInView  = p.x >= -display.extraX && p.y >= 0 && p.x <= VIEW_W + display.extraX && p.y <= VIEW_H;
   if (typeof inputMode !== 'undefined') inputMode.set('mouse');
   if (isUiBlocking()) return;
   aimAtViewPoint(p.x, p.y);
