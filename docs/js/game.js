@@ -181,57 +181,42 @@ function drawMap(nowMs, viewX0 = 0, viewX1 = VIEW_W, viewY0 = 0, viewY1 = VIEW_H
     return;
   }
 
-  // Debug view (!debug): per-tile drawing with collision overlays and labels.
-  const tileSize = TILE;
-  const seam = 1 / (display.scale * worldScale());
+  // !debug: tiles one by one, the walk-blocked area of each in red, and
+  // every tile's code and grid position.
   const parsed = parsedTiles();
-  for (let y = startY; y < endY; y++) {
-    for (let x = startX; x < endX; x++) {
-      const cell = parsed[y * mapWidth + x] || EMPTY_TILE;
-      const { code, rot, flip, cVal } = cell;
-      drawTile(ctx, cell, x, y, nowMs, seam);
-      const half = tileSize / 2;
-      const cx = x * tileSize + half;
-      const cy = y * tileSize + half;
-      {
-        // Collision overlay — draw the ColX sprite at 50% opacity with the same
-        // rotation/flip as the tile so the blocked zone transforms correctly.
-        const colFrame = mapAtlas.getMapTileFrame(`Col${cVal}`);
-        if (colFrame && colFrame.w > 1) {
-          // Col sprites are authored at 52 px; scale their dimensions proportionally
-          // so partial shapes (e.g. Col6 = 52×26 = top half) stay true to their area.
-          const COL_BASE = 52;
-          const dstW = (colFrame.w / COL_BASE) * tileSize;
-          const dstH = (colFrame.h / COL_BASE) * tileSize;
-          ctx.save();
-          ctx.globalAlpha = 0.5;
-          ctx.translate(cx, cy);
-          ctx.rotate(rot * Math.PI / 2);
-          if (flip !== 0) {
-            ctx.scale(
-              (flip === 1 || flip === 3) ? -1 : 1,
-              (flip === 2 || flip === 3) ? -1 : 1
-            );
-          }
-          ctx.drawImage(mapAtlas.image, colFrame.x, colFrame.y, colFrame.w, colFrame.h, -half, -half, dstW, dstH);
-          ctx.restore();
-        }
-        // Tile border
-        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-        ctx.lineWidth = 0.5;
-        ctx.strokeRect(x * tileSize + 0.25, y * tileSize + 0.25, tileSize - 0.5, tileSize - 0.5);
-        // Tile code label
-        ctx.fillStyle = 'rgba(0,0,0,0.55)';
-        ctx.fillRect(x * tileSize + 1, y * tileSize + 1, 34, 20);
-        ctx.fillStyle = '#fff';
-        ctx.font = '7px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText(code, x * tileSize + 3, y * tileSize + 8);
-        ctx.fillStyle = '#adf';
-        ctx.fillText(`${x},${y}`, x * tileSize + 3, y * tileSize + 17);
+  const seam = 1 / (display.scale * worldScale());
+  for (let ty = startY; ty < endY; ty++) {
+    for (let tx = startX; tx < endX; tx++) {
+      const cell = parsed[ty * mapWidth + tx] || EMPTY_TILE;
+      drawTile(ctx, cell, tx, ty, nowMs, seam);
+      drawTileDebug(cell, tx, ty);
+    }
+  }
+}
+
+// Collision of one tile sampled on a 5 px grid (red = can't walk, darker = bullets stop too).
+function drawTileDebug(cell, tx, ty) {
+  const x0 = tx * TILE, y0 = ty * TILE;
+  const col = obstacleGrid[ty * map.width + tx];
+  if (col && col.c > 2) {
+    ctx.fillStyle = col.c === 3 ? 'rgba(200,0,0,0.45)' : 'rgba(255,60,60,0.3)';
+    for (let sy = 2.5; sy < TILE; sy += 5) {
+      for (let sx = 2.5; sx < TILE; sx += 5) {
+        if (Physics.isTileWalkBlocked(col, sx, sy)) ctx.fillRect(x0 + sx - 2.5, y0 + sy - 2.5, 5, 5);
       }
     }
   }
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(x0 + 0.25, y0 + 0.25, TILE - 0.5, TILE - 0.5);
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(x0 + 1, y0 + 1, 34, 20);
+  ctx.font = '7px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(cell.code, x0 + 3, y0 + 8);
+  ctx.fillStyle = '#adf';
+  ctx.fillText(`${tx},${ty}`, x0 + 3, y0 + 17);
 }
 
 // Bot matches pause while a menu is open (they run locally, also when
@@ -240,28 +225,24 @@ function isOfflinePaused() {
   return botManager.active && isUiBlocking();
 }
 
+// One simulation step: players (input already applied), pickups, then bots.
 function update(dt) {
   playerManager.updatePlayers();
   pickupManager.update();
   if (!isOfflinePaused()) botManager.update(dt);
 }
 
+// The chosen crosshair, drawn last at the mouse (not on touch, nor over menus).
 function drawCursor() {
-  if (!cursorAtlas.ready) return;
-  if (inputMode.mode === 'touch' || isUiBlocking()) return;
+  if (!cursorAtlas.ready || inputMode.mode === 'touch' || isUiBlocking()) return;
   if (inputMode.mode === 'mouse' && !mouseInView) return;
-  const names = cursorAtlas.animationNames;
-  if (!names.length) return;
-  const animName = names[settingsManager.cursorIndex % names.length];
-  const f = cursorAtlas.getFrameData(animName, 0);
+  const list = cursorAtlas.animationNames;
+  const f = list.length && cursorAtlas.getFrameData(list[settingsManager.cursorIndex % list.length], 0);
   if (!f) return;
   ctx.save();
   resetScreenTransform(ctx);
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(cursorAtlas.image, f.x, f.y, f.w, f.h,
-    Math.round(mouseScreenX - f.w / 2),
-    Math.round(mouseScreenY - f.h / 2),
-    f.w, f.h);
+  ctx.drawImage(cursorAtlas.image, f.x, f.y, f.w, f.h, Math.round(mouseScreenX - f.w / 2), Math.round(mouseScreenY - f.h / 2), f.w, f.h);
   ctx.restore();
 }
 
@@ -304,70 +285,47 @@ function draw(nowMs) {
   drawCursor();
 }
 
-// Draws the main player's weapon hitshape in world space.
+// !debug: the local player's current weapon reach, in world space.
 function drawDebugHitshape(ctx) {
-  const player = playerManager.mainPlayer;
-  if (!player || player.isRespawning) return;
-
-  const origin   = player.getPosition();          // {x, y, rotation}
-  const rotation = origin.rotation - (90 * Constants.TO_RADIANS); // strip sprite +90° offset
-  const weapon   = player.currentWeapon;
-  const hitShape = weapon.hitShape ?? { type: 'rect' };
-  const radius   = Constants.STICK_FIGURE_HEAD_RADIUS;
-
+  const me = playerManager.mainPlayer;
+  if (!me || me.isRespawning) return;
+  const { x, y, rotation } = me.getPosition();
+  const aim = rotation - 90 * Constants.TO_RADIANS;      // sprites carry +90°
+  const shape = me.currentWeapon.hitShape ?? { type: 'rect' };
   ctx.save();
   ctx.strokeStyle = 'rgba(255,255,0,0.85)';
-  ctx.fillStyle   = 'rgba(255,255,0,0.15)';
-  ctx.lineWidth   = 1.5;
-
-  if (hitShape.type === 'ray') {
-    const ex = origin.x + Math.cos(rotation) * hitShape.maxRange;
-    const ey = origin.y + Math.sin(rotation) * hitShape.maxRange;
-    // Ray line
-    ctx.beginPath();
-    ctx.moveTo(origin.x, origin.y);
-    ctx.lineTo(ex, ey);
+  ctx.fillStyle = 'rgba(255,255,0,0.15)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  if (shape.type === 'ray') {
+    // The shot line and the corridor a target's centre must be inside.
+    const r = Constants.STICK_FIGURE_HEAD_RADIUS;
+    const ux = Math.cos(aim), uy = Math.sin(aim);
+    for (const side of [0, r, -r]) {
+      const ox = -uy * side, oy = ux * side;
+      ctx.moveTo(x + ox, y + oy);
+      ctx.lineTo(x + ox + ux * shape.maxRange, y + oy + uy * shape.maxRange);
+    }
     ctx.stroke();
-    // Width corridor (±radius)
-    const nx = -Math.sin(rotation) * radius;
-    const ny =  Math.cos(rotation) * radius;
-    ctx.beginPath();
-    ctx.moveTo(origin.x + nx, origin.y + ny);
-    ctx.lineTo(ex + nx, ey + ny);
-    ctx.moveTo(origin.x - nx, origin.y - ny);
-    ctx.lineTo(ex - nx, ey - ny);
-    ctx.stroke();
-
-  } else if (hitShape.type === 'cone') {
-    const halfAngle = (hitShape.spreadAngle * Math.PI / 180) / 2;
-    ctx.beginPath();
-    ctx.moveTo(origin.x, origin.y);
-    ctx.arc(origin.x, origin.y, hitShape.maxRange, rotation - halfAngle, rotation + halfAngle);
+  } else if (shape.type === 'cone' || shape.type === 'circle') {
+    const half = shape.type === 'cone' ? (shape.spreadAngle * Math.PI / 180) / 2 : Math.PI;
+    if (shape.type === 'cone') ctx.moveTo(x, y);
+    ctx.arc(x, y, shape.maxRange, aim - half, aim + half);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-
-  } else if (hitShape.type === 'circle') {
-    ctx.beginPath();
-    ctx.arc(origin.x, origin.y, hitShape.maxRange, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
   } else {
-    // rect — reconstruct the rotated hitbox from offsets
-    const { hitboxOffsets } = player.body.spritesheetData;
-    const corners = ['topLeft', 'topRight', 'bottomRight', 'bottomLeft'].map(k => {
-      const off = hitboxOffsets[k];
-      return Physics.rotatePoint(origin.x, origin.y, origin.x + off.x, origin.y + off.y, rotation);
-    });
-    ctx.beginPath();
-    ctx.moveTo(corners[0].x, corners[0].y);
-    for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    const off = me.body.spritesheetData?.hitboxOffsets;
+    if (off) {
+      ['topLeft', 'topRight', 'bottomRight', 'bottomLeft'].forEach((k, i) => {
+        const p = Physics.rotatePoint(x, y, x + off[k].x, y + off[k].y, aim);
+        if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y);
+      });
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
   }
-
   ctx.restore();
 }
 
@@ -450,9 +408,11 @@ function loop(nowMs) {
 }
 
 function frame(nowMs) {
-  if (!lastTime) lastTime = nowMs;
-  pacer.sample(nowMs, nowMs - lastTime);
-  const dt = Math.min((nowMs - lastTime) / 1000, 0.1);  // seconds; capped to avoid spiral after tab switch
+  // Seconds since the last frame, capped so a long stall (tab switch) can't
+  // launch anyone across the map.
+  const prev = lastTime || nowMs;
+  pacer.sample(nowMs, nowMs - prev);
+  const dt = Math.min((nowMs - prev) / 1000, 0.1);
   lastTime = nowMs;
 
   // Input is applied before update/draw so the frame on screen reflects it
@@ -544,30 +504,29 @@ if (socketManager.socket) socketManager.socket.connect();
 let currentMapFile = null;
 let _mapLoadGen = 0;
 function loadMap(filename) {
-  // Parse into a fresh loader and only apply it if no newer loadMap() started
-  // meanwhile: otherwise whichever fetch finished last would win, leaving the
-  // world on a different map than the round/server.
-  const gen = ++_mapLoadGen;
-  const next = new MapLoader();
-  return next.load('data/maps/' + filename).then(() => {
-    if (gen !== _mapLoadGen) return false;
-    Object.assign(map, next);
+  // Each load parses into its own loader and only goes live if no newer load
+  // started meanwhile, so the world always ends up on the latest map asked for.
+  const ticket = ++_mapLoadGen;
+  const incoming = new MapLoader();
+  const live = () => {
+    Object.assign(map, incoming);
     if (currentMapFile !== filename && !menu.isOpen) hudManager.showMapTitle(map.name);
     currentMapFile = filename;
     obstacleGrid = map.collisionMap;
     pickupManager.initFromMap(map.weaponSpawns);
-    // Tell the server about this map's pickup layout so it can sync state.
-    socketManager.emit('mapLoaded', {
-      weaponSpawns: map.weaponSpawns.map(ws => ({ weaponId: ws.weaponId, respawnTime: ws.respawnTime })),
-    });
-    if (!loopStarted) {
-      playerManager.createMainPlayer(map.spawnPoints);
-      loopStarted = true;
-      // Must go through rAF: calling loop() directly passed an undefined timestamp,
-      // making the first frame's dt NaN (and the player's position NaN if a key was held).
-      requestAnimationFrame(loop);
-      menu.setReady();
-    }
+    // The server keeps pickup state for everyone in the room.
+    socketManager.emit('mapLoaded', { weaponSpawns: map.weaponSpawns.map(({ weaponId, respawnTime }) => ({ weaponId, respawnTime })) });
+    if (loopStarted) return;
+    // First map: create the local player and start the frame loop (through
+    // requestAnimationFrame, so the first frame gets a real timestamp).
+    playerManager.createMainPlayer(map.spawnPoints);
+    loopStarted = true;
+    requestAnimationFrame(loop);
+    menu.setReady();
+  };
+  return incoming.load(`data/maps/${filename}`).then(() => {
+    if (ticket !== _mapLoadGen) return false;
+    live();
     return true;
   }).catch(err => { console.error('Failed to load map:', err); return false; });
 }
