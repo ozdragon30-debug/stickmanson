@@ -11,6 +11,11 @@
 - Pets (cat, dog, crow, slime, drone, ghost, fox, dragon whelp) follow their
   owner and give one small perk; bought with coins in Settings → Profile and
   shown to other players.
+- Sword, katana and bat swings: arms fully extended, a bright slash arc out
+  to the weapon's real reach, timed to finish within the cooldown; melee
+  hits show a cut / spark / impact burst on the victim, and every weapon now
+  has a hit sound (new bat, railgun and flamethrower impacts; sharper blade
+  sounds).
 - VIP is prepared (+20% coins, gold name) and will be sold with the store
   release; it can't be bought yet.
 

@@ -349,7 +349,8 @@ class BotManager {
     const dmg = damage ?? playerManager.mainPlayer?.currentWeapon?.damage ?? 5;
     const wid = weaponId ?? playerManager.mainPlayer?.currentWeapon?.id ?? 0;
 
-    bot.player.showHitsplat(dmg * shopManager.attackFactor(), wid);
+    const me = playerManager.mainPlayer;
+    bot.player.showHitsplat(dmg * shopManager.attackFactor(), wid, me ? { x: me.body.x, y: me.body.y } : null);
     if (bot.player.health > 0) return;
 
     bot.deaths++;

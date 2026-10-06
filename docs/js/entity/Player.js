@@ -378,6 +378,12 @@ class Player {
     this.hitsplat.setPosition(this.body.x, this.body.y);
     this.hitsplat.isVisible = true;
     this._hitFxAt = performance.now(); // render-only (hit rim flash)
+    // Melee hit effect (slash / impact burst) facing away from the attacker.
+    const wname = attackerWeapon?.name;
+    if (StickFigure.HIT_TIME[wname]) {
+      const ang = attackerPos ? Math.atan2(this.body.y - attackerPos.y, this.body.x - attackerPos.x) : Math.random() * Math.PI * 2;
+      this._meleeHit = { w: wname, t: performance.now(), ang, seed: Math.floor(Math.random() * 1000) };
+    }
     // Spinner perk (shop): armor reduces what the local player takes.
     const armor = this.isMainPlayer && typeof shopManager !== 'undefined' ? shopManager.armorFactor() : 1;
     this.health -= (damage ?? this.currentWeapon.damage) * Constants.DAMAGE_MULTIPLIER * armor;
@@ -593,6 +599,12 @@ class Player {
       if (modern && since < 160) fx.light(ctx, this.body.x, this.body.y, 42, FX_HIT, 0.7 * (1 - since / 160));
     }
     this.hitsplat.drawCentered(ctx);
+    const mh = this._meleeHit;
+    if (mh) {
+      const u = (performance.now() - mh.t) / 1000 / StickFigure.HIT_TIME[mh.w];
+      if (u >= 1) this._meleeHit = null;
+      else { ctx.save(); ctx.translate(this.body.x, this.body.y); StickFigure.hit(ctx, mh.w, u, mh.ang, mh.seed); ctx.restore(); }
+    }
     const pOff = (!this.muzzleFlashPinned && this.currentWeapon.shootParticle && particleAtlas.animationMap[this.currentWeapon.shootParticle]?.offset) || [0, 0];
     this.muzzleFlash.drawCenteredRotated(ctx, this.muzzleFlashPinned ? 0 : this.body.rotation, pOff[0], pOff[1]);
     if (modern && this.muzzleFlash.isVisible) {

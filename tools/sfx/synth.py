@@ -173,16 +173,17 @@ def bat():
 
 
 def katana(seed):
+    # Fast blade swish (the slash lands ~0.1 s in) with a bright metallic ring.
     rs = np.random.RandomState(60 + seed)
-    w = whoosh(60 + seed, 0.62, 1200, 8000, 0.28)
-    shing = tone(0.62, 3100 + seed * 260) * env(0.62, 0.002, 0.18) * 0.15
-    return mix(w, at(shing, 0.04) * (0.6 + 0.4 * rs.rand()))
+    w = whoosh(60 + seed, 0.45, 1500, 9000, 0.22) * 1.2
+    shing = sum(tone(0.6, (3000 + seed * 260) * r) * a for r, a in ((1, 1), (1.51, 0.45), (2.31, 0.25))) * env(0.6, 0.002, 0.22) * 0.3
+    return mix(w, at(shing, 0.02) * (0.8 + 0.2 * rs.rand()))
 
 
 def laser_sword(seed):
-    d = 0.75 + seed * 0.08
+    d = 0.6 + seed * 0.06
     t = t_(d)
-    swing = np.exp(-((t - d * 0.35) / (d * 0.2)) ** 2)
+    swing = np.exp(-((t - 0.12) / 0.07) ** 2)
     f = 110 * (1 + 0.35 * swing) * (1 + 0.02 * np.sin(2 * np.pi * 31 * t))
     ph = 2 * np.pi * np.cumsum(f) / SR
     hum = (np.sin(ph) + 0.5 * np.sin(2 * ph) + 0.3 * np.sign(np.sin(3 * ph))) * (0.35 + 0.65 * swing)
@@ -237,13 +238,6 @@ def impact(seed, d=0.5, low=70, crunch=0.6, bright=4000, wet=False):
     return drive(x, 1.8)
 
 
-def metal_impact(seed, f0):
-    rs = np.random.RandomState(seed)
-    d = 0.6
-    ring = sum(tone(d, f0 * r) * a for r, a in ((1, 1), (2.76, 0.6), (5.4, 0.35))) * env(d, 0.001, 0.12)
-    return mix(impact(seed, 0.5, 90, 0.5, 6000), ring * 0.35)
-
-
 def zap_impact():
     rs = np.random.RandomState(120)
     d = 0.9
@@ -252,10 +246,38 @@ def zap_impact():
     return drive(x * env(d, 0.002, 0.25), 2)
 
 
-def laser_impact():
-    d = 0.9
-    x = sweep(d, 1600, 200, 'saw') * env(d, 0.001, 0.15)
-    return mix(band(x, 100, 8000), impact(130, 0.5, 80, 0.4) * 0.6)
+def slice_impact(seed, laser=False):
+    """Blade hit: a sharp cut, a short ring (steel) or sizzle (laser), and a wet thud."""
+    rs = np.random.RandomState(seed)
+    d = 0.55
+    cut = band(noise(d, rs), 2500, 11000) * env(d, 0.0005, 0.04) * 1.2
+    if laser:
+        sizzle = band(noise(d, rs), 3000, 9000) * (rs.rand(int(SR * d)) > 0.6) * env(d, 0.005, 0.18) * 0.8
+        zap = sweep(d, 900, 120, 'saw') * env(d, 0.001, 0.12) * 0.6
+        extra = band(sizzle + zap, 80, 10000)
+    else:
+        extra = sum(tone(d, 2600 * r) * a for r, a in ((1, 1), (2.4, 0.4))) * env(d, 0.001, 0.1) * 0.35
+    thud = impact(seed + 1, d, 80, 0.3, 2000, True) * 0.7
+    return drive(mix(cut, extra, thud), 1.6)
+
+
+def bat_impact():
+    rs = np.random.RandomState(150)
+    d = 0.5
+    crack = band(noise(d, rs), 900, 5000) * env(d, 0.0005, 0.018) * 1.3
+    knock = sum(tone(d, f) * a for f, a in ((180, 1), (410, 0.5), (760, 0.25))) * env(d, 0.001, 0.06)
+    return drive(mix(crack, knock, impact(151, d, 70, 0.4, 2500, True) * 0.7), 2)
+
+
+def railgun_impact():
+    d = 0.6
+    return mix(zap_impact()[:int(SR * d)] * 0.7, impact(160, d, 60, 0.6, 6000) * 0.8)
+
+
+def flame_impact():
+    rs = np.random.RandomState(170)
+    d = 0.6
+    return band(noise(d, rs), 300, 4000) * env(d, 0.01, 0.15) + band(noise(d, rs), 3000, 9000) * (rs.rand(int(SR * d)) > 0.95) * 1.5 * env(d, 0.01, 0.2)
 
 
 def saw_impact():
@@ -375,9 +397,10 @@ SOUNDS = {
     'ak47_impact': lambda: impact(301, 0.45, 75, 0.7, 5000, True),
     'shotgun_impact': lambda: impact(302, 0.55, 60, 0.9, 4000, True),
     'fist_impact': lambda: impact(303, 0.35, 90, 0.35, 2500),
-    'katana_impact': lambda: metal_impact(304, 1900),
+    'katana_impact': lambda: slice_impact(304),
+    'bat_impact': bat_impact, 'railgun_impact': railgun_impact, 'flamethrower_impact': flame_impact,
     'chainsaw_impact': saw_impact,
-    'laser_sword_impact': laser_impact,
+    'laser_sword_impact': lambda: slice_impact(320, laser=True),
     'sledgehammer_impact': lambda: impact(305, 0.8, 45, 1.0, 3000, True),
     'tesla_helmet_impact': zap_impact,
     'glock_pickup': lambda: pickup(400, 'gun'), 'ak47_pickup': lambda: pickup(401, 'gun'),

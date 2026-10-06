@@ -68,16 +68,6 @@ const StickFigure = (() => {
   }
   const along = (gx, gy, ang, d) => { const [x, y] = rot(0, -d, ang); return [gx + x, gy + y]; };
 
-  // Swing trail: a fading wedge between two angles around a pivot.
-  function trail(c, px, py, a0, a1, r0, r1, rgb, alpha) {
-    if (alpha <= 0.01 || Math.abs(a1 - a0) < 0.05) return;
-    const s = Math.min(a0, a1) - Math.PI / 2, e = Math.max(a0, a1) - Math.PI / 2;
-    const g = c.createRadialGradient(px, py, r0, px, py, r1);
-    g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(0.75, `rgba(${rgb},${alpha})`); g.addColorStop(1, `rgba(${rgb},0)`);
-    c.beginPath(); c.arc(px, py, r1, s, e); c.arc(px, py, r0, e, s, true); c.closePath();
-    c.fillStyle = g; c.fill();
-  }
-
   // ── Poses ─────────────────────────────────────────────────────────────────
   const breathe = (k = 1) => Math.sin(now() * 2.3) * 0.9 * k;
 
@@ -193,32 +183,95 @@ const StickFigure = (() => {
     laser_sword: { a: -2.6, g: [-18, -6] },
   };
 
+  // Shoot animation lengths in seconds ((frames - 1) / fps, data/anims/player.json):
+  // swings are timed in seconds so a full slash fits inside the weapon's
+  // cooldown (katana fires every 0.37 s), at any animation length.
+  const SHOOT_DUR = {
+    bat_shoot: 24 / 12, katana_shoot1: 46 / 12, katana_shoot2: 34 / 12, katana_shoot3: 34 / 12,
+    laser_sword_shoot1: 22 / 12, laser_sword_shoot2: 30 / 12, laser_sword_shoot3: 28 / 12,
+  };
+
+  // Slash effect: a bright crescent swept by the blade tip out to the weapon's
+  // reach, with a softer wedge behind it.
+  const SLASH = {
+    katana: { rgb: '230,240,255', core: '255,255,255', add: false },
+    laser_sword: { rgb: '255,50,50', core: '255,235,235', add: true },
+    bat: { rgb: '255,230,180', core: '255,250,235', add: false },
+  };
+  function slash(c, w, a0, a1, r1, k) {
+    if (k <= 0.01 || Math.abs(a1 - a0) < 0.05) return;
+    const S = SLASH[w], px = 0, py = -3;
+    const s0 = Math.min(a0, a1) - Math.PI / 2, s1 = Math.max(a0, a1) - Math.PI / 2;
+    const lead = a1 - Math.PI / 2, ccw = a1 < a0;
+    c.save();
+    if (S.add) c.globalCompositeOperation = 'lighter';
+    // Wedge.
+    const g = c.createRadialGradient(px, py, r1 * 0.3, px, py, r1 + 6);
+    g.addColorStop(0, `rgba(${S.rgb},0)`); g.addColorStop(0.8, `rgba(${S.rgb},${0.22 * k})`); g.addColorStop(1, `rgba(${S.rgb},0)`);
+    c.beginPath(); c.arc(px, py, r1 + 6, s0, s1); c.arc(px, py, r1 * 0.3, s1, s0, true); c.closePath();
+    c.fillStyle = g; c.fill();
+    // Crescent at the tip: thick at the blade, thinning towards the start.
+    const N = 14;
+    for (let i = 0; i < N; i++) {
+      const u0 = i / N, u1 = (i + 1) / N;
+      const t0 = ccw ? s1 - (s1 - s0) * u0 : s0 + (s1 - s0) * u0;
+      const t1 = ccw ? s1 - (s1 - s0) * u1 : s0 + (s1 - s0) * u1;
+      const near = ccw ? u1 : 1 - u0;   // 0 at the start of the swing, 1 at the blade
+      const wv = (1 - Math.abs(near - 1)) ;
+      c.beginPath(); c.arc(px, py, r1 - 3, Math.min(t0, t1), Math.max(t0, t1));
+      c.strokeStyle = `rgba(${S.rgb},${0.75 * k * wv})`; c.lineWidth = 2 + 7 * wv * k; c.lineCap = 'round'; c.stroke();
+      c.strokeStyle = `rgba(${S.core},${0.9 * k * wv})`; c.lineWidth = 1 + 2.5 * wv * k; c.stroke();
+    }
+    // Sparkle at the leading tip.
+    const tx = px + Math.cos(lead) * (r1 - 3), ty = py + Math.sin(lead) * (r1 - 3);
+    const sg = c.createRadialGradient(tx, ty, 0, tx, ty, 10 + 6 * k);
+    sg.addColorStop(0, `rgba(${S.core},${0.9 * k})`); sg.addColorStop(1, `rgba(${S.rgb},0)`);
+    c.fillStyle = sg; c.beginPath(); c.arc(tx, ty, 10 + 6 * k, 0, Math.PI * 2); c.fill();
+    c.restore();
+  }
+
   function drawBlade(c, w, anim, kind, p) {
     const idle = IDLE[w];
     const b = breathe();
     let a = idle.a + 0.03 * Math.sin(now() * 1.9), gx = idle.g[0], gy = idle.g[1] + b;
     let trailFrom = null, swingK = 0;
     const sw = SWINGS[anim];
+    const s = p * (SHOOT_DUR[anim] || 2);         // seconds since the attack began
+    const REACH = 27;                              // arms fully extended while slashing
     if (kind === 'shoot' && sw) {
       const [a0, a1] = sw;
-      const w1 = seg(p, 0, 0.07), s1 = seg(p, 0.07, 0.2), back = seg(p, 0.42, 0.68);
-      if (p < 0.07) a = lerp(idle.a, a0, easeOut(w1));
-      else if (p < 0.42) a = lerp(a0, a1, easeOut(s1));
-      else a = lerp(a1, idle.a, easeInOut(back));
-      [gx, gy] = p < 0.42 || back < 1 ? swingPose(a) : [gx, gy];
-      if (back > 0) { gx = lerp(swingPose(a1)[0], idle.g[0], easeInOut(back)); gy = lerp(swingPose(a1)[1], idle.g[1], easeInOut(back)); }
-      if (p >= 0.07 && p < 0.32) { trailFrom = lerp(a0, a, 0.15); swingK = 1 - seg(p, 0.2, 0.32); }
+      if (s < 0.05) {                              // wind-up
+        a = lerp(idle.a, a0, easeOut(s / 0.05));
+        const [px, py] = swingPose(a, REACH);
+        gx = lerp(idle.g[0], px, s / 0.05); gy = lerp(idle.g[1], py, s / 0.05);
+      } else if (s < 0.24) {                       // slash, then a short follow-through hold
+        a = lerp(a0, a1, easeOut(seg(s, 0.05, 0.15)));
+        [gx, gy] = swingPose(a, REACH);
+      } else {                                     // recover
+        const back = easeInOut(seg(s, 0.24, 0.36));
+        a = lerp(a1, idle.a, back);
+        const [px, py] = swingPose(a1, REACH);
+        gx = lerp(px, idle.g[0], back); gy = lerp(py, idle.g[1], back);
+      }
+      if (s >= 0.05 && s < 0.34) { trailFrom = a0; swingK = 1 - seg(s, 0.15, 0.34); }
     } else if (kind === 'shoot') {
-      // Thrust (katana/laser 3rd variant).
-      const e = easeOut(seg(p, 0.04, 0.14)) * (1 - easeInOut(seg(p, 0.32, 0.55)));
-      a = lerp(idle.a, 0, Math.min(1, seg(p, 0, 0.08) * (1 - seg(p, 0.45, 0.6))));
-      gx = lerp(idle.g[0], 3, Math.min(1, seg(p, 0, 0.08))); gy = lerp(-18, -38, e);
-      if (p > 0.55) { gx = lerp(2, idle.g[0], seg(p, 0.55, 0.65)); gy = lerp(gy, idle.g[1], seg(p, 0.55, 0.65)); }
+      // Thrust (katana/laser 3rd variant): straight out to full reach and back.
+      const e = easeOut(seg(s, 0.02, 0.08)) * (1 - easeInOut(seg(s, 0.2, 0.32)));
+      a = lerp(idle.a, 0, Math.min(1, seg(s, 0, 0.04) * (1 - seg(s, 0.26, 0.34))));
+      gx = lerp(idle.g[0], 3, Math.min(1, seg(s, 0, 0.04))); gy = lerp(-18, -40, e);
+      if (s > 0.32) { gx = lerp(2, idle.g[0], seg(s, 0.32, 0.4)); gy = lerp(gy, idle.g[1], seg(s, 0.32, 0.4)); }
+      swingK = e * (1 - seg(s, 0.12, 0.26));
     }
     const len = { bat: 72, katana: 88, laser_sword: 86 }[w];
-    if (trailFrom !== null) {
-      const rgb = w === 'laser_sword' ? '255,60,60' : w === 'bat' ? '255,236,190' : '225,235,255';
-      trail(c, 0, -3, trailFrom, a, 24, 24 + len * 1.15, rgb, 0.35 * swingK);
+    // Tip radius ≈ the hit range (bat 138, katana/laser 125 world px).
+    const tipR = REACH + 3 + len * SIZE;
+    if (trailFrom !== null) slash(c, w, trailFrom, a, tipR, swingK);
+    else if (kind === 'shoot' && swingK > 0) {      // thrust streak
+      c.save(); if (SLASH[w].add) c.globalCompositeOperation = 'lighter';
+      const g = c.createLinearGradient(0, -20, 0, -tipR - 6);
+      g.addColorStop(0, `rgba(${SLASH[w].rgb},0)`); g.addColorStop(1, `rgba(${SLASH[w].core},${0.8 * swingK})`);
+      c.beginPath(); c.moveTo(-5, -30); c.lineTo(0, -tipR - 8); c.lineTo(5, -30); c.closePath(); c.fillStyle = g; c.fill();
+      c.restore();
     }
     weaponAt(c, w, gx, gy, a, swingK);
     const [lx, ly] = along(gx, gy, a, w === 'bat' ? -7 : -8);
@@ -303,6 +356,58 @@ const StickFigure = (() => {
       }
       c.strokeStyle = `rgba(150,215,255,${0.85 * k})`; c.lineWidth = 2.4; c.lineJoin = 'round'; c.stroke();
       c.strokeStyle = `rgba(255,255,255,${k})`; c.lineWidth = 1; c.stroke();
+    }
+    c.restore();
+  }
+
+  // ── Hit effects on the victim (melee) ─────────────────────────────────────
+  // u: 0 → 1 over HIT_TIME; ang: direction the blow came from (radians, world).
+  const HIT_TIME = { katana: 0.32, laser_sword: 0.4, bat: 0.3, fist: 0.22, sledgehammer: 0.45, chainsaw: 0.3 };
+  function hit(c, w, u, ang, seed) {
+    if (u >= 1) return;
+    const k = 1 - u;
+    c.save();
+    c.rotate(ang);                               // +X = direction of the blow
+    if (w === 'katana' || w === 'laser_sword') {
+      const laser = w === 'laser_sword';
+      if (laser) c.globalCompositeOperation = 'lighter';
+      const rgb = laser ? '255,60,50' : '220,235,255', core = laser ? '255,230,220' : '255,255,255';
+      const L = 46 * Math.min(1, u * 6);         // the cut opens fast
+      for (const [off, tilt] of [[0, 0.55], [5, -0.5]].slice(0, laser ? 1 : 2)) {
+        c.save(); c.rotate(Math.PI / 2 + tilt); c.translate(0, off);
+        c.beginPath(); c.moveTo(-L, 0); c.quadraticCurveTo(0, -4 * k, L, 0); c.quadraticCurveTo(0, 4 * k, -L, 0);
+        c.fillStyle = `rgba(${core},${0.95 * k})`; c.fill();
+        c.lineWidth = laser ? 7 * k : 3 * k; c.strokeStyle = `rgba(${rgb},${0.6 * k})`; c.stroke();
+        c.restore();
+      }
+      for (let i = 0; i < 9; i++) {              // sparks / embers flying on
+        const a = (hash(seed + i) - 0.5) * 1.6, d = 10 + 44 * easeOut(u) * (0.5 + hash(seed * 3 + i));
+        c.beginPath(); c.arc(Math.cos(a) * d, Math.sin(a) * d, 1.8 * k + 0.4, 0, Math.PI * 2);
+        c.fillStyle = `rgba(${laser ? '255,150,90' : '255,245,200'},${k})`; c.fill();
+      }
+    } else if (w === 'chainsaw') {
+      for (let i = 0; i < 12; i++) {
+        const a = (hash(seed + i) - 0.5) * 1.4, d = 8 + 40 * u * (0.4 + hash(seed + 7 * i));
+        const x = Math.cos(a) * d, y = Math.sin(a) * d;
+        c.beginPath(); c.moveTo(x, y); c.lineTo(x - Math.cos(a) * 6, y - Math.sin(a) * 6);
+        c.strokeStyle = `rgba(255,${180 + 60 * hash(i)},80,${k})`; c.lineWidth = 1.6; c.stroke();
+      }
+    } else {
+      // Blunt: a star burst, a dust ring and speed lines.
+      const big = w === 'sledgehammer' ? 1.6 : w === 'bat' ? 1.15 : 0.8;
+      c.beginPath();
+      for (let i = 0; i < 16; i++) {
+        const a = i * Math.PI / 8, r = (i % 2 ? 7 : 18) * big * (0.6 + 0.6 * easeOut(Math.min(1, u * 4)));
+        c.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      c.closePath(); c.fillStyle = `rgba(255,240,200,${0.85 * k * k})`; c.fill();
+      c.beginPath(); c.arc(0, 0, (14 + 36 * easeOut(u)) * big, 0, Math.PI * 2);
+      c.strokeStyle = `rgba(235,225,205,${0.6 * k})`; c.lineWidth = 3 * k + 1; c.stroke();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6 - 0.5) * 1.6, r0 = (16 + 30 * u) * big;
+        c.beginPath(); c.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); c.lineTo(Math.cos(a) * (r0 + 12 * big), Math.sin(a) * (r0 + 12 * big));
+        c.strokeStyle = `rgba(255,255,255,${0.8 * k})`; c.lineWidth = 2; c.stroke();
+      }
     }
     c.restore();
   }
@@ -463,5 +568,5 @@ const StickFigure = (() => {
     },
   };
 
-  return { body, death, particles };
+  return { body, death, particles, hit, HIT_TIME };
 })();
