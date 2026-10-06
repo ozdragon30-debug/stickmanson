@@ -149,6 +149,17 @@ test('names are sanitised and reserved names refused', async () => {
   assert.strictEqual(app.player(a.id).name, 'Bob the Great');
 });
 
+test('duplicate names in a room get a suffix', async () => {
+  const a = await connect({ query: { room: 'names' } });
+  const b = await connect({ query: { room: 'names' } });
+  a.emit('setName', { name: 'Twin' });
+  await new Promise(r => setTimeout(r, 100));
+  const assigned = next(b, 'nameAssigned', 400);
+  b.emit('setName', { name: 'twin' });
+  assert.deepStrictEqual(await assigned, { name: 'twin 2' });
+  assert.strictEqual(app.player(b.id).name, 'twin 2');
+});
+
 test('chat is rate limited', async () => {
   const a = await connect();
   const seen = [];

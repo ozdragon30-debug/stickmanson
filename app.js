@@ -530,8 +530,16 @@ io.on("connection", (socket) => {
 
   socket.on("setName", (data) => {
     if (!players[socket.id] || !data) return;
-    const name = cleanText(data.name, 20);
+    let name = cleanText(data.name, 20);
     if (!name || RESERVED_NAMES.test(name)) return;
+    // Names are unique within a room (chat "you" detection and !kick rely on it).
+    const taken = n => Object.entries(players).some(([id, pl]) => id !== socket.id && pl.name.toLowerCase() === n.toLowerCase());
+    if (taken(name)) {
+      let i = 2, candidate;
+      do { candidate = `${name.slice(0, 17)} ${i++}`; } while (taken(candidate) && i < 100);
+      name = candidate;
+      socket.emit('nameAssigned', { name });
+    }
     if (name === players[socket.id].name) { announceJoin(); return; }
     if (!allow(socket, 'nameBucket', 5, 10000)) return;
     players[socket.id].name = name;

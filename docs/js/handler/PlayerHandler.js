@@ -211,6 +211,11 @@ socketManager.on("roundStart", (data) => {
   });
 });
 
+// The server made our name unique in this room ("Name 2"): show that locally.
+socketManager.on("nameAssigned", (data) => {
+  if (playerManager.mainPlayer && data && typeof data.name === 'string') playerManager.mainPlayer.name = data.name;
+});
+
 socketManager.on("playerStatus", (data) => {
   const player = playerManager.getPlayer(data.playerId);
   if (player) player.afk = !!data.afk;
