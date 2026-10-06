@@ -87,7 +87,24 @@ class ChatManager {
     return text;
   }
 
+  // Client-side mute list (persisted): hides chat from those names locally.
+  get muted() {
+    if (!this._muted) {
+      try { this._muted = new Set(JSON.parse(localStorage.getItem('sar_muted') || '[]')); } catch (e) { this._muted = new Set(); }
+    }
+    return this._muted;
+  }
+
+  setMuted(name, on) {
+    const key = String(name).trim().toLowerCase();
+    if (!key) return false;
+    if (on) this.muted.add(key); else this.muted.delete(key);
+    try { localStorage.setItem('sar_muted', JSON.stringify([...this.muted])); } catch (e) {}
+    return true;
+  }
+
   addMessage(name, text, hue = null) {
+    if (name && this.muted.has(String(name).toLowerCase())) return;
     // System lines from the (English) server are translated client-side.
     if ((name === 'Server' || name === '[Admin]') && typeof i18n !== 'undefined') {
       text = i18n.chat(text);

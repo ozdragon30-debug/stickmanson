@@ -55,6 +55,11 @@ function submitChat(text) {
   if (!text) return;
   if (text === '!help') {
     for (const line of t('chat.help').split('\n')) chatManager.addMessage('?', line, null);
+  } else if (/^!(un)?mute\s+\S/.test(text)) {
+    const on = text.startsWith('!mute');
+    const who = text.replace(/^!(un)?mute\s+/, '');
+    chatManager.setMuted(who, on);
+    chatManager.addMessage('?', t(on ? 'chat.muted' : 'chat.unmuted', { name: who }), null);
   } else if (text === '!debug') {
     debugTiles = !debugTiles;
   } else if (text === '!fps') {
