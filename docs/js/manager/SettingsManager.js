@@ -138,8 +138,13 @@ class SettingsManager {
     this._rebinding = null;
     if (tab) this._tab = tab;
     if (typeof onBlurHandler === 'function') onBlurHandler();
+    this._opener = document.activeElement;
     this._overlay.classList.add('open');
+    // Modal: the menu behind can't take focus while settings is open.
+    if (typeof menu !== 'undefined' && menu.el) menu.el.inert = true;
     this._refresh();
+    const sel = this._panel.querySelector('.sar-tabs button.sel');
+    if (sel) sel.focus({ preventScroll: true });
   }
 
   close() {
@@ -152,9 +157,15 @@ class SettingsManager {
     this._applyToPlayer();
     // Keep the main menu's name field in sync (it would otherwise push the old name back on Play).
     if (typeof menu !== 'undefined' && menu.nameEl) menu.syncName();
-    // Don't leave keyboard focus on a settings control / the gear button:
-    // game keys are ignored while a button has focus.
-    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+    if (typeof menu !== 'undefined' && menu.el) menu.el.inert = false;
+    if (typeof menu !== 'undefined' && menu.isOpen && this._opener && this._opener.isConnected) {
+      this._opener.focus({ preventScroll: true }); // back to where the user was in the menu
+    } else if (document.activeElement && document.activeElement !== document.body) {
+      // In game: don't leave focus on a settings control / the gear button
+      // (game keys are ignored while a button has focus).
+      document.activeElement.blur();
+    }
+    this._opener = null;
   }
 
   _applyToPlayer() {
@@ -195,9 +206,11 @@ class SettingsManager {
         }
         this.settings.keybinds[this._rebinding] = e.code;
       }
+      const action = this._rebinding;
       this._rebinding = null;
       this._save();
       this._buildKeybinds();
+      this._focusBind(action);
       return;
     }
     if (e.key === 'Escape') {
@@ -228,11 +241,11 @@ class SettingsManager {
         <button id="sar-close" class="sar-x" aria-label="Close settings">✕</button>
       </div>
       <nav class="sar-tabs" role="tablist">
-        <button data-tab="profile" data-i18n="set.tab.profile">Profile</button>
-        <button data-tab="controls" data-i18n="set.tab.controls">Controls</button>
-        <button data-tab="audio" data-i18n="set.tab.audio">Audio</button>
-        <button data-tab="video" data-i18n="set.tab.video">Video</button>
-        <button data-tab="hud" data-i18n="set.tab.hud">HUD</button>
+        <button role="tab" data-tab="profile" data-i18n="set.tab.profile">Profile</button>
+        <button role="tab" data-tab="controls" data-i18n="set.tab.controls">Controls</button>
+        <button role="tab" data-tab="audio" data-i18n="set.tab.audio">Audio</button>
+        <button role="tab" data-tab="video" data-i18n="set.tab.video">Video</button>
+        <button role="tab" data-tab="hud" data-i18n="set.tab.hud">HUD</button>
       </nav>
 
       <section data-pane="profile">
@@ -333,8 +346,16 @@ class SettingsManager {
     panel.querySelector('#sar-reset').onclick = () => this.resetDefaults();
     panel.querySelector('#sar-fullscreen').onclick = () => toggleFullscreen();
 
-    panel.querySelectorAll('.sar-tabs button').forEach(b => {
+    const tabs = [...panel.querySelectorAll('.sar-tabs button')];
+    tabs.forEach((b, i) => {
       b.onclick = () => { this._tab = b.dataset.tab; this._showTab(); };
+      // ←/→ switch tabs (WAI-ARIA tabs pattern).
+      b.addEventListener('keydown', e => {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        e.preventDefault();
+        const n = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+        n.focus(); n.click();
+      });
     });
 
     panel.querySelector('#sar-name').addEventListener('change', e => this.setName(e.target.value));
@@ -496,6 +517,12 @@ class SettingsManager {
     });
   }
 
+  // The keybind buttons are rebuilt on every change: keep keyboard focus on the same one.
+  _focusBind(action) {
+    const b = this._panel.querySelector(`.sar-key[data-action="${action}"]`);
+    if (b) b.focus({ preventScroll: true });
+  }
+
   // ── Keybind table ─────────────────────────────────────────────────────────
   _buildKeybinds() {
     const container = this._panel.querySelector('#sar-keybinds');
@@ -518,6 +545,7 @@ class SettingsManager {
       btn.onclick = () => {
         this._rebinding = this._rebinding === action ? null : action;
         this._buildKeybinds();
+        this._focusBind(action);
       };
       const lbl = document.createElement('span');
       lbl.textContent = label;

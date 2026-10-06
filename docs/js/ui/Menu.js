@@ -18,6 +18,7 @@ class Menu {
 
     this.syncName();
     this.nameEl.addEventListener('keydown', e => {
+      if (e.key === 'Escape') return; // let the menu's Esc-to-resume handle it
       e.stopPropagation();
       if (e.key === 'Enter') this.play();
     });
@@ -196,6 +197,7 @@ class Menu {
     this.syncName();
     this.el.classList.add('open');
     if (typeof onBlurHandler === 'function') onBlurHandler();
+    if (this._ready && inputMode.mode !== 'touch') this.playBtn.focus({ preventScroll: true });
     if (typeof reportAfk === 'function') reportAfk(true);
   }
 

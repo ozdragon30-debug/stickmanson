@@ -213,12 +213,17 @@ class BotManager {
       if (this.active) this.despawn();
     });
 
-    // Wait 2 s for a server connection; if none, load a random map and start bots.
+    // No socket.io at all (static hosting): start bots after 2 s. With a server
+    // that is still connecting (slow network) wait up to 10 s — a refused
+    // connection reports connect_error at once and starts bots immediately.
     // If the socket DOES connect, gameState → loadMap → considerSpawning handles it.
-    this._offlineTimer = setTimeout(() => {
+    const startOffline = () => {
+      if (this._offlineTimer) clearTimeout(this._offlineTimer);
       this._offlineTimer = null;
       if (!loopStarted) this._startOffline();
-    }, 2000);
+    };
+    this._offlineTimer = setTimeout(startOffline, socketManager.socket ? 10000 : 2000);
+    socketManager.on('connect_error', () => { if (this._offlineTimer) startOffline(); });
   }
 
   /**
