@@ -2,7 +2,10 @@
 
 ## 2026 modernisation
 
-Everything below keeps **gameplay and physics identical** to the original:
+Everything below keeps **gameplay and physics identical** to the original —
+proven by `npm run parity`, which runs the original game and this one side by
+side (fake clock, seeded randomness) on 10 maps: 10,100 frames of movement and
+285 weapon hit events, all identical. In addition
 movement speed and 8-direction movement, collisions, hit shapes, damage,
 cooldowns, weapon stats, field of view (960×720 logical view) and map data are
 locked by `test/golden.json` (constants, 4 000 hit-shape cases, sub-tile walk
