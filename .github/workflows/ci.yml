@@ -7,6 +7,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the parity test compares against the original import commit
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -18,3 +20,5 @@ jobs:
       - run: npm test
       - name: Browser smoke test
         run: npx playwright install --with-deps chromium && npm run e2e
+      - name: Gameplay parity with the original game
+        run: npm run parity

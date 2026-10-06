@@ -95,7 +95,10 @@ npm run dev     # server with auto-restart
 npm test        # gameplay lock + server + input + i18n tests
 npm run lint    # ESLint (catches undefined globals across the script files)
 npm run e2e     # headless Chromium smoke test (needs `npx playwright install chromium`)
+npm run parity  # runs the ORIGINAL game and this one side by side: identical movement + hits
 ```
+
+`npm run parity` is the strongest guarantee: it extracts the original game from the first commit, runs both versions in headless Chromium with a fake clock and seeded randomness, feeds them the same inputs on 10 maps and compares the player position on every frame plus every weapon's hits — they must be identical.
 
 `test/golden.json` fingerprints every gameplay‑relevant calculation (constants, weapon stats, hit shapes, sub‑tile collision, line of sight and parsing of every map). If a change intentionally alters gameplay, regenerate it with `npm run golden:update` — otherwise a failing golden test means gameplay changed by accident.
 
