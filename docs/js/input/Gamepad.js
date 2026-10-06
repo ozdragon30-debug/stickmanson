@@ -31,6 +31,64 @@ class GamepadInput {
     this._scoreboardHeld = false;
   }
 
+  // Edge + auto-repeat for held directions (400 ms delay, then every 110 ms).
+  _repeat(dir, held) {
+    const now = performance.now();
+    this._rep = this._rep || {};
+    if (!held) { delete this._rep[dir]; return false; }
+    const r = this._rep[dir];
+    if (!r) { this._rep[dir] = now + 400; return true; }
+    if (now >= r) { this._rep[dir] = now + 110; return true; }
+    return false;
+  }
+
+  _navigateUi(p, root, b, edge) {
+    const ay = p.axes[1] || 0, axx = p.axes[0] || 0;
+    const up = this._repeat('up', b(12) || ay < -0.6);
+    const down = this._repeat('down', b(13) || ay > 0.6);
+    const left = this._repeat('left', b(14) || axx < -0.6);
+    const right = this._repeat('right', b(15) || axx > 0.6);
+    this._release();
+    inputMode.set('gamepad');
+
+    const items = [...root.querySelectorAll('button, input, select, summary')]
+      .filter(el => !el.disabled && el.offsetParent !== null && !el.closest('[hidden]'));
+    if (!items.length) return;
+    let i = items.indexOf(document.activeElement);
+    const focus = (j) => { const el = items[(j + items.length) % items.length]; el.focus({ preventScroll: false }); el.scrollIntoView({ block: 'nearest' }); };
+
+    if (up) { focus(i < 0 ? 0 : i - 1); return; }
+    if (down) { focus(i < 0 ? 0 : i + 1); return; }
+
+    const el = i >= 0 ? items[i] : null;
+    if ((left || right) && el) {
+      const d = right ? 1 : -1;
+      if (el.type === 'range') {
+        el.value = String(Math.max(+el.min, Math.min(+el.max, +el.value + d * 5)));
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      } else if (el.tagName === 'SELECT') {
+        el.selectedIndex = Math.max(0, Math.min(el.options.length - 1, el.selectedIndex + d));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        focus(i + d);
+      }
+      return;
+    }
+
+    if (edge(0)) {
+      const target = el || root.querySelector('.menu-play:not([disabled])') || items[0];
+      const wasMenu = typeof menu !== 'undefined' && menu.isOpen;
+      target.click();
+      // Starting the game with A must not also fire a shot.
+      if (wasMenu && !menu.isOpen) this._suppressA = true;
+      return;
+    }
+    if (edge(1) || edge(9)) {               // B / Start: back out
+      if (settingsManager.isOpen()) settingsManager.close();
+      else if (typeof menu !== 'undefined' && menu.isOpen && edge(9)) menu.play();
+    }
+  }
+
   rumble(strong = 0.5, weak = 0.3, ms = 120) {
     const p = this._pad();
     const act = p && p.vibrationActuator;
@@ -45,10 +103,11 @@ class GamepadInput {
     const b = i => !!(p.buttons[i] && (p.buttons[i].pressed || p.buttons[i].value > 0.3));
     const edge = i => b(i) && !this._prevButtons[i];
 
-    // A in the main menu = Play.
-    if (edge(0) && typeof menu !== 'undefined' && menu.isOpen && !settingsManager.isOpen()) {
-      menu.play();
-      this._suppressA = true; // don't also attack with the same press
+    // Menus: D-pad / left stick move focus, A activates, B closes, ←/→ adjust.
+    const uiRoot = settingsManager.isOpen() ? settingsManager._panel
+                 : (typeof menu !== 'undefined' && menu.isOpen) ? menu.el : null;
+    if (uiRoot && !(typeof chatManager !== 'undefined' && chatManager.isOpen)) {
+      this._navigateUi(p, uiRoot, b, edge);
       this._prevButtons = p.buttons.map(x => x.pressed);
       return;
     }
