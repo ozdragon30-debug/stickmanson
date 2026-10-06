@@ -165,6 +165,7 @@ const I18N_CHAT_TR = [
   [/^Gamepad connected\.$/, 'Gamepad bağlandı.'],
   [/^Server is restarting…$/, 'Sunucu yeniden başlatılıyor…'],
   [/^Unknown map: (.+)$/, 'Bilinmeyen harita: $1'],
+  [/^Something went wrong — the game recovered\. Reload if it misbehaves\.$/, 'Bir hata oluştu — oyun toparlandı. Sorun devam ederse sayfayı yenile.'],
   [/^(.+) was kicked\.$/, '$1 atıldı.'],
   [/^(.+) was banned\.$/, '$1 yasaklandı.'],
   [/^Kicked by admin\.$/, 'Yönetici tarafından atıldın.'],

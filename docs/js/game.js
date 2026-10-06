@@ -224,7 +224,24 @@ function drawDebugHitshape(ctx) {
 }
 
 let lastTime = 0;
+let _loopErrors = 0;
 function loop(nowMs) {
+  // Schedule the next frame first: an exception in one frame used to stop the
+  // rAF chain and freeze the game permanently.
+  requestAnimationFrame(loop);
+  try {
+    frame(nowMs);
+  } catch (err) {
+    // A throw between save()/restore() leaves canvas state unbalanced: reset it.
+    if (ctx.reset) ctx.reset();
+    if (_loopErrors++ < 3) {
+      console.error('[game] frame error (game keeps running):', err);
+      if (typeof chatManager !== 'undefined') chatManager.addMessage('Server', 'Something went wrong — the game recovered. Reload if it misbehaves.', null);
+    }
+  }
+}
+
+function frame(nowMs) {
   if (!lastTime) lastTime = nowMs;
   display.reportFrame(nowMs - lastTime);
   const dt = Math.min((nowMs - lastTime) / 1000, 0.1);  // seconds; capped to avoid spiral after tab switch
@@ -242,7 +259,6 @@ function loop(nowMs) {
   draw(nowMs);
   hudManager.tickFps(nowMs);
   if (!menu.isOpen && !document.hidden) statsManager.tick(dt);
-  requestAnimationFrame(loop);
 }
 
 document.addEventListener("keydown", keyDownHandler);
