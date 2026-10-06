@@ -78,6 +78,20 @@ Repo ayarlarında **Pages → Branch: … / folder: `/docs`** seçersen oyun
 Bu sayfadan çevrimiçi oynamak için menüdeki **"Bağlan"** alanına sunucunun
 adresini yaz, ya da linke `?server=https://stick.ornek.com` ekle.
 
+## 5) Android uygulaması (APK)
+
+`docs/` klasöründeki her değişiklikte GitHub Actions ("Android APK" iş akışı)
+bir APK derler ve reponun **Releases → Android APK (latest build)** sayfasına
+koyar. Telefondan `StickArenaReborn.apk` dosyasını indirip aç; Android
+"bilinmeyen kaynaklardan yükleme" izni ister.
+
+- Uygulama yatay ve tam ekran açılır, ekran kapanmaz.
+- Sunucu olmadan botlara karşı oynanır; çevrimiçi oynamak için menüdeki
+  **Bağlan** alanına sunucu adresini yaz.
+- Elle derlemek için: Android Studio + JDK 21 kurulu bir bilgisayarda iş
+  akışındaki adımları (`npx cap add android`, `python3 tools/android-prepare.py`,
+  `./gradlew assembleDebug`) sırayla çalıştır.
+
 ## Faydalı adresler
 
 | Adres | Ne işe yarar |

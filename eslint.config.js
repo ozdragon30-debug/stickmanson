@@ -33,7 +33,7 @@ const rules = {
 };
 
 module.exports = [
-  { ignores: ['node_modules/**', 'tools/**', 'docs/js/vendor/**'] },
+  { ignores: ['node_modules/**', 'tools/**', 'docs/js/vendor/**', 'build/**', 'android/**'] },
   {
     files: ['docs/js/**/*.js'],
     languageOptions: {
