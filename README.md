@@ -73,7 +73,7 @@ Health check: `GET /healthz` (JSON). Status page for hosts: `GET /status`.
 Available to LAN/localhost players (direct connections) or after `!login`:
 `!next` (end round), `!kick <name>`, `!ban <name>`, `!weapon <id>`, `!debugmap`.
 
-Client‑side: `!fps` (toggle FPS), `!debug` (collision overlay), and offline only `!map <name>`, `!next`.
+Client‑side: `!help`, `!fps` (toggle FPS), `!debug` (collision overlay), `!mute <name>` / `!unmute <name>` (hide someone's chat, only for you), and offline only `!map <name>`, `!next`.
 
 ## Controls
 
