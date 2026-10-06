@@ -93,7 +93,7 @@ class TouchInput {
     const p = display.toView(e.clientX, e.clientY);
     s.x = p.x; s.y = p.y;
     // Let a floating stick follow the thumb if dragged far beyond its radius.
-    const dx = s.x - s.ox, dy = s.y - s.oy, d = Math.hypot(dx, dy), max = TouchInput.RADIUS * 1.6;
+    const dx = s.x - s.ox, dy = s.y - s.oy, d = Math.hypot(dx, dy), max = TouchInput.radius() * 1.6;
     if (d > max) { s.ox = s.x - dx / d * max; s.oy = s.y - dy / d * max; }
   }
 
@@ -131,10 +131,14 @@ class TouchInput {
     this.keys.shoot = firing || performance.now() < this._tapUntil;
   }
 
+  // Visual stick radius in view px: bigger on phones so it matches a thumb.
+  static radius() { return TouchInput.RADIUS * (display.uiScale || 1); }
+
   // Drawn in screen space by the HUD.
   draw(ctx) {
     if (!this.enabled) return;
-    const R = TouchInput.RADIUS;
+    const R = TouchInput.radius();
+    const u = display.uiScale || 1;
     const stick = (s, color) => {
       ctx.globalAlpha = 0.35;
       ctx.fillStyle = '#0a1420';
@@ -153,12 +157,13 @@ class TouchInput {
       ctx.globalAlpha = 0.22;
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
       const swap = settingsManager.get('touchLeftHanded');
-      const mx = swap ? VIEW_W - 130 : 130, ax = swap ? 130 : VIEW_W - 130;
-      ctx.beginPath(); ctx.arc(mx, VIEW_H - 140, R, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(ax, VIEW_H - 140, R, 0, Math.PI * 2); ctx.stroke();
-      ctx.globalAlpha = 0.45; ctx.fillStyle = '#fff'; ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(t('hud.move'), mx, VIEW_H - 136);
-      ctx.fillText(t('hud.aim'), ax, VIEW_H - 136);
+      const inset = 70 + R, hy = VIEW_H - 80 - R;
+      const mx = swap ? VIEW_W - inset : inset, ax = swap ? inset : VIEW_W - inset;
+      ctx.beginPath(); ctx.arc(mx, hy, R, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(ax, hy, R, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 0.45; ctx.fillStyle = '#fff'; ctx.font = `${Math.round(13 * u)}px system-ui, sans-serif`; ctx.textAlign = 'center';
+      ctx.fillText(t('hud.move'), mx, hy + 4 * u);
+      ctx.fillText(t('hud.aim'), ax, hy + 4 * u);
     }
     ctx.restore();
   }
