@@ -39,6 +39,10 @@ jobs:
           pip install pillow
           python3 tools/android-prepare.py
           npx cap sync android
+      - name: Use the repo's fixed debug signing key
+        # Same signature on every build, so a new APK installs over the old one.
+        # (A debug key: fine for sideloading, not for the Play Store.)
+        run: mkdir -p ~/.android && cp tools/android-debug.keystore ~/.android/debug.keystore
       - name: Build APK
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug
