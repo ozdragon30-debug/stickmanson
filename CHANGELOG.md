@@ -2,6 +2,17 @@
 
 ## 2026 modernisation
 
+### Modern effects (render-only, Settings → Video → Modern effects)
+
+- Soft drop shadows under characters, corpses and weapon pickups.
+- Energy glow on laser sword, railgun and tesla helmet; red rim flash on hit.
+- Muzzle light pools and additive flash bloom for firearms.
+- Pickups: pulsing colour halo by weapon class and a contact shadow that
+  shrinks as the weapon bobs, so it reads as floating.
+- Soft ground light in each player's colour; screen vignette.
+- Draw-only (`docs/js/utils/Fx.js`): parity and golden tests unchanged; slow
+  devices drop the blur automatically.
+
 Everything below keeps **gameplay and physics identical** to the original —
 proven by `npm run parity`, which runs the original game and this one side by
 side (fake clock, seeded randomness) on 10 maps: 10,100 frames of movement and

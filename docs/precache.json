@@ -159,6 +159,7 @@
   "js/spritesheet/AtlasSpritesheet.js",
   "js/ui/Menu.js",
   "js/utils/Constants.js",
+  "js/utils/Fx.js",
   "js/utils/I18n.js",
   "js/utils/Pathfinder.js",
   "js/utils/Physics.js",

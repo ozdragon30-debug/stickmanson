@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS = {
   // Video
   renderQuality:     'auto',   // auto | high | low
   pixelArt:          false,    // nearest-neighbour sprite scaling
+  modernFx:          true,     // shadows, glow, lights (render-only)
   showFps:           false,
   showPing:          true,
   // HUD feedback
@@ -316,6 +317,8 @@ class SettingsManager {
             <option value="low" data-i18n="set.res.low">Low (1× – fastest)</option>
           </select>
         </div>
+        <label class="sar-check"><input type="checkbox" data-setting="modernFx"> <span data-i18n="set.fx">Modern effects</span>
+          <span class="sar-hint" data-i18n="set.fx.hint">— shadows, weapon glow, muzzle light (looks only)</span></label>
         <label class="sar-check"><input type="checkbox" data-setting="pixelArt"> <span data-i18n="set.pixel">Pixel-art scaling</span>
           <span class="sar-hint" data-i18n="set.pixel.hint">— crisp nearest-neighbour sprites</span></label>
         <label class="sar-check"><input type="checkbox" data-setting="showFps"> <span data-i18n="set.fps">Show FPS</span></label>

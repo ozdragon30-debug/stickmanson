@@ -369,6 +369,7 @@ class Player {
     this.hitsplat.setAnimation(anim, 1);
     this.hitsplat.setPosition(this.body.x, this.body.y);
     this.hitsplat.isVisible = true;
+    this._hitFxAt = performance.now(); // render-only (hit rim flash)
     this.health -= (damage ?? this.currentWeapon.damage);
 
     if (this.isMainPlayer) {
@@ -462,9 +463,38 @@ class Player {
     ctx.restore();
   }
 
+  // Additive light pool in front of a firing gun (render-only).
+  _drawMuzzleLight(ctx) {
+    if (this.isRespawning) return;
+    const weapon = this.currentWeapon;
+    const rgb = weapon && FX_MUZZLE[weapon.name];
+    if (!rgb || !String(this.body.animName).includes('shoot')) return;
+    // Weapons with a flash sprite light up with it; the others flicker while firing.
+    const k = weapon.shootParticle
+      ? (this.muzzleFlash.isVisible ? 1 : 0)
+      : 0.65 + 0.35 * Math.random();
+    if (!k) return;
+    const r = this.body.rotation;
+    const x = this.body.x + Math.sin(r) * 34;
+    const y = this.body.y - Math.cos(r) * 34;
+    fx.light(ctx, x, y, 110, rgb, 0.32 * k);
+  }
+
   draw(ctx) {
     // Indicator spinner drawn first (below everything).
     this._drawIndicator(ctx);
+    const modern = fx.enabled;
+    if (modern && !this.isRespawning) {
+      // Soft ground light in the player's colour, so everyone reads at a glance.
+      if (this._fxHue !== this.indicatorHue) {
+        this._fxHue = this.indicatorHue;
+        this._fxRgb = fx.hueRgb(((this.indicatorHue ?? 0) + 36) % 360);
+      }
+      fx.light(ctx, this.body.x, this.body.y, 46, this._fxRgb, 0.13);
+    }
+    if (modern) this._drawMuzzleLight(ctx);
+    ctx.save();
+    if (modern) fx.setShadow(ctx);
     // Legs are drawn first (behind body).
     if (!this.canMove) {
       this.legs.draw(ctx);
@@ -472,12 +502,35 @@ class Player {
     if (this.isRespawning) {
       this.deathBody.draw(ctx);
     } else {
+      // Energy weapons glow (an extra pass under the shadowed body).
+      const glow = modern && !fx.lite && FX_GLOW[this.currentWeapon?.name];
+      if (glow) {
+        ctx.save();
+        fx.setGlow(ctx, glow, 12);
+        this.body.drawWithHeadPivot(ctx);
+        ctx.restore();
+      }
       // Body rotates around the head pivot so the character aims correctly.
       this.body.drawWithHeadPivot(ctx);
+      // Red rim for a moment after taking a hit.
+      const since = performance.now() - (this._hitFxAt || -1e9);
+      if (modern && since < 160) {
+        fx.setGlow(ctx, `rgba(255,40,40,${0.9 * (1 - since / 160)})`, 10);
+        this.body.drawWithHeadPivot(ctx);
+      }
     }
+    ctx.restore();
     this.hitsplat.drawCentered(ctx);
     const pOff = (!this.muzzleFlashPinned && this.currentWeapon.shootParticle && particleAtlas.animationMap[this.currentWeapon.shootParticle]?.offset) || [0, 0];
     this.muzzleFlash.drawCenteredRotated(ctx, this.muzzleFlashPinned ? 0 : this.body.rotation, pOff[0], pOff[1]);
+    if (modern && this.muzzleFlash.isVisible) {
+      // Bloom: a second, additive copy of the flash.
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.55;
+      this.muzzleFlash.drawCenteredRotated(ctx, this.muzzleFlashPinned ? 0 : this.body.rotation, pOff[0], pOff[1]);
+      ctx.restore();
+    }
     // Name tag above the player (hidden while dead).
     if (!this.isRespawning && this.name) {
       const x = this.body.x;

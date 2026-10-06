@@ -27,10 +27,32 @@ class WeaponPickup {
     const bob   = Math.sin(time * 1.5) * 5;  // ±5 px vertical bob
     const angle = time * (Math.PI * 2 / 6);  // one full rotation every 6 s
 
+    const modern = fx.enabled;
+    if (modern) this._drawGround(ctx, time, bob, f);
+
     ctx.save();
     ctx.translate(this.sprite.x, this.sprite.y + bob);
     ctx.rotate(angle);
+    if (modern) fx.setShadow(ctx, 0.8);
     ctx.drawImage(pickupAtlas.image, f.x, f.y, f.w, f.h, -f.w / 2, -f.h / 2, f.w, f.h);
+    ctx.restore();
+  }
+
+  // Render-only: a pulsing coloured halo and a contact shadow that shrinks as
+  // the weapon bobs up, so pickups read as floating above the floor.
+  _drawGround(ctx, time, bob, f) {
+    const x = this.sprite.x, y = this.sprite.y;
+    const name = Constants.WEAPON_ID_MAP[this.weaponId]?.name;
+    const rgb = FX_PICKUP[name] || [200, 210, 230];
+    const pulse = 0.5 + 0.5 * Math.sin(time * 3);
+    fx.light(ctx, x, y, 40 + 8 * pulse, rgb, 0.22 + 0.14 * pulse);
+    const h = (5 - bob) / 10;  // 0 (lowest) … 1 (highest)
+    const rx = Math.max(f.w, f.h) * (0.42 - 0.1 * h);
+    ctx.save();
+    ctx.fillStyle = `rgba(0,0,0,${0.28 - 0.12 * h})`;
+    ctx.beginPath();
+    ctx.ellipse(x + 2, y + 8, rx, rx * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 
