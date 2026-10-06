@@ -74,7 +74,12 @@ class ScoreboardManager {
 
     if (this.isVisible) {
       // Grow on phones like the rest of the HUD, but keep the 620 px panel on screen.
-      const u = Math.min(display.uiScale || 1, VIEW_W / 660);
+      // Same panel geometry as _drawOverlay, so the scale can also be capped by height.
+      const rows = Math.max(1, Object.keys(this.scores || {}).length);
+      const panelH = Math.min(VIEW_H - 120, 128 + rows * 30 + 20);
+      const py = Math.max(60, (VIEW_H - panelH) / 2 - 20);
+      const cy = VIEW_H / 2;
+      const u = Math.max(1, Math.min(display.uiScale || 1, VIEW_W / 660, cy / (cy - py), cy / (py + panelH - cy)));
       const s = display.scale;
       ctx.setTransform(s * u, 0, 0, s * u, s * (VIEW_W / 2) * (1 - u), s * (VIEW_H / 2) * (1 - u));
       this._drawOverlay(ctx, canvas);

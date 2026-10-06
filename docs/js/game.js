@@ -151,7 +151,8 @@ function draw(nowMs) {
   if (debugTiles) drawDebugHitshape(ctx);
   hudManager.draw(ctx);
   scoreboardManager.draw(ctx, canvas);
-  chatManager.draw(ctx, canvas);
+  // Chat history would draw over the scoreboard; keep it while typing.
+  if (!scoreboardManager.isVisible || chatManager.isOpen) chatManager.draw(ctx, canvas);
   drawCursor();
 }
 
@@ -308,8 +309,16 @@ botManager.init();
 // Resolves true once the map is live, false if it failed to load (callers may
 // retry with another map; e.g. offline with only some maps cached).
 let currentMapFile = null;
+let _mapLoadGen = 0;
 function loadMap(filename) {
-  return map.load('data/maps/' + filename).then(() => {
+  // Parse into a fresh loader and only apply it if no newer loadMap() started
+  // meanwhile: otherwise whichever fetch finished last would win, leaving the
+  // world on a different map than the round/server.
+  const gen = ++_mapLoadGen;
+  const next = new MapLoader();
+  return next.load('data/maps/' + filename).then(() => {
+    if (gen !== _mapLoadGen) return false;
+    Object.assign(map, next);
     if (currentMapFile !== filename && !menu.isOpen) hudManager.showMapTitle(map.name);
     currentMapFile = filename;
     obstacleGrid = map.collisionMap;

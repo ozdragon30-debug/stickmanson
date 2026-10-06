@@ -385,11 +385,17 @@ io.on("connection", (socket) => {
   // AFK flag (menu open / tab hidden) — purely informational for other players.
   socket.on("playerStatus", (data) => {
     if (!players[socket.id] || !data) return;
-    if (!allow(socket, 'statusBucket', 10, 5000)) return;
     const afk = data.afk === true;
     if (players[socket.id].afk === afk) return;
     players[socket.id].afk = afk;
-    socket.to(room.id).emit("playerStatus", { playerId: socket.id, afk });
+    const broadcast = () => {
+      if (players[socket.id]) socket.to(room.id).emit("playerStatus", { playerId: socket.id, afk: players[socket.id].afk });
+    };
+    if (allow(socket, 'statusBucket', 10, 5000)) { broadcast(); return; }
+    // Rate limited: still deliver the final state once the window has passed.
+    if (!socket.data.afkPending) {
+      socket.data.afkPending = setTimeout(() => { socket.data.afkPending = null; broadcast(); }, 5000);
+    }
   });
 
   // Client sends its spinner identity once the map has loaded.
@@ -532,16 +538,16 @@ io.on("connection", (socket) => {
     if (!players[socket.id] || !data) return;
     let name = cleanText(data.name, 20);
     if (!name || RESERVED_NAMES.test(name)) return;
+    if (name !== players[socket.id].name && !allow(socket, 'nameBucket', 5, 10000)) return;
     // Names are unique within a room (chat "you" detection and !kick rely on it).
     const taken = n => Object.entries(players).some(([id, pl]) => id !== socket.id && pl.name.toLowerCase() === n.toLowerCase());
     if (taken(name)) {
       let i = 2, candidate;
-      do { candidate = `${name.slice(0, 17)} ${i++}`; } while (taken(candidate) && i < 100);
+      do { candidate = `${name.slice(0, 17).trimEnd()} ${i++}`; } while (taken(candidate) && i < 100);
       name = candidate;
       socket.emit('nameAssigned', { name });
     }
     if (name === players[socket.id].name) { announceJoin(); return; }
-    if (!allow(socket, 'nameBucket', 5, 10000)) return;
     players[socket.id].name = name;
     socket.to(room.id).emit("playerNameChanged", { playerId: socket.id, name });
     room.emit("scoreUpdate", { scores: room.getScores() });

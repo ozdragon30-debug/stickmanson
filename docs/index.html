@@ -93,7 +93,8 @@
       try {
         if (raw) {
           var u = new URL(raw);
-          if (/^https?:$/.test(u.protocol) && /^[a-z0-9.-]+$/i.test(u.hostname) && /^\d*$/.test(u.port)) {
+          // Plain hostnames/IPv4, or a bracketed IPv6 literal. Never written into the page.
+          if (/^https?:$/.test(u.protocol) && /^([a-z0-9.-]+|\[[0-9a-f:.]+\])$/i.test(u.hostname) && /^\d*$/.test(u.port)) {
             server = u.protocol + '//' + u.hostname + (u.port ? ':' + u.port : '');
           }
         }

@@ -245,7 +245,8 @@ class HudManager {
     ctx.globalAlpha = a;
     // Below the (possibly enlarged) kill feed; text grows with uiScale on phones.
     const u = display.uiScale || 1;
-    const cy = 150 + (u - 1) * 130;
+    const feedBottom = this.killFeed.length ? (96 + (this.killFeed.length - 1) * 32 + 14) * u : 0;
+    const cy = u > 1 ? Math.max(150, feedBottom + 45 * u) : 150;
     hudTransform(ctx, VIEW_W / 2, cy);
     ctx.translate(VIEW_W / 2, cy);
     ctx.scale(s, s);
@@ -350,6 +351,8 @@ class HudManager {
 
   _drawConnection(ctx) {
     if (!socketManager.wasConnected || socketManager.isConnected || socketManager.kicked) return;
+    // Below the (possibly enlarged) timer / rank / bot-status stack.
+    hudTransform(ctx, VIEW_W / 2, 0);
     const msg = t('hud.reconnecting');
     ctx.font = 'bold 13px system-ui, sans-serif';
     ctx.textAlign = 'center';

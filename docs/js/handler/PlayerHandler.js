@@ -113,6 +113,7 @@ socketManager.on("playerDied", (data) => {
 socketManager.on("connect", () => {
   const me = playerManager.mainPlayer;
   if (!me) return; // first connection: createMainPlayer() announces us
+  me.name = settingsManager.name; // a previous room-unique suffix ("Name 2") may no longer apply
   // The server now believes we're holding fists (fresh player): match it so
   // everyone sees the same weapon.
   me.equipWeapon(0, true);
