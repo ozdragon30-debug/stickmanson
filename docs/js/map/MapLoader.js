@@ -1,31 +1,29 @@
-// Parses Stick Arena .dat map files.
+// Map files (.dat): a text file of `key=value` sections separated by '&'.
 //
-// Format:
-//   inf=W H Map Name
-//   &tiles= TTTRFC TTTRFC ...   (6-char codes per tile)
-//   &sp=  X1 Y1 X2 Y2 ...      (spawn points, 0 0 = unused slot)
-//   &ws=  X Y WeaponId RespawnSec ...  (weapon spawns, 0 0 0 0 = unused)
-//   &rt=  Seconds               (round time, optional)
-//   &ts=  0|1                   (team setting, 0=FFA)
-//   &bg=  file.webp             (optional painted background for the whole map,
-//   &bgpad= N  &bgpx= PX         painted with N tiles of surroundings at PX px/tile)
-//
-// Tile code: TTT R F C
-//   TTT = 3-char tile image key (looked up in atlas as "TTT.png")
-//   R   = rotation (0-3, multiples of 90°)
-//   F   = flip (0=none 1=H 2=V 3=H+V)
-//   C   = collision (3 = solid wall, 0/other = walkable)
+//   inf=   W H Map name
+//   tiles= one 6-character code per tile, row by row: TTT R F C
+//            TTT  tile key (only used for animated water now)
+//            R    rotation, quarter turns (0–3)
+//            F    flip: 0 none, 1 horizontal, 2 vertical, 3 both
+//            C    collision: 0–2 open, 3 solid (blocks bullets too),
+//                 4 blocks walking only, 5–9 partly solid (see Physics)
+//   sp=    spawn points "x y" in tile-corner pixels ("0 0" = unused)
+//   ws=    weapon spawns "x y weaponId respawnSeconds" ("0 0 …" = unused)
+//   rt=    round time (s)     ts= team setting (0 = free for all)
+//   bg=    painted background image, bgpad= tiles of surroundings in it,
+//   bgpx=  its pixels per tile
 class MapLoader {
   constructor() {
     this.ready = false;
     this.width = 0;
     this.height = 0;
     this.name = '';
-    this.tiles = [];          // raw 6-char codes
-    this.collisionMap = [];   // 0=walkable, 1=solid (based on 6th char == '3')
-    this.spawnPoints = [];    // [{x, y}]
+    this.tiles = [];          // tile codes
+    this.collisionMap = [];   // per tile {c, r, f}
+    this.spawnPoints = [];    // [{x, y}] tile centres
     this.weaponSpawns = [];   // [{x, y, weaponId, respawnTime (ms)}]
     this.bgImage = null;      // painted background (drawing only)
+    this.bgFile = null;
     this.bgPad = 0;
     this.bgPx = 0;
   }
@@ -33,8 +31,7 @@ class MapLoader {
   async load(url) {
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Failed to load map: ${url}`);
-    const text = await resp.text();
-    this._parse(text);
+    this._parse(await resp.text());
     if (this.bgFile) {
       // Decode before the map goes live so the first frames don't stall.
       const img = new Image();
@@ -45,62 +42,57 @@ class MapLoader {
     this.ready = true;
   }
 
+  // Splits the file into its sections (first occurrence of each key wins).
+  static sections(text) {
+    const out = {};
+    for (const part of text.split('&')) {
+      const eq = part.indexOf('=');
+      if (eq < 0) continue;
+      const key = part.slice(0, eq).trim().toLowerCase();
+      if (key && !(key in out)) out[key] = part.slice(eq + 1);
+    }
+    return out;
+  }
+
+  // Numbers on the first line of a section ("" when it starts on a new line).
+  static numbers(value) {
+    const line = (value || '').split('\n')[0].trim();
+    return line ? line.split(/\s+/).map(Number) : [];
+  }
+
   _parse(text) {
-    const s = text.replace(/\r/g, '').trim();
+    const sec = MapLoader.sections(text.replace(/\r/g, '').trim());
 
-    // inf=W H Map Name
-    const infMatch = s.match(/inf=(\d+)\s+(\d+)\s+([^\n&]+)/i);
-    if (!infMatch) throw new Error('inf= line not found in .dat');
-    this.width  = parseInt(infMatch[1], 10);
-    this.height = parseInt(infMatch[2], 10);
-    this.name   = infMatch[3].trim();
+    const inf = /^(\d+)\s+(\d+)\s+([^\n]+)/.exec(sec.inf || '');
+    if (!inf) throw new Error('inf= line not found in .dat');
+    this.width = parseInt(inf[1], 10);
+    this.height = parseInt(inf[2], 10);
+    this.name = inf[3].trim();
 
-    // &tiles= ...  &
-    const tilesMatch = s.match(/&tiles=\s*([\s\S]*?)&/i);
-    if (!tilesMatch) throw new Error('&tiles= block not found');
-    this.tiles = tilesMatch[1].trim().split(/\s+/).filter(Boolean);
+    if (sec.tiles === undefined) throw new Error('&tiles= block not found');
+    this.tiles = sec.tiles.trim().split(/\s+/).filter(Boolean);
+    const digit = (code, i) => parseInt(code[i], 10) || 0;
+    this.collisionMap = this.tiles.map(code => ({ c: digit(code, 5), r: digit(code, 3) % 4, f: digit(code, 4) % 4 }));
 
-    // Collision map: stores {c, r, f} per tile (6th, 4th, and 5th characters of the tile code).
-    // c=0-2: fully passable; c=3: solid (no walk, no shoot); c=4: no walk (shoot-through);
-    // c=5-9: partial walk collision whose blocked zone rotates with r and flips with f.
-    this.collisionMap = this.tiles.map(code => ({
-      c: parseInt(code[5], 10) || 0,
-      r: (parseInt(code[3], 10) || 0) % 4,
-      f: (parseInt(code[4], 10) || 0) % 4,
-    }));
-
-    // &sp=  X1 Y1 X2 Y2 …  (0 0 pairs = unused)
+    // Positions in the file are tile corners; the game uses tile centres.
+    const half = 25;
     this.spawnPoints = [];
-    const spMatch = s.match(/&sp=([^\n&]+)/i);
-    if (spMatch) {
-      const nums = spMatch[1].trim().split(/\s+/).map(Number);
-      for (let i = 0; i + 1 < nums.length; i += 2) {
-        if (nums[i] !== 0 || nums[i + 1] !== 0) {
-          this.spawnPoints.push({ x: nums[i] + 25, y: nums[i + 1] + 25 });
-        }
-      }
+    const sp = MapLoader.numbers(sec.sp);
+    for (let i = 0; i + 1 < sp.length; i += 2) {
+      if (sp[i] || sp[i + 1]) this.spawnPoints.push({ x: sp[i] + half, y: sp[i + 1] + half });
     }
 
-    const bg = s.match(/&bg=\s*([\w.-]+)/i);
-    this.bgFile = bg ? bg[1] : null;
-    this.bgPad = parseInt((s.match(/&bgpad=\s*(\d+)/i) || [])[1] || '0', 10);
-    this.bgPx = parseInt((s.match(/&bgpx=\s*(\d+)/i) || [])[1] || '0', 10);
-
-    // &ws=  X Y WeaponId RespawnSec …  (groups of 4, 0 0 * * = unused)
     this.weaponSpawns = [];
-    const wsMatch = s.match(/&ws=([^\n&]+)/i);
-    if (wsMatch) {
-      const nums = wsMatch[1].trim().split(/\s+/).map(Number);
-      for (let i = 0; i + 3 < nums.length; i += 4) {
-        if (nums[i] !== 0 || nums[i + 1] !== 0) {
-          this.weaponSpawns.push({
-            x: nums[i] + 25,
-            y: nums[i + 1] + 25,
-            weaponId: nums[i + 2],
-            respawnTime: (nums[i + 3] || 10) * 1000,
-          });
-        }
+    const ws = MapLoader.numbers(sec.ws);
+    for (let i = 0; i + 3 < ws.length; i += 4) {
+      if (ws[i] || ws[i + 1]) {
+        this.weaponSpawns.push({ x: ws[i] + half, y: ws[i + 1] + half, weaponId: ws[i + 2], respawnTime: (ws[i + 3] || 10) * 1000 });
       }
     }
+
+    const bg = /^\s*([\w.-]+)/.exec(sec.bg || '');
+    this.bgFile = bg ? bg[1] : null;
+    this.bgPad = parseInt((/^\s*(\d+)/.exec(sec.bgpad || '') || [])[1] || '0', 10);
+    this.bgPx = parseInt((/^\s*(\d+)/.exec(sec.bgpx || '') || [])[1] || '0', 10);
   }
 }
