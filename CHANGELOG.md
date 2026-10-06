@@ -65,7 +65,8 @@ collision and line of sight on every map).
   all inputs validated; chat/rename rate limits; event flood guard; per-IP
   connection cap; persistent bans (`BANS_FILE`).
 - gzip, cache + security headers, `/healthz`, graceful shutdown, Docker.
-- Dependencies updated (express 4.22, socket.io 4.8): 10 advisories → 0.
+- Dependencies updated (express 4.22, socket.io 4.8, proxy-addr 2.0.8):
+  11 advisories (incl. 1 critical published overnight) → 0.
 
 ### Performance
 - Lossless sprite atlas optimisation: downloads 20.7 → 12.3 MB (WebP,
@@ -105,7 +106,11 @@ collision and line of sight on every map).
 - Reconnect grace (12 s) keeps your round score after a network blip; slow
   connections can't leave the client on a different map than the server;
   refused connections (room full/banned) fall back to an offline match with
-  the reason shown; service worker only caches the game page as offline shell.
+  the reason shown; service worker only caches the game page as offline shell;
+  slow networks wait for the server instead of dropping to offline mode.
+- Keyboard accessibility: settings is a proper modal (focus in, inert menu,
+  focus restored), arrow keys switch tabs, focus kept while rebinding.
+- Verified by QA: no memory/CPU growth over long multi-round sessions.
 
 ### Developer experience
 - `npm test`: golden gameplay lock, server integration (socket.io), input,
