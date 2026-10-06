@@ -39,7 +39,8 @@ class ScoreboardManager {
     ctx.save();
     resetScreenTransform(ctx);
 
-    // Round timer — always visible, top-center.
+    // Round timer — always visible, top-center (scaled up on phones).
+    hudTransform(ctx, VIEW_W / 2, 0);
     const remaining = this.getRemainingTime();
     const minutes = Math.floor(remaining / 60);
     const seconds  = String(remaining % 60).padStart(2, '0');
@@ -72,6 +73,7 @@ class ScoreboardManager {
     }
 
     if (this.isVisible) {
+      resetScreenTransform(ctx);
       this._drawOverlay(ctx, canvas);
     }
 

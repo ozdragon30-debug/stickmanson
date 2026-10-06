@@ -73,6 +73,10 @@ class Display {
       this.canvas.height = bh;
     }
     this.scale = bw / VIEW_W;
+    // On small screens (phones) HUD text would shrink to ~6 px. uiScale grows
+    // screen-space HUD groups around their anchors; the world view is untouched.
+    const cssRatio = cssW / VIEW_W;
+    this.uiScale = cssRatio < 0.8 ? Math.min(1.7, 0.8 / cssRatio) : 1;
     for (const fn of this.listeners) fn();
   }
 
@@ -111,4 +115,12 @@ const display = new Display(document.getElementById('canvas'));
 // Replacement for ctx.setTransform(1,0,0,1,0,0): screen-space drawing in logical px.
 function resetScreenTransform(ctx) {
   ctx.setTransform(display.scale, 0, 0, display.scale, 0, 0);
+}
+
+// Screen-space transform scaled by display.uiScale around an anchor point, so a
+// HUD group keeps its corner/edge position while its contents grow.
+function hudTransform(ctx, anchorX, anchorY) {
+  const u = display.uiScale || 1;
+  const s = display.scale;
+  ctx.setTransform(s * u, 0, 0, s * u, s * anchorX * (1 - u), s * anchorY * (1 - u));
 }

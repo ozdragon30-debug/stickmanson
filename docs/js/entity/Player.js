@@ -483,14 +483,15 @@ class Player {
       const x = this.body.x;
       const y = this.body.y;
       ctx.save();
-      ctx.font = 'bold 11px monospace';
+      ctx.font = `bold ${Math.round(11 * (display.uiScale || 1))}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       const padding = 3;
       const label = this.afk ? `💤 ${this.name}` : this.name;
       const tw = ctx.measureText(label).width;
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(x - tw / 2 - padding, y - 48 - 13, tw + padding * 2, 13);
+      const th = Math.round(13 * (display.uiScale || 1));
+      ctx.fillRect(x - tw / 2 - padding, y - 48 - th, tw + padding * 2, th);
       ctx.fillStyle = this.afk ? '#9fb3c8' : '#ffffff';
       ctx.fillText(label, x, y - 48);
       ctx.restore();

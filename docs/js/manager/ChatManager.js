@@ -103,7 +103,7 @@ class ChatManager {
     if (!this.messages.length && !this.isOpen) return;
 
     ctx.save();
-    resetScreenTransform(ctx);
+    hudTransform(ctx, 0, VIEW_H); // grows from the bottom-left corner on phones
 
     const x      = 50;   // aligned with the input box, clear of the ⚙ button
     const lineH  = 18;

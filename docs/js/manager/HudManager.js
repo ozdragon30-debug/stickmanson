@@ -95,14 +95,20 @@ class HudManager {
 
     this._drawDamage(ctx, now);
     if (me) {
+      hudTransform(ctx, 0, 0);
       this._drawHealth(ctx, me);
+      hudTransform(ctx, VIEW_W, 0);
       this._drawWeapon(ctx, me);
     }
+    hudTransform(ctx, VIEW_W, 0);
     this._drawKillFeed(ctx, now);
+    resetScreenTransform(ctx);
     this._drawCenter(ctx, now);
     if (me && me.isRespawning) this._drawDeath(ctx, now);
     this._drawHitMarker(ctx, now);
+    hudTransform(ctx, VIEW_W, VIEW_H);
     this._drawStats(ctx);
+    resetScreenTransform(ctx);
     this._drawConnection(ctx);
     if (typeof touchInput !== 'undefined') touchInput.draw(ctx);
 
@@ -237,7 +243,11 @@ class HudManager {
     const s = HudManager.reducedMotion ? 1 : 1 + Math.max(0, 0.25 - age / 600);
     ctx.save();
     ctx.globalAlpha = a;
-    ctx.translate(VIEW_W / 2, 150);
+    // Below the (possibly enlarged) kill feed; text grows with uiScale on phones.
+    const u = display.uiScale || 1;
+    const cy = 150 + (u - 1) * 130;
+    hudTransform(ctx, VIEW_W / 2, cy);
+    ctx.translate(VIEW_W / 2, cy);
     ctx.scale(s, s);
     ctx.textAlign = 'center';
     ctx.font = '900 22px system-ui, sans-serif';
@@ -262,6 +272,7 @@ class HudManager {
     ctx.globalAlpha = a * 0.35;
     ctx.fillStyle = '#300';
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    hudTransform(ctx, VIEW_W / 2, VIEW_H / 2 - 60);
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
     ctx.font = '900 30px system-ui, sans-serif';
