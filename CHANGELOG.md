@@ -88,6 +88,10 @@ collision and line of sight on every map).
 - Offline chat messages vanished; every hit requested a missing sound file.
 - Any runtime exception stopped the game loop for good; it now recovers.
 - Out-of-order map loads could leave the world on the wrong map.
+- Found in browser playtests: settings renames reverted by Play; keyboard
+  dead after closing settings; joins announced with the wrong name; no bots
+  after the last opponent left; room UI on static builds; squashed map names
+  (real names now come from `docs/data/maps/index.json`).
 
 ### Security
 - Fixed: spoofed `X-Forwarded-For` granted admin; `?server=` script
