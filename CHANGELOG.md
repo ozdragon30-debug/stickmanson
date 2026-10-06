@@ -11,6 +11,19 @@
   shadows, plus trees, bushes, rocks, tables and parked props. Outdoor maps
   get themed surroundings beyond the border so wide screens are filled.
 
+### Spinner shop (gameplay change, on request)
+
+- Coins are earned by playing (kill +10, round +5, win +25) and shown under
+  the health bar. The first 4 spinners are free; the other 60 are bought in
+  Settings → Profile (60 / 150 / 300 coins) and each gives one small perk
+  while worn: health +4/+7/+10, attack +3/5/8 % or armor +3/5/8 %. Bots get
+  no perks. Saved in localStorage (`sar_shop`).
+
+### Worn weapons
+
+- Weapon colours are toned down and every part gets scuffs, grime and dirty
+  edges, so the weapons sit with the weathered maps instead of standing out.
+
 ### Sledgehammer redesigned (gameplay change, on request)
 
 - One hit kills (damage 100), narrower strike (20° cone, 100 px), longer

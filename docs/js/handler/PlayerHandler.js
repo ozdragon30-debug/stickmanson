@@ -87,7 +87,9 @@ socketManager.on("playerGotHit", (data) => {
   if (!player || player.isRespawning) return;
 
   const attacker = playerManager.getPlayer(attackerId);
-  player.showHitsplat(damage, weaponId, attacker ? { x: attacker.body.x, y: attacker.body.y } : null);
+  // Attacker's spinner perk (bots have none).
+  const atk = attacker && !botManager.isBot(attackerId) ? ShopManager.attackFactorFor(attacker.indicatorShapeIndex) : 1;
+  player.showHitsplat((damage ?? Constants.WEAPON_ID_MAP[weaponId]?.damage ?? 5) * atk, weaponId, attacker ? { x: attacker.body.x, y: attacker.body.y } : null);
 
   // Only the victim's own client triggers death, to avoid every player calling it.
   if (isMe && player.health <= 0) {

@@ -57,7 +57,7 @@ class Player {
 
     // Death animation finished — respawn.
     this.deathBody.addEventListener("animationcomplete", () => {
-      this.health = 100;
+      this.health = this.maxHealth();
       this.canShoot = true;
       this.canMove = true;
 
@@ -341,7 +341,7 @@ class Player {
     const { x, y } = pts[Math.floor(Math.random() * pts.length)];
 
     clearTimeout(this._cooldownTimer);
-    this.health = 100;
+    this.health = this.maxHealth();
     this.isRespawning = false;
     this.canShoot = true;
     this.canMove = true;
@@ -358,6 +358,11 @@ class Player {
     }
   }
 
+  // 100, plus the local player's health perk from the spinner shop.
+  maxHealth() {
+    return this.isMainPlayer && typeof shopManager !== 'undefined' ? shopManager.maxHealth() : 100;
+  }
+
   showHitsplat(damage, attackerWeaponId, attackerPos = null) {
     const attackerWeapon = Constants.WEAPON_ID_MAP[attackerWeaponId];
     // Weapons without an impactSound fell back to 'impact', a file that doesn't
@@ -370,7 +375,9 @@ class Player {
     this.hitsplat.setPosition(this.body.x, this.body.y);
     this.hitsplat.isVisible = true;
     this._hitFxAt = performance.now(); // render-only (hit rim flash)
-    this.health -= (damage ?? this.currentWeapon.damage) * Constants.DAMAGE_MULTIPLIER;
+    // Spinner perk (shop): armor reduces what the local player takes.
+    const armor = this.isMainPlayer && typeof shopManager !== 'undefined' ? shopManager.armorFactor() : 1;
+    this.health -= (damage ?? this.currentWeapon.damage) * Constants.DAMAGE_MULTIPLIER * armor;
 
     if (this.isMainPlayer) {
       if (typeof hudManager !== 'undefined') hudManager.onDamaged(attackerPos);

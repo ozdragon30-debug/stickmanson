@@ -9,28 +9,77 @@
 const WeaponArt = (() => {
   const OUT = 'rgba(8,10,14,0.9)';
 
+  // Worn look: colours are toned down (a little grey, a little darker) and
+  // every larger part gets scuffs, grime and darkened edges, all
+  // deterministic (seeded by the part's geometry) so nothing flickers.
+  const muted = new Map();
+  function mute(col) {
+    if (typeof col !== 'string' || col[0] !== '#' || col.length !== 7) return col;
+    let m = muted.get(col);
+    if (!m) {
+      const n = parseInt(col.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+      const l = 0.3 * r + 0.59 * g + 0.11 * b;
+      const f = v => Math.round((v + (l - v) * 0.22) * 0.9);
+      m = `rgb(${f(r)},${f(g)},${f(b)})`;
+      muted.set(col, m);
+    }
+    return m;
+  }
+  const rnd = seed => () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+  function wear(c, path, x, y, w, h) {
+    if (w * h < 40) return;
+    const r = rnd(Math.abs(Math.round(x * 131 + y * 71 + w * 37 + h * 17)) % 2147483646 + 1);
+    c.save();
+    path(); c.clip();
+    for (let i = 0; i < 2; i++) {                                   // grime
+      c.beginPath();
+      c.ellipse(x + r() * w, y + r() * h, 1 + r() * w * 0.5, 1 + r() * h * 0.25, r() * 3, 0, Math.PI * 2);
+      c.fillStyle = 'rgba(30,22,14,0.2)'; c.fill();
+    }
+    const n = Math.min(4, 1 + Math.floor(w * h / 120)), tall = h > w;  // scratches
+    for (let i = 0; i < n; i++) {
+      const x0 = x + r() * w, y0 = y + r() * h, L = (0.25 + r() * 0.5) * Math.max(w, h);
+      const k = (r() - 0.5) * 0.5;
+      c.beginPath(); c.moveTo(x0, y0);
+      c.lineTo(tall ? x0 + k * L * 0.3 : x0 + L, tall ? y0 + L : y0 + k * L * 0.3);
+      c.strokeStyle = 'rgba(235,228,214,0.22)'; c.lineWidth = 0.5; c.stroke();
+    }
+    path();                                                         // worn, dirty edges
+    c.strokeStyle = 'rgba(25,18,10,0.3)'; c.lineWidth = 2.2; c.stroke();
+    c.restore();
+  }
+
   function poly(c, pts, fill, stroke = OUT, lw = 1.1) {
-    c.beginPath();
-    c.moveTo(pts[0], pts[1]);
-    for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]);
-    c.closePath();
-    c.fillStyle = fill; c.fill();
-    if (stroke) { c.lineWidth = lw; c.strokeStyle = stroke; c.stroke(); }
+    const path = () => {
+      c.beginPath();
+      c.moveTo(pts[0], pts[1]);
+      for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]);
+      c.closePath();
+    };
+    path();
+    c.fillStyle = mute(fill); c.fill();
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let i = 0; i < pts.length; i += 2) {
+      x0 = Math.min(x0, pts[i]); x1 = Math.max(x1, pts[i]); y0 = Math.min(y0, pts[i + 1]); y1 = Math.max(y1, pts[i + 1]);
+    }
+    wear(c, path, x0, y0, x1 - x0, y1 - y0);
+    if (stroke) { path(); c.lineWidth = lw; c.strokeStyle = stroke; c.stroke(); }
   }
   function rect(c, x, y, w, h, fill, stroke = OUT, r = 0) {
-    c.beginPath();
-    if (r && c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h);
-    c.fillStyle = fill; c.fill();
-    if (stroke) { c.lineWidth = 1.1; c.strokeStyle = stroke; c.stroke(); }
+    const path = () => { c.beginPath(); if (r && c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h); };
+    path();
+    c.fillStyle = mute(fill); c.fill();
+    wear(c, path, x, y, w, h);
+    if (stroke) { path(); c.lineWidth = 1.1; c.strokeStyle = stroke; c.stroke(); }
   }
   function circle(c, x, y, r, fill, stroke = OUT) {
     c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2);
-    c.fillStyle = fill; c.fill();
+    c.fillStyle = mute(fill); c.fill();
     if (stroke) { c.lineWidth = 1.1; c.strokeStyle = stroke; c.stroke(); }
   }
   function vgrad(c, x0, x1, a, b, mid) {
     const g = c.createLinearGradient(x0, 0, x1, 0);
-    g.addColorStop(0, a); if (mid) g.addColorStop(0.45, mid); g.addColorStop(1, b);
+    g.addColorStop(0, mute(a)); if (mid) g.addColorStop(0.45, mute(mid)); g.addColorStop(1, mute(b));
     return g;
   }
   function line(c, x0, y0, x1, y1, color, w) {

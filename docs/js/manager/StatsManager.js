@@ -32,6 +32,11 @@ class StatsManager {
   }
 
   onRoundEnd(won) {
+    if (typeof shopManager !== 'undefined') {
+      const n = ShopManager.REWARD.round + (won ? ShopManager.REWARD.win : 0);
+      shopManager.earn(n);
+      if (typeof hudManager !== 'undefined') hudManager.onCoins(n, true);
+    }
     this.stats.rounds++;
     if (won) this.stats.wins++;
     this._dirty = true;

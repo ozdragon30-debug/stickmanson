@@ -59,7 +59,7 @@ class SettingsManager {
     const saved = this._loadRaw();
     // Randomise identity on very first load (no saved prefs).
     if (saved.spinnerHue        == null) DEFAULT_SETTINGS.spinnerHue        = Math.floor(Math.random() * 360);
-    if (saved.spinnerShapeIndex == null) DEFAULT_SETTINGS.spinnerShapeIndex = Math.floor(Math.random() * 64);
+    if (saved.spinnerShapeIndex == null) DEFAULT_SETTINGS.spinnerShapeIndex = Math.floor(Math.random() * 4);  // a free one
     if (saved.cursorIndex       == null) DEFAULT_SETTINGS.cursorIndex       = Math.floor(Math.random() * 8);
     if (!saved.name)                     DEFAULT_SETTINGS.name              = 'Player' + Math.random().toString(36).slice(2, 5).toUpperCase();
 
@@ -273,8 +273,10 @@ class SettingsManager {
           <div id="sar-cursor-grid" class="sar-grid"></div>
         </div>
         <div class="sar-sec">
-          <div class="sar-lbl" data-i18n="set.spinner">Spinner Shape</div>
+          <div class="sar-lbl"><span data-i18n="set.spinner">Spinner Shape</span> — <span class="sar-coins" id="sar-coins"></span></div>
+          <div class="sar-hint" data-i18n="shop.hint"></div>
           <div id="sar-spin-grid" class="sar-grid sar-scroll"></div>
+          <div id="sar-spin-info" class="sar-spin-info"></div>
         </div>
         <div class="sar-sec">
           <label class="sar-lbl" for="sar-hue"><span data-i18n="set.color">Spinner Color</span> — <span id="sar-hue-lbl"></span></label>
@@ -521,6 +523,7 @@ class SettingsManager {
     grid.innerHTML = '';
     const names = Object.keys(indicatorAtlas.animationMap);
     const selIdx = this.settings.spinnerShapeIndex % names.length;
+    if (this._spinFocus == null) this._spinFocus = selIdx;
     names.forEach((anim, i) => {
       const fd = indicatorAtlas.getFrameData(anim, 0);
       if (!fd) return;
@@ -529,22 +532,72 @@ class SettingsManager {
       c.width = 40; c.height = 40;
       const cx = c.getContext('2d');
       cx.imageSmoothingEnabled = false;
+      const owned = shopManager.owns(i);
       const src = tintCache.get(indicatorAtlas, fd, this.settings.spinnerHue);
-      if (src) cx.drawImage(src.canvas, src.x, src.y, fd.w, fd.h,
-        (40 - fd.w * scale) / 2, (40 - fd.h * scale) / 2,
-        fd.w * scale, fd.h * scale);
+      if (src) {
+        if (!owned) cx.globalAlpha = 0.45;
+        cx.drawImage(src.canvas, src.x, src.y, fd.w, fd.h,
+          (40 - fd.w * scale) / 2, (40 - fd.h * scale) / 2,
+          fd.w * scale, fd.h * scale);
+      }
+      const perk = ShopManager.perk(i);
       const tile = document.createElement('button');
-      tile.className = 'sar-tile sar-tile-sm' + (i === selIdx ? ' sel' : '');
-      tile.setAttribute('aria-label', `Spinner ${i + 1}`);
+      tile.className = 'sar-tile sar-tile-sm' + (i === selIdx ? ' sel' : '') + (owned ? '' : ' locked')
+        + (i === this._spinFocus ? ' focus' : '') + (perk.stat ? ' perk-' + perk.stat : '');
+      tile.setAttribute('aria-label', `Spinner ${i + 1}: ${ShopManager.perkLabel(i)}`);
       tile.appendChild(c);
+      if (!owned) {
+        const tag = document.createElement('span');
+        tag.className = 'sar-price'; tag.textContent = perk.price;
+        tile.appendChild(tag);
+      }
       tile.onclick = () => {
-        this.settings.spinnerShapeIndex = i;
-        this._save();
-        this._syncIdentity();
-        grid.querySelectorAll('.sar-tile').forEach((el, j) => el.classList.toggle('sel', j === i));
+        this._spinFocus = i;
+        if (shopManager.owns(i)) {
+          this.settings.spinnerShapeIndex = i;
+          this._save();
+          this._syncIdentity();
+        }
+        this._buildSpinnerPicker();
       };
       grid.appendChild(tile);
     });
+    this._renderSpinInfo();
+  }
+
+  // Coins + the focused spinner's perk, with a Buy button when it isn't owned.
+  _renderSpinInfo() {
+    const coins = this._panel.querySelector('#sar-coins');
+    if (coins) coins.textContent = `${t('shop.coins')}: ${shopManager.coins}`;
+    const box = this._panel.querySelector('#sar-spin-info');
+    if (!box) return;
+    const i = this._spinFocus ?? this.settings.spinnerShapeIndex;
+    const perk = ShopManager.perk(i);
+    box.innerHTML = '';
+    const lbl = document.createElement('span');
+    lbl.textContent = `#${i + 1} · ${ShopManager.perkLabel(i)}`;
+    box.appendChild(lbl);
+    if (shopManager.owns(i)) {
+      if (i === this.settings.spinnerShapeIndex) {
+        const eq = document.createElement('span');
+        eq.className = 'sar-hint'; eq.textContent = ' ✓ ' + t('shop.equipped');
+        box.appendChild(eq);
+      }
+      return;
+    }
+    const btn = document.createElement('button');
+    btn.className = 'sar-btn sar-buy';
+    const afford = shopManager.coins >= perk.price;
+    btn.textContent = afford ? `${t('shop.buy')} — ${perk.price}` : `${t('shop.need')} (${perk.price})`;
+    btn.disabled = !afford;
+    btn.onclick = () => {
+      if (!shopManager.buy(i)) return;
+      this.settings.spinnerShapeIndex = i;
+      this._save();
+      this._syncIdentity();
+      this._buildSpinnerPicker();
+    };
+    box.appendChild(btn);
   }
 
   // The keybind buttons are rebuilt on every change: keep keyboard focus on the same one.

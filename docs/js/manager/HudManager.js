@@ -21,6 +21,7 @@ class HudManager {
   onKill({ killerName, killerHue, victimName, victimHue, weaponId, killerIsMe, victimIsMe }) {
     if (typeof statsManager !== 'undefined') {
       if (killerIsMe && !victimIsMe) statsManager.onKill(weaponId);
+      if (killerIsMe && !victimIsMe && typeof shopManager !== 'undefined') this.onCoins(ShopManager.REWARD.kill);
       if (victimIsMe) statsManager.onDeath();
     }
     if (settingsManager.get('killFeed')) {
@@ -40,6 +41,32 @@ class HudManager {
       this.streak = 0;
       this.deathInfo = { killer: killerIsMe ? null : killerName, t: performance.now() };
     }
+  }
+
+  // Coins from the spinner shop economy: a small counter under the health bar
+  // and a "+n" pop when some are earned.
+  onCoins(n, alreadyEarned = false) {
+    if (!alreadyEarned) shopManager.earn(n);
+    this.coinPop = { n, t: performance.now() };
+  }
+
+  _drawCoins(ctx, x, y) {
+    if (typeof shopManager === 'undefined') return;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x + 6, y - 4, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#f5c542'; ctx.fill();
+    ctx.strokeStyle = '#9a6b12'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.font = 'bold 12px ui-monospace, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillText(shopManager.coins, x + 17, y + 1);
+    ctx.fillStyle = '#ffe08a'; ctx.fillText(shopManager.coins, x + 16, y);
+    const pop = this.coinPop, age = pop ? (performance.now() - pop.t) / 1400 : 1;
+    if (age < 1) {
+      ctx.globalAlpha = 1 - age;
+      ctx.fillStyle = '#ffd166';
+      ctx.fillText('+' + pop.n, x + 24 + ctx.measureText(String(shopManager.coins)).width, y - 10 * age);
+    }
+    ctx.restore();
   }
 
   onHitConfirmed() {
@@ -117,7 +144,7 @@ class HudManager {
 
   _drawHealth(ctx, me) {
     const x = 50, y = 15, w = 100, h = 20;
-    const hp = Math.max(0, Math.min(100, me.health));
+    const hp = Math.max(0, Math.min(100, me.health / me.maxHealth() * 100));
     // Trail eases down toward the real value after taking damage.
     this.displayHp = hp > this.displayHp ? hp : this.displayHp + (hp - this.displayHp) * 0.08;
 
@@ -142,10 +169,12 @@ class HudManager {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
-    ctx.fillText(Math.ceil(hp), x + w / 2 + 1, y + h / 2 + 1);
+    const hpText = Math.max(0, Math.ceil(me.health));
+    ctx.fillText(hpText, x + w / 2 + 1, y + h / 2 + 1);
     ctx.fillStyle = '#fff';
-    ctx.fillText(Math.ceil(hp), x + w / 2, y + h / 2);
+    ctx.fillText(hpText, x + w / 2, y + h / 2);
     ctx.textBaseline = 'alphabetic';
+    this._drawCoins(ctx, x, y + h + 16);
 
     me.healthbarHeart.drawCentered(ctx);
   }

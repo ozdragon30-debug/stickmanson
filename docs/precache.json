@@ -61,6 +61,7 @@
   "js/manager/PlayerManager.js",
   "js/manager/ScoreboardManager.js",
   "js/manager/SettingsManager.js",
+  "js/manager/ShopManager.js",
   "js/manager/SocketManager.js",
   "js/manager/SoundManager.js",
   "js/manager/StatsManager.js",
