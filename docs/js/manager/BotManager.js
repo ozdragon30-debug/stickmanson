@@ -384,7 +384,8 @@ class BotManager {
       }
       this.spawn(pts, BotManager.getBotCount(map));
       this._beginOfflineRound();
-      chatManager.addMessage('Server', `Round started on ${map.name || file}!`, null);
+      const { title, author } = splitMapName(map.name || file);
+      chatManager.addMessage('Server', `Round started on ${author ? `${title} (by ${author})` : title}!`, null);
       return true;
     });
   }

@@ -154,14 +154,15 @@ class TouchInput {
     if (this.aim) stick(this.aim, '#ff9a8f');
     // Idle hints so new players know where to put their thumbs.
     if (!this.move && !this.aim) {
-      ctx.globalAlpha = 0.22;
+      ctx.globalAlpha = 0.32;
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
       const swap = settingsManager.get('touchLeftHanded');
       const inset = 70 + R, hy = VIEW_H - 80 - R;
       const mx = swap ? VIEW_W - inset : inset, ax = swap ? inset : VIEW_W - inset;
       ctx.beginPath(); ctx.arc(mx, hy, R, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath(); ctx.arc(ax, hy, R, 0, Math.PI * 2); ctx.stroke();
-      ctx.globalAlpha = 0.45; ctx.fillStyle = '#fff'; ctx.font = `${Math.round(13 * u)}px system-ui, sans-serif`; ctx.textAlign = 'center';
+      ctx.globalAlpha = 0.7; ctx.fillStyle = '#fff';
+      ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.font = `${Math.round(13 * u)}px system-ui, sans-serif`; ctx.textAlign = 'center';
       ctx.fillText(t('hud.move'), mx, hy + 4 * u);
       ctx.fillText(t('hud.aim'), ax, hy + 4 * u);
     }
