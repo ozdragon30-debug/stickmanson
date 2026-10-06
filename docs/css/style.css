@@ -254,6 +254,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 }
 .menu-room[hidden], .menu-map[hidden] { display: none; }
 .menu-map { margin: -4px 0 12px; }
+.menu-server { display: flex; gap: 8px; margin: -4px 0 12px; }
+.menu-server[hidden] { display: none; }
+.menu-server .sar-text { flex: 1; min-width: 0; }
 .menu-room b { color: #fff; font-family: var(--mono); letter-spacing: .05em; }
 .menu-btn-sm { flex: 0 0 auto; min-width: 0; padding: 6px 10px; font-size: 12px; }
 .menu-btn {

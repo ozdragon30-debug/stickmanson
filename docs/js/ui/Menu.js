@@ -51,6 +51,24 @@ class Menu {
     this.mapSelect = document.getElementById('menu-map-select');
     this._buildMapPicker();
 
+    // Static/offline builds: connect to a game server by URL (reloads with ?server=).
+    this.serverForm = document.getElementById('menu-server');
+    const serverInput = document.getElementById('menu-server-url');
+    serverInput.addEventListener('keydown', e => e.stopPropagation());
+    this.serverForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      let raw = serverInput.value.trim();
+      if (!raw) return;
+      if (!/^https?:\/\//i.test(raw)) raw = 'https://' + raw;
+      try {
+        const u = new URL(raw);
+        const url = new URL(location.href);
+        url.searchParams.set('server', u.origin);
+        location.href = url.toString();
+      } catch (err) { serverInput.setCustomValidity(t('menu.server.hint')); serverInput.reportValidity(); }
+    });
+    serverInput.addEventListener('input', () => serverInput.setCustomValidity(''));
+
     this.roomEl = document.getElementById('menu-room');
     this.roomLabel = document.getElementById('menu-room-label');
     this.roomBtn = document.getElementById('menu-room-btn');
@@ -230,6 +248,8 @@ class Menu {
     if (this.isOpen) {
       this._renderRoom();
       this.mapEl.hidden = socketManager.isConnected || !botManager.active;
+      // Only when there is no game server at all (static hosting / offline).
+      this.serverForm.hidden = !!socketManager.socket || !botManager.active;
       const html = this._statusHtml();
       if (this.status.innerHTML !== html) this.status.innerHTML = html;
       if (!this._ready) {
