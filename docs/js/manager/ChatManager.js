@@ -124,7 +124,7 @@ class ChatManager {
 
       const myId = (typeof socketManager !== 'undefined') ? socketManager.socket?.id : null;
       const isMe = (typeof playerManager !== 'undefined') && playerManager.mainPlayer?.name === msg.name;
-      const displayName = isMe ? 'You' : msg.name;
+      const displayName = isMe ? t('hud.you') : msg.name;
 
       // Derive spinner-matching color from hue (sepia+saturate+hue-rotate produces ~hsl(H+36, 80%, 50%))
       const nameHue = msg.hue != null ? (msg.hue + 36) % 360 : null;
