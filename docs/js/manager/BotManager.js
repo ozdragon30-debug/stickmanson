@@ -340,7 +340,7 @@ class BotManager {
       const scores = scoreboardManager.scores;
       scoreboardManager.showRoundEnd(scores);
       const myId = socketManager.socket?.id ?? 'local_player';
-      const ranked = Object.entries(scores).sort((a, b) => b[1].kills - a[1].kills);
+      const ranked = Object.entries(scores).sort(compareScores);
       const won = !!ranked[0] && ranked[0][0] === myId;
       soundManager.play(won ? 'win' : 'lose');
       statsManager.onRoundEnd(won);

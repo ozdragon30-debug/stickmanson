@@ -113,9 +113,14 @@ function keyDownHandler(event) {
     scoreboardManager.tabHeld = true;
   } else if (event.key === ' ') {
     event.preventDefault();
-  } else if (event.key === 'Shift') {
+  } else if (event.key === 'Shift' && !shiftIsGameBind(event)) {
     scoreboardManager.tabHeld = true;
   }
+}
+
+// Shift shows the scoreboard unless it is bound to a movement/attack action.
+function shiftIsGameBind(event) {
+  return ['up', 'left', 'down', 'right', 'shoot'].some(a => keyMatches(event, a));
 }
 
 function keyUpHandler(event) {

@@ -52,7 +52,9 @@ class GamepadInput {
     inputMode.set('gamepad');
 
     const items = [...root.querySelectorAll('button, input, select, summary')]
-      .filter(el => !el.disabled && el.offsetParent !== null && !el.closest('[hidden]'));
+      .filter(el => !el.disabled && el.offsetParent !== null && !el.closest('[hidden]')
+        // contents of a closed <details> (other than its summary) aren't focusable
+        && (el.tagName === 'SUMMARY' || !el.closest('details:not([open])')));
     if (!items.length) return;
     let i = items.indexOf(document.activeElement);
     const focus = (j) => { const el = items[(j + items.length) % items.length]; el.focus({ preventScroll: false }); el.scrollIntoView({ block: 'nearest' }); };

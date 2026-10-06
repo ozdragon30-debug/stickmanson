@@ -187,7 +187,8 @@ class SettingsManager {
     if (this._rebinding) {
       e.preventDefault();
       e.stopImmediatePropagation();
-      if (e.key !== 'Escape') {
+      // Enter (chat), Tab and Escape keep their fixed jobs; Escape cancels.
+      if (e.key !== 'Escape' && e.key !== 'Enter' && e.key !== 'Tab') {
         // Unbind the same key from any other action to avoid conflicts.
         for (const a in this.settings.keybinds) {
           if (this.settings.keybinds[a] === e.code) this.settings.keybinds[a] = '';

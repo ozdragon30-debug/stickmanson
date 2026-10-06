@@ -268,6 +268,24 @@ test('event floods are dropped', async () => {
   assert.ok(relayed > 50 && relayed <= 200, `relayed ${relayed}`);
 });
 
+test('a brief disconnect keeps the round score and stays quiet', async () => {
+  const session = 'blip_' + 'z'.repeat(20);
+  const watcher = await connect({ query: { room: 'blip' } });
+  const rita = await connect({ query: { room: 'blip', session } });
+  const victim = await connect({ query: { room: 'blip' } });
+  await new Promise(r => setTimeout(r, 100));
+  victim.emit('iDied', { killerId: rita.id, weaponId: 2 });
+  await new Promise(r => setTimeout(r, 100));
+  assert.strictEqual(app.player(rita.id).kills, 1);
+
+  const left = next(watcher, 'chatMessage', 600, m => / left the game/.test(m.text));
+  rita.close();                                  // clean disconnect (network blip)
+  await new Promise(r => setTimeout(r, 150));
+  const back = await connect({ query: { room: 'blip', session } });
+  assert.strictEqual(await left, null, 'no "left the game" for a blip');
+  assert.strictEqual(app.player(back.id).kills, 1, 'score restored');
+});
+
 test('admin weapon command no longer crashes the server', async () => {
   const a = await connect(); // direct localhost connection = LAN admin
   const forced = next(a, 'forceWeapon', 400);

@@ -34,8 +34,13 @@ socketManager.on("playerDisconnected", (playerId) => {
   playerManager.removePlayer(playerId);
   // The last other player left mid-round: bring the bots back right away
   // instead of leaving an empty arena until the next round.
-  const humans = Object.keys(playerManager.getPlayers()).filter(id => !botManager.isBot(id));
-  if (!humans.length && !botManager.active && map.ready && playerManager.mainPlayer) botManager.considerSpawning({});
+  // Wait a moment: a player whose connection just blipped usually comes back.
+  setTimeout(() => {
+    const humans = Object.keys(playerManager.getPlayers()).filter(id => !botManager.isBot(id));
+    if (!humans.length && !botManager.active && socketManager.isConnected && map.ready && playerManager.mainPlayer) {
+      botManager.considerSpawning({});
+    }
+  }, 6000);
 });
 
 socketManager.on("playWalkingAnimation", (data) => {
@@ -147,7 +152,7 @@ socketManager.on("gameState", (data) => {
 function _myRank(scores) {
   const myId = socketManager.socket?.id;
   if (!myId || !(myId in scores)) return null;
-  const sorted = Object.entries(scores).sort((a, b) => b[1].kills - a[1].kills);
+  const sorted = Object.entries(scores).sort(compareScores);
   return sorted.findIndex(([id]) => id === myId) + 1; // 1-based
 }
 

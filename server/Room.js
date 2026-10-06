@@ -28,6 +28,7 @@ class Room {
     this.roundMs = roundMs;
     this.roundEndMs = roundEndMs;
     this.players = {};
+    this.roundId = 0;   // increments every round (reconnect grace restores scores only within a round)
     this.debugMapEnabled = false;
     this.roundEndTimeout = null;
     this.roundStartTimeout = null;
@@ -91,6 +92,7 @@ class Room {
   startNewRound() {
     const game = this.game;
     this.roundStartTimeout = null;
+    this.roundId++;
     game.mapFile     = this.pickMap(game.mapFile);
     game.roundEndsAt = Date.now() + this.roundMs;
     game.phase       = 'playing';

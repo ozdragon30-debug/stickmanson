@@ -106,6 +106,12 @@ const mapFiles = fs.readdirSync(mapsDir).filter(f => f.endsWith(".dat") && f !==
 // Bans survive restarts when BANS_FILE is set (e.g. BANS_FILE=./data/bans.json).
 const BANS_FILE = process.env.BANS_FILE || '';
 const bannedIps = new Set();
+
+// Brief network drops: a player who disconnects and comes back with the same
+// session token within this window keeps their round score, and nobody sees
+// "left"/"joined" spam. Key: `${roomId}|${session}`.
+const RECONNECT_GRACE_MS = 12000;
+const departed = new Map();
 if (BANS_FILE) {
   try { for (const ip of JSON.parse(fs.readFileSync(BANS_FILE, 'utf8'))) bannedIps.add(String(ip)); }
   catch (e) { if (e.code !== 'ENOENT') console.warn(`Could not read ${BANS_FILE}:`, e.message); }
@@ -277,6 +283,15 @@ io.on("connection", (socket) => {
   const p = new Player();
   p.name     = 'Player ' + socket.id.slice(0, 4);
   p.position = { x: 0, y: 0 };
+  const graceKey = socket.data.session ? `${room.id}|${socket.data.session}` : null;
+  const returning = graceKey && departed.get(graceKey);
+  if (returning) {
+    clearTimeout(returning.timer);
+    departed.delete(graceKey);
+    if (returning.round === room.roundId) { p.kills = returning.kills; p.deaths = returning.deaths; }
+    p.name = returning.name;
+    socket.data.announced = true; // quiet rejoin
+  }
   players[socket.id] = p;
 
   socket.emit("currentPlayers", players);
@@ -304,11 +319,25 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     if (!process.env.QUIET) console.log("user disconnected: ", socket.id);
-    const leavingName = players[socket.id]?.name ?? 'A player';
+    const leaving = players[socket.id];
+    const leavingName = leaving?.name ?? 'A player';
     delete players[socket.id];
     room.emit("playerDisconnected", socket.id);
     room.emit("scoreUpdate", { scores: room.getScores() });
-    if (!socket.data.replaced) room.emit("chatMessage", { name: 'Server', text: `${leavingName} left the game.` });
+    if (socket.data.replaced) { releaseRoom(room); return; }
+    const graceKey = socket.data.session ? `${room.id}|${socket.data.session}` : null;
+    if (graceKey && leaving) {
+      // Hold the score (and the room) briefly in case this was a network blip.
+      const timer = setTimeout(() => {
+        departed.delete(graceKey);
+        room.emit("chatMessage", { name: 'Server', text: `${leavingName} left the game.` });
+        releaseRoom(room);
+      }, RECONNECT_GRACE_MS);
+      if (timer.unref) timer.unref();
+      departed.set(graceKey, { kills: leaving.kills, deaths: leaving.deaths, name: leavingName, round: room.roundId, timer });
+      return;
+    }
+    room.emit("chatMessage", { name: 'Server', text: `${leavingName} left the game.` });
     releaseRoom(room);
   });
 
@@ -592,6 +621,7 @@ module.exports = {
   server, io, rooms, weaponsData,
   player(id) { for (const r of rooms.values()) if (r.players[id]) return r.players[id]; return null; },
   close() {
+    for (const d of departed.values()) clearTimeout(d.timer);
     for (const r of rooms.values()) r.dispose();
     io.close();
     return new Promise(r => server.close(() => r()));

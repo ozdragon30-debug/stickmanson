@@ -1,3 +1,9 @@
+// One ranking rule everywhere (panel, HUD rank, sounds, stats): most kills,
+// then fewest deaths.
+function compareScores(a, b) {
+  return b[1].kills - a[1].kills || a[1].deaths - b[1].deaths;
+}
+
 class ScoreboardManager {
   static getInstance() {
     if (!ScoreboardManager.instance) {
@@ -58,7 +64,7 @@ class ScoreboardManager {
       ? (socketManager.socket?.id ?? 'local_player')
       : 'local_player';
     if (myId && this.scores && myId in this.scores) {
-      const sorted = Object.entries(this.scores).sort((a, b) => b[1].kills - a[1].kills);
+      const sorted = Object.entries(this.scores).sort(compareScores);
       const rank = sorted.findIndex(([id]) => id === myId) + 1;
       const total = sorted.length;
       const suffixes = ['th','st','nd','rd'];
@@ -110,7 +116,7 @@ class ScoreboardManager {
     const myId  = (typeof socketManager !== 'undefined')
       ? (socketManager.socket?.id ?? 'local_player')
       : 'local_player';
-    const sorted = Object.entries(this.scores).sort((a, b) => b[1].kills - a[1].kills || a[1].deaths - b[1].deaths);
+    const sorted = Object.entries(this.scores).sort(compareScores);
 
     const rowH = 30;
     const panelW = 620;
@@ -193,7 +199,16 @@ class ScoreboardManager {
       ctx.fillStyle = `hsl(${nameHue},80%,${isMe ? '75%' : '68%'})`;
       ctx.font = isMe ? '700 15px system-ui, sans-serif' : '600 15px system-ui, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(displayName, colName, y);
+      // Long names are cut with "…" so they never run into the Kills column.
+      let shown = displayName;
+      const maxW = colKills - colName - 40;
+      if (ctx.measureText(shown).width > maxW) {
+        const suffix = isMe ? ` ${t('sb.you')}` : '';
+        let base = data.name;
+        while (base.length > 1 && ctx.measureText(base + '…' + suffix).width > maxW) base = base.slice(0, -1);
+        shown = base + '…' + suffix;
+      }
+      ctx.fillText(shown, colName, y);
 
       ctx.fillStyle = isMe ? '#fff' : '#cfd8e3';
       ctx.font = '600 15px ui-monospace, monospace';
