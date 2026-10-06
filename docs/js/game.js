@@ -1,5 +1,7 @@
 const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
+// Opaque canvas: the page compositor can skip blending it (the game always
+// paints every pixel).
+const ctx = canvas.getContext("2d", { alpha: false });
 
 // World zoom: the original 960×720 canvas rendered the 800×600 Flash stage at 1.2×.
 const scaleFactor = Math.min(VIEW_W / 800, VIEW_H / 600);
@@ -326,16 +328,61 @@ function drawDebugHitshape(ctx) {
 
 let lastTime = 0;
 let _loopErrors = 0;
-// Optional frame-rate cap (Settings → Video). Unlimited by default: the game
-// runs at the monitor's refresh rate (60/120/144/240 Hz). All movement and
-// timers use real elapsed time, so the cap never changes game speed.
+// Frame-rate cap (Settings → Video). All movement and timers use real elapsed
+// time, so a cap never changes game speed.
+//   auto (default): the monitor's refresh rate (60/120/144 Hz…); if the device
+//     keeps missing frames, lower the render resolution step by step, then
+//     settle on a steady 60 fps — a stable 60 looks smoother than 80–120 jitter.
+//   unlimited: always the refresh rate.   240/144/120/60/30: fixed caps.
 let _frameInterval = 0;  // ms between rendered frames; 0 = every display refresh
 let _nextFrameAt = 0;
+let _fpsMode = 'auto';
 function setFpsLimit(v) {
-  const n = parseInt(v, 10);
+  _fpsMode = (v === 'off' || v === undefined) ? 'auto' : v;  // 'off' = old default
+  const n = parseInt(_fpsMode, 10);
   _frameInterval = n > 0 ? 1000 / n : 0;
   _nextFrameAt = 0;
+  pacer.reset();
 }
+
+const pacer = {
+  _gaps: [],
+  _start: 0,
+  refresh: 1000 / 60,   // estimated display refresh interval (ms)
+  _refreshSeen: Infinity,
+  autoCapped: false,
+
+  reset() { this._gaps.length = 0; this._start = 0; this.autoCapped = false; this._stepped = false; },
+
+  // Called with the time between two rendered frames.
+  sample(nowMs, gap) {
+    if (_fpsMode !== 'auto' || document.hidden || gap <= 0 || gap > 250) return;
+    if (!this._start) this._start = nowMs;
+    this._gaps.push(gap);
+    if (nowMs - this._start < 2000 || this._gaps.length < 30) return;
+    const g = this._gaps.sort((a, b) => a - b);
+    // Fastest frames show the display's refresh interval.
+    this._refreshSeen = Math.min(this._refreshSeen, g[Math.floor(g.length * 0.1)]);
+    this.refresh = this._refreshSeen;
+    const median = g[Math.floor(g.length / 2)];
+    this._gaps.length = 0;
+    this._start = 0;
+    const target = Math.max(this.refresh, _frameInterval);
+    if (median <= target * 1.25) return;
+    // Missing frames. On a fast (120 Hz+) screen: one resolution step, then a
+    // steady 60 fps (sharper than dropping resolution further); after that,
+    // or on a 60 Hz screen, fewer pixels step by step.
+    if (this.refresh < 13 && !this.autoCapped) {
+      if (!this._stepped && display.stepDown()) { this._stepped = true; return; }
+      this.autoCapped = true;
+      _frameInterval = 1000 / 60;
+      console.info('[pacer] device can\'t hold ' + Math.round(1000 / this.refresh) + ' fps — steady 60 fps');
+      return;
+    }
+    display.stepDown();
+  },
+};
+
 function loop(nowMs) {
   // Schedule the next frame first: an exception in one frame used to stop the
   // rAF chain and freeze the game permanently.
@@ -359,9 +406,7 @@ function loop(nowMs) {
 
 function frame(nowMs) {
   if (!lastTime) lastTime = nowMs;
-  // A deliberately low cap is not a slow device: don't let adaptive
-  // resolution react to it.
-  if (!_frameInterval || _frameInterval < 20) display.reportFrame(nowMs - lastTime);
+  pacer.sample(nowMs, nowMs - lastTime);
   const dt = Math.min((nowMs - lastTime) / 1000, 0.1);  // seconds; capped to avoid spiral after tab switch
   lastTime = nowMs;
 

@@ -14,12 +14,13 @@ import argparse, json, os, sys
 import numpy as np
 import cv2
 
-ROOT = os.path.join(os.path.dirname(__file__), '..', 'docs', 'sprites', 'player')
+SPRITES = os.path.join(os.path.dirname(__file__), '..', 'docs', 'sprites')
+ROOT = os.path.join(SPRITES, 'player')  # --atlas changes it
 STEPS = 5  # 12 fps × 5 = 60 fps
 
 
 def load_atlas():
-    meta = json.load(open(os.path.join(ROOT, 'spritesheet.json')))
+    meta = json.load(open(os.path.join(ROOT, 'spritesheet.json'), encoding='utf-8-sig'))
     img = cv2.imread(os.path.join(ROOT, 'spritesheet.png'), cv2.IMREAD_UNCHANGED)
     if img.shape[2] == 3:
         img = np.dstack([img, np.full(img.shape[:2], 255, np.uint8)])
@@ -27,15 +28,21 @@ def load_atlas():
 
 
 def frame_rect(meta, key):
+    """Frame rect; trimmed sheets (tools/trim-atlases.py) are expanded back to
+    the original frame size: w×h = sw×sh, tx/ty = offset of the stored pixels."""
     raw = meta['frames'][key]
-    return raw.get('frame', raw)
+    f = dict(raw.get('frame', raw))
+    f.setdefault('tx', 0); f.setdefault('ty', 0)
+    f.setdefault('sw', f['w']); f.setdefault('sh', f['h'])
+    return f
 
 
 def origin_of(meta, anim, f):
+    # Origin in *original* (untrimmed) frame coordinates.
     so = meta.get('set_origins', {}).get(anim)
     if so and so.get('ox') is not None:
         return so['ox'], so['oy']
-    return round(f['w'] / 2), round(f['h'] * 0.95)
+    return round(f.get('sw', f['w']) / 2), round(f.get('sh', f['h']) * 0.95)
 
 
 def to_premul(rgba):
@@ -118,7 +125,7 @@ interpolate.held = interpolate.total = interpolate.same = 0
 def place(atlas, f, ox, oy, cw, ch, cx, cy):
     """Copy frame f (origin ox,oy) onto a cw×ch canvas whose origin is cx,cy."""
     c = np.zeros((ch, cw, 4), np.uint8)
-    x0, y0 = cx - ox, cy - oy
+    x0, y0 = cx - ox + f['tx'], cy - oy + f['ty']
     c[y0:y0 + f['h'], x0:x0 + f['w']] = atlas[f['y']:f['y'] + f['h'], f['x']:f['x'] + f['w']]
     return c
 
@@ -152,8 +159,8 @@ def build(meta, atlas, only=None):
             pad = 6
             left = max(oax, obx) + pad
             top = max(oay, oby) + pad
-            right = max(fa['w'] - oax, fb['w'] - obx) + pad
-            bottom = max(fa['h'] - oay, fb['h'] - oby) + pad
+            right = max(fa['sw'] - oax, fb['sw'] - obx) + pad
+            bottom = max(fa['sh'] - oay, fb['sh'] - oby) + pad
             cw, ch = left + right, top + bottom
             pa = to_premul(place(atlas, fa, oax, oay, cw, ch, left, top))
             pb = to_premul(place(atlas, fb, obx, oby, cw, ch, left, top))
@@ -192,8 +199,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--only')
     ap.add_argument('--preview')
-    ap.add_argument('--out', default=os.path.join(ROOT, 'inbetween'))
+    ap.add_argument('--atlas', default='player', help='sprite folder: player, death…')
+    ap.add_argument('--out')
+    ap.add_argument('--max-mismatch', type=float, default=0.10,
+                    help='lower = stricter: more motions keep the original drawing')
     args = ap.parse_args()
+    global ROOT, GROUPED, MAX_MISMATCH
+    ROOT = os.path.join(SPRITES, args.atlas)
+    GROUPED = args.atlas == 'player'   # per-weapon sheets; other atlases: one sheet
+    MAX_MISMATCH = args.max_mismatch
+    args.out = args.out or os.path.join(ROOT, 'inbetween')
     meta, atlas = load_atlas()
     only = set(args.only.split(',')) if args.only else None
     frames, holds = build(meta, atlas, only)
@@ -221,7 +236,12 @@ def main():
     print(f'{len(frames)} in-between frames in {len(groups)} sheets, {total / 1e6:.1f} MB')
 
 
+GROUPED = True
+
+
 def group_of(key):
+    if not GROUPED:
+        return 'all'
     name = key.split('~')[0].rsplit('_', 1)[0]  # e.g. "ak47_shoot"
     if name in ('walk', 'run'):
         return 'legs'
@@ -239,8 +259,9 @@ def preview(meta, atlas, frames, anims, path):
         for key in anim['frames'][:6]:
             f = frame_rect(meta, key)
             ox, oy = origin_of(meta, name, f)
-            cells = [(atlas[f['y']:f['y'] + f['h'], f['x']:f['x'] + f['w']], ox, oy)]
-            cells += [frames[f'{key}~{k}'] for k in range(1, STEPS)]
+            cells = [(atlas[f['y']:f['y'] + f['h'], f['x']:f['x'] + f['w']], ox - f['tx'], oy - f['ty'])]
+            # Skipped in-betweens show the original drawing they fall back to.
+            cells += [frames.get(f'{key}~{k}', cells[0]) for k in range(1, STEPS)]
             rows.append(cells)
     cell = 150
     sheet = np.full((cell * len(rows), cell * STEPS, 4), 255, np.uint8)

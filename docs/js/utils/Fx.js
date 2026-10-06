@@ -23,6 +23,9 @@ const FX_GLOW = {
   tesla_helmet: [130, 160, 255],
 };
 
+// Red flash on a hit.
+const FX_HIT = [255, 40, 40];
+
 // Pickup halo colours by weapon class.
 const FX_PICKUP = {
   bat: [200, 200, 210], chainsaw: [255, 170, 60], katana: [220, 230, 255],
@@ -67,7 +70,7 @@ const fx = {
   // Additive coloured light pool (muzzle flashes, energy weapons, halos).
   light(ctx, x, y, radius, rgb, alpha) {
     if (alpha <= 0) return;
-    const key = rgb.join(',');
+    const key = rgb._key || (rgb._key = rgb.join(','));  // colour arrays are long-lived
     let spr = this._lights[key];
     if (!spr) {
       spr = this._lights[key] = fxSprite(128, [

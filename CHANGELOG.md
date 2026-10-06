@@ -2,6 +2,25 @@
 
 ## 2026 modernisation
 
+### Phone performance pass
+
+- Sprite sheets trimmed and repacked (`tools/trim-atlases.py`): player
+  4085×6715 → 3072×2866, particles 4084×4174 → 2048×1866, death and blood
+  likewise. GPU memory for these drops from ~205 MB to ~59 MB and every sheet
+  now fits the 4096 px texture limit of mobile GPUs (larger sheets were
+  re-uploaded piecemeal while drawing). Frames are placed exactly as before;
+  verified pixel by pixel (the old sheets also bled a neighbour's row into a
+  few frame edges, which is gone).
+- Frame pacer (Settings → Video → Frame rate: Auto, the new default): runs at
+  the screen's refresh rate; a device that keeps missing frames first lowers
+  the render resolution one step, then holds a steady 60 fps on 120 Hz+
+  screens. Smooth devices are never touched.
+- Death animations also at 60 fps (in-between drawings, stricter quality
+  threshold).
+- Less work per frame: name tags pre-rendered, frame data cached, no per-frame
+  allocations for in-betweens or lights, opaque canvas, sounds decoded two at
+  a time instead of ~60 at once.
+
 ### Full screen and smoother frames
 
 - Fill wide screens (default on, Settings → Video): phones in landscape and

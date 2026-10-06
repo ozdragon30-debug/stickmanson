@@ -463,6 +463,36 @@ class Player {
     ctx.restore();
   }
 
+  // The name tag is rendered to a small canvas once (text drawing every frame
+  // was one of the costlier calls on phones) and redrawn only when the label,
+  // HUD scale or resolution changes.
+  _nameTag() {
+    const u = display.uiScale || 1;
+    const label = this.afk ? `💤 ${this.name}` : this.name;
+    const res = Math.max(1, display.scale * scaleFactor);
+    const key = label + '|' + u + '|' + res;
+    if (this._tag && this._tag.key === key) return this._tag;
+    const font = `bold ${Math.round(11 * u)}px monospace`;
+    const pad = 3, th = Math.round(13 * u);
+    const m = document.createElement('canvas').getContext('2d');
+    m.font = font;
+    const w = Math.ceil(m.measureText(label).width) + pad * 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(w * res);
+    canvas.height = Math.ceil(th * res);
+    const c = canvas.getContext('2d');
+    c.scale(res, res);
+    c.fillStyle = 'rgba(0,0,0,0.55)';
+    c.fillRect(0, 0, w, th);
+    c.font = font;
+    c.textAlign = 'center';
+    c.textBaseline = 'bottom';
+    c.fillStyle = this.afk ? '#9fb3c8' : '#ffffff';
+    c.fillText(label, w / 2, th);
+    this._tag = { key, canvas, w, h: th };
+    return this._tag;
+  }
+
   // Additive light pool in front of a firing gun (render-only).
   _drawMuzzleLight(ctx) {
     if (this.isRespawning) return;
@@ -511,7 +541,7 @@ class Player {
       this.body.drawWithHeadPivot(ctx);
       // Red flash for a moment after taking a hit.
       const since = performance.now() - (this._hitFxAt || -1e9);
-      if (modern && since < 160) fx.light(ctx, this.body.x, this.body.y, 42, [255, 40, 40], 0.7 * (1 - since / 160));
+      if (modern && since < 160) fx.light(ctx, this.body.x, this.body.y, 42, FX_HIT, 0.7 * (1 - since / 160));
     }
     this.hitsplat.drawCentered(ctx);
     const pOff = (!this.muzzleFlashPinned && this.currentWeapon.shootParticle && particleAtlas.animationMap[this.currentWeapon.shootParticle]?.offset) || [0, 0];
@@ -526,21 +556,8 @@ class Player {
     }
     // Name tag above the player (hidden while dead).
     if (!this.isRespawning && this.name) {
-      const x = this.body.x;
-      const y = this.body.y;
-      ctx.save();
-      ctx.font = `bold ${Math.round(11 * (display.uiScale || 1))}px monospace`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      const padding = 3;
-      const label = this.afk ? `💤 ${this.name}` : this.name;
-      const tw = ctx.measureText(label).width;
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      const th = Math.round(13 * (display.uiScale || 1));
-      ctx.fillRect(x - tw / 2 - padding, y - 48 - th, tw + padding * 2, th);
-      ctx.fillStyle = this.afk ? '#9fb3c8' : '#ffffff';
-      ctx.fillText(label, x, y - 48);
-      ctx.restore();
+      const tag = this._nameTag();
+      if (tag) ctx.drawImage(tag.canvas, this.body.x - tag.w / 2, this.body.y - 48 - tag.h, tag.w, tag.h);
     }
   }
 }

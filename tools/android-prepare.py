@@ -20,7 +20,8 @@ manifest = os.path.join(APP, 'AndroidManifest.xml')
 s = open(manifest).read()
 if 'screenOrientation' not in s:
     s = s.replace('android:name=".MainActivity"',
-                  'android:name=".MainActivity"\n            android:screenOrientation="sensorLandscape"')
+                  'android:name=".MainActivity"\n            android:screenOrientation="sensorLandscape"'
+                  '\n            android:hardwareAccelerated="true"')
 open(manifest, 'w').write(s)
 
 # Fullscreen, no title bar, dark window background.

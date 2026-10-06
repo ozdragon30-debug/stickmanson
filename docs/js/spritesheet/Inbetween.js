@@ -1,4 +1,4 @@
-// 60 fps display of the hand-drawn 12 fps player animations.
+// 60 fps display of the hand-drawn 12 fps player and death animations.
 //
 // tools/gen-inbetweens.py computes 4 drawings between every pair of original
 // frames (optical-flow interpolation). AtlasGameObject shows them while it waits
@@ -9,7 +9,7 @@
 // Sheets are split per weapon and fetched the first time a drawing from them is
 // needed; until then the original drawing is shown.
 class InbetweenFrames {
-  constructor(base) {
+  constructor(base, preload = []) {
     this.base = base;
     this.steps = 1;
     this.ready = false;
@@ -22,11 +22,14 @@ class InbetweenFrames {
         this.steps = d.steps;
         Object.assign(this._next, d.next);
         for (const group in d.groups) {
-          for (const key in d.groups[group]) this._where[key] = { group, f: d.groups[group][key] };
+          for (const key in d.groups[group]) {
+            const f = d.groups[group][key];
+            // Same shape as AtlasSpritesheet.getFrameData(), built once.
+            this._where[key] = { group, f: { x: f.x, y: f.y, w: f.w, h: f.h, origin: { ox: f.ox, oy: f.oy } }, hit: null };
+          }
         }
         this.ready = true;
-        this._sheet('legs'); // walking legs are on screen all the time
-        this._sheet('fist'); // everyone spawns with fists
+        for (const g of preload) if (d.groups[g]) this._sheet(g);
       })
       .catch(err => console.info('[Inbetween] not available, animations stay at 12 fps:', err));
   }
@@ -56,12 +59,18 @@ class InbetweenFrames {
   // or null to keep showing `key`.
   lookup(key, k) {
     const id = key + '~' + k;
-    if (this._next[id]) return { next: true };
+    if (this._next[id]) return InbetweenFrames.NEXT;
     const w = this._where[id];
     if (!w) return null;
+    if (w.hit) return w.hit;
     const sheet = this._sheet(w.group);
-    return sheet.loaded ? { img: sheet.img, f: w.f } : null;
+    if (!sheet.loaded) return null;
+    return (w.hit = { img: sheet.img, f: w.f });
   }
 }
 
-const inbetweens = new InbetweenFrames('sprites/player/inbetween');
+InbetweenFrames.NEXT = Object.freeze({ next: true });
+
+// Player: per-weapon sheets; legs and fists are on screen from the start.
+playerAtlas.inbetween = new InbetweenFrames('sprites/player/inbetween', ['legs', 'fist']);
+deathAtlas.inbetween = new InbetweenFrames('sprites/death/inbetween', ['all']);

@@ -89,16 +89,17 @@ class AtlasGameObject {
   // Read-only: frame index and timing are never touched, so animation events
   // fire exactly as before.
   _inbetween() {
-    if (this.atlas !== playerAtlas || typeof inbetweens === 'undefined' || !inbetweens.enabled) return null;
+    const ib = this.atlas.inbetween;
+    if (!ib || !ib.enabled) return null;
     if (this.frameIndex < 0 || (this.repeatTimes !== -1 && this.repeatTimes <= 0)) return null;
     const anim = this.atlas.getAnimation(this.animName);
     if (!anim || anim.frames.length < 2) return null;
     // Last drawing of a one-shot animation: there is nothing to move towards.
     if (this.frameIndex === anim.frames.length - 1 && this.repeatTimes === 1) return null;
     const elapsed = performance.now() - this.lastUpdated;
-    const k = Math.min(inbetweens.steps - 1, Math.floor(elapsed * (anim.fps || 12) / 1000 * inbetweens.steps));
+    const k = Math.min(ib.steps - 1, Math.floor(elapsed * (anim.fps || 12) / 1000 * ib.steps));
     if (k <= 0) return null;
-    return inbetweens.lookup(anim.frames[this.frameIndex], k);
+    return ib.lookup(anim.frames[this.frameIndex], k);
   }
 
   // Draw anchoring the sprite's origin point at (this.x, this.y).
@@ -108,7 +109,7 @@ class AtlasGameObject {
     let img = this.atlas.image, f;
     if (sub && sub.img) {
       img = sub.img;
-      f = { x: sub.f.x, y: sub.f.y, w: sub.f.w, h: sub.f.h, origin: { ox: sub.f.ox, oy: sub.f.oy } };
+      f = sub.f;
     } else {
       f = this.atlas.getFrameData(this.animName, Math.max(0, this.frameIndex) + (sub && sub.next ? 1 : 0));
     }
@@ -130,9 +131,10 @@ class AtlasGameObject {
     if (!this.isVisible) return;
     const f = this.atlas.getFrameData(this.animName, Math.max(0, this.frameIndex));
     if (!f) return;
+    // Centred on the original (untrimmed) frame size.
     ctx.drawImage(this.atlas.image, f.x, f.y, f.w, f.h,
-      Math.round(this.x - f.w / 2),
-      Math.round(this.y - f.h / 2),
+      Math.round(this.x - f.sw / 2) + f.tx,
+      Math.round(this.y - f.sh / 2) + f.ty,
       f.w, f.h);
   }
 
@@ -145,7 +147,7 @@ class AtlasGameObject {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(rotation);
-    ctx.drawImage(this.atlas.image, f.x, f.y, f.w, f.h, -f.w / 2 + offsetX, -f.h / 2 + offsetY, f.w, f.h);
+    ctx.drawImage(this.atlas.image, f.x, f.y, f.w, f.h, -f.sw / 2 + f.tx + offsetX, -f.sh / 2 + f.ty + offsetY, f.w, f.h);
     ctx.restore();
   }
 

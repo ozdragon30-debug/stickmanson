@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS = {
   // Video
   renderQuality:     'auto',   // auto | high | low
   wideScreen:        true,     // fill wide screens (side margins show the map only)
-  fpsLimit:          'off',    // off (monitor refresh rate) | 240 | 144 | 120 | 60 | 30
+  fpsLimit:          'auto',   // auto | unlimited | 240 | 144 | 120 | 60 | 30
   pixelArt:          false,    // nearest-neighbour sprite scaling
   modernFx:          true,     // shadows, glow, lights (render-only)
   smoothAnim:        true,     // 60 fps in-between drawings (render-only)
@@ -64,6 +64,8 @@ class SettingsManager {
     if (saved.cursorIndex       == null) DEFAULT_SETTINGS.cursorIndex       = Math.floor(Math.random() * 8);
     if (!saved.name)                     DEFAULT_SETTINGS.name              = 'Player' + Math.random().toString(36).slice(2, 5).toUpperCase();
 
+    // 'off' was the earlier default frame-rate mode; 'auto' replaces it.
+    if (saved.fpsLimit === 'off') saved.fpsLimit = 'auto';
     this.settings   = this._merge(saved);
     this.isFirstRun = !saved.name;
     this._isOpen    = false;
@@ -323,7 +325,8 @@ class SettingsManager {
         <div class="sar-sec">
           <label class="sar-lbl" for="sar-fps" data-i18n="set.fpsLimit">Frame rate limit</label>
           <select id="sar-fps" class="sar-select" data-setting="fpsLimit">
-            <option value="off" data-i18n="set.fpsLimit.off">Monitor refresh rate (unlimited)</option>
+            <option value="auto" data-i18n="set.fpsLimit.auto">Auto (refresh rate, steady 60 if the device can't keep up)</option>
+            <option value="unlimited" data-i18n="set.fpsLimit.off">Monitor refresh rate (unlimited)</option>
             <option value="240">240 FPS</option>
             <option value="144">144 FPS</option>
             <option value="120">120 FPS</option>

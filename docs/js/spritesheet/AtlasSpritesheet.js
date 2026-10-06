@@ -46,22 +46,34 @@ class AtlasSpritesheet {
     return this.animationMap[name] || null;
   }
 
-  // Returns { x, y, w, h, origin } for a given animation frame.
+  // Returns { x, y, w, h, origin, tx, ty, sw, sh } for a given animation frame.
   // origin is the single {ox, oy} anchor from set_origins (or a sensible default).
+  //
+  // Trimmed sheets (tools/trim-atlases.py) store only the opaque part of each
+  // frame: sw×sh is the original frame size and (tx, ty) where the stored
+  // pixels sat inside it. The origin is shifted to match, so drawing at
+  // -origin with w×h puts every pixel exactly where the untrimmed frame did.
+  // Results are cached: this runs several times per player per frame.
   getFrameData(animName, frameIndex) {
     const anim = this.animationMap[animName];
     if (!anim || !anim.frames.length) return null;
-    const key = anim.frames[Math.max(0, frameIndex) % anim.frames.length];
+    const i = Math.max(0, frameIndex) % anim.frames.length;
+    const cache = anim._fd || (anim._fd = []);
+    if (cache[i] !== undefined) return cache[i];
+    const key = anim.frames[i];
     const raw = this.frames[key];
-    if (!raw) return null;
+    if (!raw) return (cache[i] = null);
 
     // Support both {x,y,w,h} and {frame:{x,y,w,h}} formats
     const f = (raw.frame !== undefined) ? raw.frame : raw;
+    const tx = raw.tx || 0, ty = raw.ty || 0;
+    const sw = raw.sw || f.w, sh = raw.sh || f.h;
     const so = this.setOrigins[animName] || {};
     // Single origin — falls back to per-frame baked origin then center-bottom
-    const origin = (so.ox != null) ? so : (raw.origin || { ox: Math.round(f.w / 2), oy: Math.round(f.h * 0.95) });
+    const o = (so.ox != null) ? so : (raw.origin || { ox: Math.round(sw / 2), oy: Math.round(sh * 0.95) });
+    const origin = (tx || ty) ? { ox: o.ox - tx, oy: o.oy - ty } : o;
 
-    return { x: f.x, y: f.y, w: f.w, h: f.h, origin };
+    return (cache[i] = { x: f.x, y: f.y, w: f.w, h: f.h, origin, tx, ty, sw, sh });
   }
 
   // Returns tile frame {x,y,w,h} from the map atlas by 3-char tile key (e.g. "0B0").

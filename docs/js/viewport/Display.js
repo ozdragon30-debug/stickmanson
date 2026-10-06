@@ -21,8 +21,6 @@ class Display {
     this.extraX = 0;         // logical px of map-only margin on each side
     this.quality = 'auto';   // 'auto' | 'high' | 'low'
     this.dynamicCap = Infinity; // lowered by adaptive resolution on slow devices
-    this._frameTimeSum = 0;     // sum of frame times in the current window (ms)
-    this._frameSamples = 0;
     this.listeners = [];
 
     const onResize = () => this.resize();
@@ -104,22 +102,17 @@ class Display {
 
   onResize(fn) { this.listeners.push(fn); }
 
-  // Adaptive resolution ('auto' quality only): if frames keep taking longer
-  // than ~22 ms (< 45 fps) for a few seconds, step the render scale down.
+  // Adaptive resolution ('auto' quality only), driven by the frame pacer in
+  // game.js: one step down (2× → 1.5× → 1×). Returns false at the bottom.
   // It only ever steps down, so it can't oscillate.
-  reportFrame(ms) {
-    if (this.quality !== 'auto' || document.hidden || ms > 250) return;
-    this._frameSamples++;
-    this._frameTimeSum += ms;                          // accumulated frame time
-    if (this._frameSamples < 180) return;            // ~3 s window
-    const avg = this._frameTimeSum / this._frameSamples;
-    this._frameSamples = this._frameTimeSum = 0;
+  stepDown() {
+    if (this.quality !== 'auto') return false;
     const current = this._pixelRatio();
-    if (avg > 22 && current > 1) {
-      this.dynamicCap = Math.max(1, Math.round((current - 0.5) * 2) / 2);
-      console.info(`[Display] slow frames — render scale ${current}× → ${this.dynamicCap}×`);
-      this.resize();
-    }
+    if (current <= 1) return false;
+    this.dynamicCap = Math.max(1, Math.round((current - 0.5) * 2) / 2);
+    console.info(`[Display] missed frames — render scale ${current}× → ${this.dynamicCap}×`);
+    this.resize();
+    return true;
   }
 
   // Convert a pointer event's client coordinates into logical view coordinates.

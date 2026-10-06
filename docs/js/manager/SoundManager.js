@@ -88,9 +88,13 @@ class SoundManager {
     });
   }
 
+  // Two at a time: fetching and decoding ~60 files at once made the first
+  // seconds of play stutter on phones.
   preload(names) {
     if (!this._ensureContext()) return;
-    for (const n of names) this._load(n);
+    const queue = names.filter(n => this.buffers[n] === undefined);
+    const next = () => { const n = queue.shift(); if (n) this._load(n).then(next); };
+    next(); next();
   }
 
   // Gain/pan for a sound emitted at world position `pos` (null = non-positional).
