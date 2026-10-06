@@ -482,7 +482,7 @@ class BotManager {
     this._currentMap = file;
     // Determine initial status: if socket.io isn't even available we're fully offline;
     // if it is but hasn't connected yet we're still waiting to see.
-    this.status = (typeof io === 'undefined' || !socketManager.socket) ? 'no-server' : 'waiting';
+    this.status = socketManager.isConnected ? 'waiting' : 'no-server';
     // Weapon data must be ready before pickups are built from the map.
     Constants._weaponsReady.then(() => loadMap(file))
       .then((ok) => {
