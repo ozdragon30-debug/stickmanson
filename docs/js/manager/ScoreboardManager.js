@@ -67,7 +67,8 @@ class ScoreboardManager {
       ctx.fillStyle = '#aaccee';
       ctx.font = '11px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`${rank}${suffix} / ${total}`, VIEW_W / 2, 43);
+      const ordinal = i18n.lang === 'tr' ? `${rank}.` : `${rank}${suffix}`; // Turkish: "2."
+      ctx.fillText(`${ordinal} / ${total}`, VIEW_W / 2, 43);
     }
 
     if (this.isVisible) {
