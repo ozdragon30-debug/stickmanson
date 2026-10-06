@@ -150,6 +150,11 @@ class SettingsManager {
     const nameEl = this._panel.querySelector('#sar-name');
     if (nameEl.value.trim() && nameEl.value.trim() !== this.settings.name) this.setName(nameEl.value);
     this._applyToPlayer();
+    // Keep the main menu's name field in sync (it would otherwise push the old name back on Play).
+    if (typeof menu !== 'undefined' && menu.nameEl) menu.syncName();
+    // Don't leave keyboard focus on a settings control / the gear button:
+    // game keys are ignored while a button has focus.
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
   }
 
   _applyToPlayer() {
@@ -363,6 +368,7 @@ class SettingsManager {
     gear.textContent = '⚙';
     gear.title = 'Settings [Esc]';
     gear.setAttribute('aria-label', 'Settings');
+    gear.tabIndex = -1;
     gear.addEventListener('mousedown', e => e.stopPropagation());
     gear.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
     gear.addEventListener('click', () => this.toggle());

@@ -20,3 +20,8 @@ test('service worker precache list matches the files on disk (run: npm run preca
   const onDisk = require('../docs/precache.json');
   assert.deepStrictEqual(onDisk.files, build().files);
 });
+
+test('map name index matches the map files (run: npm run maps)', () => {
+  const { build } = require('../tools/gen-map-index');
+  assert.deepStrictEqual(require('../docs/data/maps/index.json'), build());
+});

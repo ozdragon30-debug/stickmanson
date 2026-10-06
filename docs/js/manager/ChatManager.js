@@ -22,6 +22,7 @@ class ChatManager {
     el.setAttribute('aria-label', 'Chat message');
     el.setAttribute('enterkeyhint', 'send');
     el.className = 'chat-input';
+    el.tabIndex = -1; // not reachable with Tab while chat is closed
     el.addEventListener('keydown', e => {
       e.stopPropagation();
       if (e.key === 'Enter' && !e.isComposing) {
@@ -105,12 +106,13 @@ class ChatManager {
 
   addMessage(name, text, hue = null) {
     if (name && this.muted.has(String(name).toLowerCase())) return;
+    const system = name === 'Server' || name === '[Admin]' || name === '?';
     // System lines from the (English) server are translated client-side.
     if ((name === 'Server' || name === '[Admin]') && typeof i18n !== 'undefined') {
       text = i18n.chat(text);
       if (name === 'Server') name = t('chat.server');
     }
-    this.messages.push({ name, text, hue, timestamp: Date.now() });
+    this.messages.push({ name, text, hue, system, timestamp: Date.now() });
     if (this.messages.length > this.maxMessages) {
       this.messages.shift();
     }
@@ -140,7 +142,7 @@ class ChatManager {
       if (alpha <= 0) return;
 
       const myId = (typeof socketManager !== 'undefined') ? socketManager.socket?.id : null;
-      const isMe = (typeof playerManager !== 'undefined') && playerManager.mainPlayer?.name === msg.name;
+      const isMe = !msg.system && (typeof playerManager !== 'undefined') && playerManager.mainPlayer?.name === msg.name;
       const displayName = isMe ? t('hud.you') : msg.name;
 
       // Derive spinner-matching color from hue (sepia+saturate+hue-rotate produces ~hsl(H+36, 80%, 50%))

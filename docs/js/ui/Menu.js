@@ -16,7 +16,7 @@ class Menu {
     // ?play skips the menu (handy for kiosks / testing).
     if (new URLSearchParams(location.search).has('play')) this._hide();
 
-    this.nameEl.value = settingsManager.name;
+    this.syncName();
     this.nameEl.addEventListener('keydown', e => {
       e.stopPropagation();
       if (e.key === 'Enter') this.play();
@@ -115,7 +115,7 @@ class Menu {
     sel.appendChild(random);
     for (const [g, files] of Object.entries(groups)) {
       const og = document.createElement('optgroup');
-      og.label = g === '' ? 'Stick Arena' : g === 'feature/' ? 'Featured' : 'Ballistick';
+      og.label = g === '' ? 'Stick Arena' : g === 'feature/' ? t('menu.map.featured') : 'Ballistick';
       for (const f of files.sort()) {
         const o = document.createElement('option');
         o.value = f;
@@ -125,6 +125,18 @@ class Menu {
       sel.appendChild(og);
     }
     sel.addEventListener('keydown', e => e.stopPropagation());
+    // Replace file-name labels with the real map names once the index loads.
+    fetch('data/maps/index.json').then(r => r.json()).then(names => {
+      for (const o of sel.querySelectorAll('option[value]')) {
+        if (o.value && names[o.value]) o.textContent = splitMapName(names[o.value]).title;
+      }
+    }).catch(() => {});
+  }
+
+  // Show the current name; Play only pushes a name the user actually edited here.
+  syncName() {
+    this.nameEl.value = settingsManager.name;
+    this._shownName = settingsManager.name;
   }
 
   play() {
@@ -136,7 +148,7 @@ class Menu {
       botManager.startOfflineRound(picked);
     }
     const name = this.nameEl.value.trim();
-    if (name && name !== settingsManager.name) settingsManager.setName(name);
+    if (name && name !== this._shownName && name !== settingsManager.name) settingsManager.setName(name);
     soundManager._ensureContext();
     this._hide();
     if (typeof map !== 'undefined' && map.ready) hudManager.showMapTitle(map.name);
@@ -181,7 +193,7 @@ class Menu {
   open() {
     this.isOpen = true;
     if (document.getElementById('menu-stats').open) this._renderStats();
-    this.nameEl.value = settingsManager.name;
+    this.syncName();
     this.el.classList.add('open');
     if (typeof onBlurHandler === 'function') onBlurHandler();
     if (typeof reportAfk === 'function') reportAfk(true);
@@ -268,7 +280,8 @@ class Menu {
 
   _renderRoom(force = false) {
     const online = socketManager.isConnected;
-    this.roomEl.hidden = !online && !socketManager.room;
+    // No game server at all (static build): rooms are meaningless.
+    this.roomEl.hidden = !socketManager.socket || (!online && !socketManager.room);
     if (this.roomEl.hidden) return;
     const label = socketManager.room
       ? t('menu.room.private', { code: socketManager.room })

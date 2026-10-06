@@ -132,7 +132,7 @@ class ScoreboardManager {
     ctx.font = '900 24px system-ui, sans-serif';
     ctx.fillText(this.roundEndActive ? t('sb.over') : t('sb.title'), VIEW_W / 2, py + 38);
 
-    const mapName = (typeof map !== 'undefined' && map.ready && map.name) ? map.name : '';
+    const mapName = (typeof map !== 'undefined' && map.ready && map.name) ? mapLabelLocal(map.name) : '';
     const remaining = this.getRemainingTime();
     const timeTxt = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
     let sub = mapName;

@@ -294,6 +294,8 @@ settingsManager.onChange((key, value) => {
     i18n.setLanguage(value);
     if (menu._ready) menu.playBtn.textContent = t('menu.play');
     menu._renderRecentRooms();
+    const groups = document.querySelectorAll('#menu-map-select optgroup');
+    if (groups[1]) groups[1].label = t('menu.map.featured');
     if (settingsManager.isOpen()) settingsManager._refresh();
   }
 });

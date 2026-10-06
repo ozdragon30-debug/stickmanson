@@ -32,6 +32,10 @@ socketManager.on("newPlayer", (data) => {
 
 socketManager.on("playerDisconnected", (playerId) => {
   playerManager.removePlayer(playerId);
+  // The last other player left mid-round: bring the bots back right away
+  // instead of leaving an empty arena until the next round.
+  const humans = Object.keys(playerManager.getPlayers()).filter(id => !botManager.isBot(id));
+  if (!humans.length && !botManager.active && map.ready && playerManager.mainPlayer) botManager.considerSpawning({});
 });
 
 socketManager.on("playWalkingAnimation", (data) => {

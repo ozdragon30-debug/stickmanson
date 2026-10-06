@@ -33,6 +33,7 @@ const I18N = {
     'menu.iosInstall': 'Tap the Share button, then "Add to Home Screen" to install Stick Arena.',
     'menu.recent': 'Recent rooms:',
     'menu.server.connect': 'Connect', 'menu.server.hint': 'Game server address, e.g. https://stick.example.com',
+    'menu.map.featured': 'Featured',
     'menu.map': 'Map (offline)', 'menu.map.random': '🎲 Random rotation',
     'stats.kills': 'Kills', 'stats.deaths': 'Deaths', 'stats.kd': 'K/D ratio', 'stats.wins': 'Rounds won',
     'stats.streak': 'Best kill streak', 'stats.weapon': 'Favourite weapon', 'stats.time': 'Time played',
@@ -108,6 +109,7 @@ const I18N = {
     'menu.iosInstall': 'Yüklemek için Paylaş düğmesine, ardından "Ana Ekrana Ekle"ye dokun.',
     'menu.recent': 'Son odalar:',
     'menu.server.connect': 'Bağlan', 'menu.server.hint': 'Oyun sunucusu adresi, örn. https://stick.example.com',
+    'menu.map.featured': 'Öne çıkanlar',
     'menu.map': 'Harita (çevrimdışı)', 'menu.map.random': '🎲 Rastgele sıra',
     'stats.kills': 'Leş', 'stats.deaths': 'Ölüm', 'stats.kd': 'L/Ö oranı', 'stats.wins': 'Kazanılan tur',
     'stats.streak': 'En iyi seri', 'stats.weapon': 'Favori silah', 'stats.time': 'Oynama süresi',
@@ -161,7 +163,14 @@ const I18N_CHAT_TR = [
   [/^(.+) joined the game\.$/, '$1 oyuna katıldı.'],
   [/^(.+) left the game\.$/, '$1 oyundan ayrıldı.'],
   [/^Round over! Next round starting in (\d+(?:\.\d+)?) seconds\.\.\.$/, 'Tur bitti! Yeni tur $1 saniye içinde başlıyor...'],
+  [/^Round started on (.+?) \(by (.+)\)!$/, 'Tur başladı: $1 (yapan: $2)!'],
   [/^Round started on (.+)!$/, 'Tur başladı: $1!'],
+  [/^(.+) is now known as (.+)\.$/, '$1 artık $2 olarak biliniyor.'],
+  [/^No player named "(.+)"\.$/, '"$1" adında oyuncu yok.'],
+  [/^Debug map ON .*$/, 'Debug haritası AÇIK — yeni tur başlıyor...'],
+  [/^Debug map OFF .*$/, 'Debug haritası KAPALI — yeni tur başlıyor...'],
+  [/^You have been removed from the server\.$/, 'Sunucudan çıkarıldın.'],
+  [/^Too many connections from your address\.$/, 'Adresinden çok fazla bağlantı var.'],
   [/^Waiting for other players, playing against bots\.$/, 'Diğer oyuncular bekleniyor, botlara karşı oynanıyor.'],
   [/^No connection to the server, playing against bots\.$/, 'Sunucu bağlantısı yok, botlara karşı oynanıyor.'],
   [/^No server found — playing offline with bots\.$/, 'Sunucu bulunamadı — botlarla çevrimdışı oynanıyor.'],
@@ -211,6 +220,21 @@ const i18n = {
     return text;
   },
 };
+
+// "Paris Streets (by Warjag)" → { title: 'Paris Streets', author: 'Warjag' };
+// all-lowercase names are title-cased.
+function splitMapName(name) {
+  const m = /^(.*?)\s*\(by (.+)\)\s*$/.exec(name || '');
+  let title = m ? m[1] : (name || '');
+  if (title && !/[A-Z]/.test(title)) title = title.replace(/(^|\s)\S/g, c => c.toUpperCase());
+  return { title, author: m ? m[2] : null };
+}
+
+// Localised one-line map label: "Paris Streets · by Warjag" / "… · yapan: Warjag".
+function mapLabelLocal(name) {
+  const { title, author } = splitMapName(name);
+  return author ? `${title} · ${t('hud.mapBy', { name: author })}` : title;
+}
 
 function t(key, vars) {
   const s = (I18N[i18n.lang] && I18N[i18n.lang][key]) ?? I18N.en[key] ?? key;

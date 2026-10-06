@@ -289,14 +289,15 @@ io.on("connection", (socket) => {
   socket.to(room.id).emit("newPlayer", { playerId: socket.id, name: p.name });
   room.emit("scoreUpdate", { scores: room.getScores() });
 
-  // Announce the join once the client has sent its chosen name (or after a
-  // short grace period), instead of announcing the placeholder "Player xxxx".
+  // Announce the join when the player actually enters the game (first
+  // playerStatus {afk:false}, i.e. Play pressed — by then the name typed in the
+  // menu has been sent), with a fallback for clients that never report it.
   const announceJoin = () => {
     if (socket.data.announced || !players[socket.id]) return;
     socket.data.announced = true;
     room.emit("chatMessage", { name: 'Server', text: `${players[socket.id].name} joined the game.` });
   };
-  setTimeout(announceJoin, 2000);
+  setTimeout(announceJoin, 30000);
 
   // Round-trip latency probe used by the client's ping display.
   socket.on("latency", (_t, ack) => { if (typeof ack === 'function') ack(); });
@@ -386,6 +387,7 @@ io.on("connection", (socket) => {
   socket.on("playerStatus", (data) => {
     if (!players[socket.id] || !data) return;
     const afk = data.afk === true;
+    if (!afk) announceJoin();
     if (players[socket.id].afk === afk) return;
     players[socket.id].afk = afk;
     const broadcast = () => {
@@ -537,7 +539,11 @@ io.on("connection", (socket) => {
   socket.on("setName", (data) => {
     if (!players[socket.id] || !data) return;
     let name = cleanText(data.name, 20);
-    if (!name || RESERVED_NAMES.test(name)) return;
+    if (!name || RESERVED_NAMES.test(name)) {
+      // Tell the client which name it really has, so it doesn't show "Server" locally.
+      socket.emit('nameAssigned', { name: players[socket.id].name });
+      return;
+    }
     if (name !== players[socket.id].name && !allow(socket, 'nameBucket', 5, 10000)) return;
     // Names are unique within a room (chat "you" detection and !kick rely on it).
     const taken = n => Object.entries(players).some(([id, pl]) => id !== socket.id && pl.name.toLowerCase() === n.toLowerCase());
@@ -547,11 +553,12 @@ io.on("connection", (socket) => {
       name = candidate;
       socket.emit('nameAssigned', { name });
     }
-    if (name === players[socket.id].name) { announceJoin(); return; }
+    if (name === players[socket.id].name) return;
+    const previous = players[socket.id].name;
     players[socket.id].name = name;
     socket.to(room.id).emit("playerNameChanged", { playerId: socket.id, name });
     room.emit("scoreUpdate", { scores: room.getScores() });
-    announceJoin();
+    if (socket.data.announced) room.emit("chatMessage", { name: 'Server', text: `${previous} is now known as ${name}.` });
   });
 });
 

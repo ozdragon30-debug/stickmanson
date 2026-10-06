@@ -87,7 +87,10 @@ function keyDownHandler(event) {
   // Menus and focused form controls (Play button, name field…) keep their keys.
   if (typeof menu !== 'undefined' && menu.isOpen) return;
   const tag = event.target && event.target.tagName;
-  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+  // A focused button only keeps keys while a menu is actually open.
+  if (tag === 'BUTTON' && isUiBlocking()) return;
+  if (tag === 'BUTTON') event.target.blur();
 
   // Settings panel handles Escape via capture phase; suppress game input while open.
   if (settingsManager.isOpen()) return;

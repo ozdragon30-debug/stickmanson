@@ -4,8 +4,14 @@
 
 const DEBUG_MAP_FILE = 'debug.dat';
 
-// Convert a map filename like 'anarchystreets.dat' to 'Anarchystreets'.
+// Real map names ("Anarchy Streets (by Bloodsyn)") from docs/data/maps/index.json.
+let MAP_NAMES = {};
+try { MAP_NAMES = require('../docs/data/maps/index.json'); } catch (e) { /* fall back to file names */ }
+
+// Map title for chat; all-lowercase names are title-cased.
 function mapDisplayName(filename) {
+  const raw = MAP_NAMES[filename];
+  if (raw) return /[A-Z]/.test(raw) ? raw : raw.replace(/\b\w/g, c => c.toUpperCase());
   return filename.replace(/^_+/, '').replace(/\.dat$/i, '')
     .replace(/^./, c => c.toUpperCase());
 }

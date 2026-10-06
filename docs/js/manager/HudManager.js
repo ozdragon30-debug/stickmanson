@@ -68,8 +68,8 @@ class HudManager {
   // "Facility (by Someone)" → big map title with the author underneath.
   showMapTitle(name) {
     if (!name) return;
-    const m = /^(.*?)\s*\(by (.+)\)\s*$/.exec(name);
-    this.flash(m ? m[1] : name, m ? t('hud.mapBy', { name: m[2] }) : null, '#cfe3f7', 2600);
+    const { title, author } = splitMapName(name);
+    this.flash(title, author ? t('hud.mapBy', { name: author }) : null, '#cfe3f7', 2600);
     if (this.centerMsg) this.centerMsg.subColor = '#8fa6bf';
   }
 
