@@ -17,6 +17,10 @@ collision and line of sight on every map).
   original 8 directions.
 - Installable PWA with full offline play (service worker precaches the game).
 - Screen wake lock and a portrait-mode hint on phones.
+- Readable HUD on phones: health, timer, kill feed, chat, scoreboard, name
+  tags and touch sticks scale up around their screen anchors (the world view
+  is untouched; desktop is pixel-identical).
+- Gamepad navigation of the menu and settings (D-pad, A, B, ←/→).
 
 ### Interface
 - Start menu (name, server status, rooms, stats, controls, about).
@@ -30,7 +34,9 @@ collision and line of sight on every map).
 - Lifetime stats (kills, K/D, wins, best streak, favourite weapon, time).
 - Offline map picker; touch quick-chat phrases; left-handed touch layout;
   AFK 💤 marker for players in the menu; tab-title alert when someone joins;
-  settings button fades while the mouse is idle; reduced-motion support.
+  settings button fades while the mouse is idle; reduced-motion support;
+  client-side chat mute (`!mute`); first-game controls hint; recent rooms;
+  'connect to server' field for static builds; iOS install help.
 
 ### Multiplayer
 - Private rooms with invite links (`?room=code`).
@@ -41,6 +47,8 @@ collision and line of sight on every map).
   monitor refresh rate (240 Hz monitors used to flood the server).
 - Reconnects replace your old socket immediately (no ghost copy, no lock-out
   from a full room), restore your name/colour and leave no ghost players.
+- Unique player names per room; AFK marker; `/status` page for hosts;
+  `docker compose up` with persisted bans.
 
 ### Audio
 - Web Audio (decoded once, low latency), volume, mute (M), optional
@@ -78,6 +86,8 @@ collision and line of sight on every map).
   load could leave a player dead forever.
 - Reconnecting left ghost players / a frozen copy of yourself.
 - Offline chat messages vanished; every hit requested a missing sound file.
+- Any runtime exception stopped the game loop for good; it now recovers.
+- Out-of-order map loads could leave the world on the wrong map.
 
 ### Security
 - Fixed: spoofed `X-Forwarded-For` granted admin; `?server=` script

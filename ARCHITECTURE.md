@@ -63,7 +63,7 @@ relays and validates.
 | `iDied {killerId, weaponId}` | `playerDied {playerId, killerId, weaponId}`, `scoreUpdate` |
 | `playerRespawn {position}` | `playerMoved` |
 | `mapLoaded {weaponSpawns}` / `pickupWeapon {spawnIndex}` | `pickupState` / `pickupTaken` |
-| `setName`, `playerIdentity`, `playerStatus {afk}` | `playerNameChanged`, `playerIdentityUpdate`, `playerStatus` |
+| `setName`, `playerIdentity`, `playerStatus {afk}` | `playerNameChanged`, `nameAssigned` (room-unique suffix), `playerIdentityUpdate`, `playerStatus` |
 | `chatMessage {text}` | `chatMessage {name, hue, text}` |
 | `latency` (ack) | — |
 | — | `currentPlayers`, `gameState`, `newPlayer`, `playerDisconnected`, `roundEnd`, `roundStart`, `forceWeapon`, `kicked` |
