@@ -1,0 +1,15 @@
+# docker compose up -d   →   http://localhost:1138
+services:
+  stick-arena:
+    build: .
+    ports:
+      - "1138:1138"
+    environment:
+      # ADMIN_PASSWORD: change-me      # enables "!login <password>" in chat
+      # TRUST_PROXY: "1"               # set when running behind a reverse proxy
+      BANS_FILE: /data/bans.json
+    volumes:
+      - stick-arena-data:/data
+    restart: unless-stopped
+volumes:
+  stick-arena-data:

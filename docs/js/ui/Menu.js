@@ -69,6 +69,9 @@ class Menu {
     });
     serverInput.addEventListener('input', () => serverInput.setCustomValidity(''));
 
+    this._rememberRoom();
+    this._renderRecentRooms();
+
     this.roomEl = document.getElementById('menu-room');
     this.roomLabel = document.getElementById('menu-room-label');
     this.roomBtn = document.getElementById('menu-room-btn');
@@ -194,6 +197,37 @@ class Menu {
     }
     if (socketManager.socket && !botManager.active) return `<span class="dot"></span>${t('menu.status.connecting')}`;
     return `<span class="dot offline"></span>${t('menu.status.offline')}`;
+  }
+
+  // Recently joined private rooms (most recent first, max 3) for quick rejoin.
+  _recentRooms() {
+    try { return JSON.parse(localStorage.getItem('sar_rooms') || '[]').filter(r => /^[a-z0-9][a-z0-9-]{0,23}$/.test(r)); }
+    catch (e) { return []; }
+  }
+
+  _rememberRoom() {
+    if (!socketManager.room) return;
+    const list = [socketManager.room, ...this._recentRooms().filter(r => r !== socketManager.room)].slice(0, 3);
+    try { localStorage.setItem('sar_rooms', JSON.stringify(list)); } catch (e) {}
+  }
+
+  _renderRecentRooms() {
+    const el = document.getElementById('menu-recent');
+    const others = this._recentRooms().filter(r => r !== socketManager.room);
+    el.hidden = !others.length || !socketManager.socket;
+    if (el.hidden) return;
+    el.textContent = '';
+    const label = document.createElement('span');
+    label.textContent = t('menu.recent');
+    el.appendChild(label);
+    for (const code of others) {
+      const a = document.createElement('a');
+      const url = new URL(location.href);
+      url.searchParams.set('room', code);
+      a.href = url.toString();
+      a.textContent = code;
+      el.appendChild(a);
+    }
   }
 
   _renderStats() {

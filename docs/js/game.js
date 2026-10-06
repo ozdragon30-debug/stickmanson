@@ -293,6 +293,7 @@ settingsManager.onChange((key, value) => {
   else if (key === 'language') {
     i18n.setLanguage(value);
     if (menu._ready) menu.playBtn.textContent = t('menu.play');
+    menu._renderRecentRooms();
     if (settingsManager.isOpen()) settingsManager._refresh();
   }
 });

@@ -46,8 +46,7 @@ npm start            # http://localhost:1138
 Or with Docker:
 
 ```bash
-docker build -t stick-arena .
-docker run -p 1138:1138 stick-arena
+docker compose up -d        # or: docker build -t stick-arena . && docker run -p 1138:1138 stick-arena
 ```
 
 Players open `http://your-server:1138` and join the public room automatically. The static build (e.g. GitHub Pages) can also play online against any server: `https://<user>.github.io/<repo>/?server=https://your-server.example`. "Create private room" in the menu makes an invite link like `http://your-server:1138/?room=k3x9pq`; each room has its own map rotation, rounds and scores.

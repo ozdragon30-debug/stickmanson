@@ -255,6 +255,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .menu-room[hidden], .menu-map[hidden] { display: none; }
 .menu-map { margin: -4px 0 12px; }
 .menu-server { display: flex; gap: 8px; margin: -4px 0 12px; }
+.menu-recent { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: -4px 0 12px; font-size: 12px; color: var(--muted); }
+.menu-recent[hidden] { display: none; }
+.menu-recent a { color: #cfe3f7; font-family: var(--mono); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+.menu-recent a:hover, .menu-recent a:focus-visible { border-color: var(--accent); color: #fff; }
 .menu-server[hidden] { display: none; }
 .menu-server .sar-text { flex: 1; min-width: 0; }
 .menu-room b { color: #fff; font-family: var(--mono); letter-spacing: .05em; }
