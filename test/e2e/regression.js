@@ -18,7 +18,7 @@ const os = require('os');
 const path = require('path');
 const http = require('http');
 const assert = require('node:assert');
-/* global __step */
+/* global __step, __fakeTimers, __reseed */
 const { chromium } = require('playwright');
 
 const BASE = process.env.BASE || '9948cb8';
@@ -162,7 +162,7 @@ async function run(url) {
       __reseed(4321);
       const me = playerManager.mainPlayer;
       me.forceRespawn([map.spawnPoints[0]]);
-      const rec = [], shots = [];
+      const rec = [];
       if (!Player.prototype.__counted) {
         const sh = Player.prototype.shoot;
         Player.prototype.shoot = function (...a) { (window.__shots = window.__shots || []).push([this.name, performance.now()]); return sh.apply(this, a); };
