@@ -101,8 +101,8 @@ class Physics {
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist > maxRange) return false;
     let angleDiff = Math.atan2(dy, dx) - rotation;
-    // Normalise to [-π, π]
-    angleDiff = ((angleDiff + Math.PI) % (2 * Math.PI)) - Math.PI;
+    // Normalise to [-π, π] (the old `%` form missed half the arc when facing west).
+    angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
     return Math.abs(angleDiff) <= (spreadAngle * Math.PI / 180) / 2;
   }
 
@@ -112,8 +112,9 @@ class Physics {
     const yDistance = targetPlayerPos.y - playerPos.y;
     const totalDistance = Math.sqrt(xDistance ** 2 + yDistance ** 2);
 
-    // Calculate number of tiles between players
-    const numTiles = totalDistance / 50;
+    // Sample every 10 px up to and including the target (sampling once per
+    // 50 px let shots slip through wall corners and thin walls).
+    const numTiles = totalDistance / 10;
 
     // Calculate x and y increments for each tile
     const xIncrement = xDistance / numTiles;
@@ -124,7 +125,7 @@ class Physics {
     let currentY = playerPos.y;
 
     // Iterate through tiles between players
-    for (let i = 0; i < numTiles; i++) {
+    for (let i = 0; i <= numTiles; i++) {
       // Convert current position to tile index
       const tileX = Math.floor(currentX / 50);
       const tileY = Math.floor(currentY / 50);

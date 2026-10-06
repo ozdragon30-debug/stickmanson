@@ -17,6 +17,7 @@ class PlayerManager {
 
     this.mainPlayer = new Player(x, y);
     this.mainPlayer.isMainPlayer = true;
+    this.mainPlayer.health = this.mainPlayer.maxHealth();   // shop health perks count from the first life
     this.mainPlayer.healthbarHeart = new AtlasGameObject(heartbeatAtlas, 'heartbeat_healthy', 30, 25);
 
     // Apply persisted settings (name, spinner appearance).

@@ -13,7 +13,7 @@
 
 class Bot {
   // Weapon IDs in weapons.json that are melee (aggressive close-range behaviour).
-  static MELEE_IDS = new Set([0, 1, 6, 8, 9, 11]);
+  static MELEE_IDS = new Set([0, 1, 6, 8, 9, 11, 12]);  // + tesla helmet (75 px aura)
 
   /**
    * @param {string} id         Unique key used in playerManager (e.g. 'bot_0').
@@ -158,7 +158,10 @@ class Bot {
       this._reactionTimer = 0;
       this._hasReacted    = false;
     }
-    const target = (rawTarget && this._hasReacted && !isUnarmed) ? rawTarget : null;
+    // Unarmed bots still fight back when someone is right on them or just hit them.
+    const provoked = rawTarget && (performance.now() - (p._hitFxAt || -1e9) < 3000 ||
+      this._dist(myPos, rawTarget.getPosition()) < 120);
+    const target = (rawTarget && this._hasReacted && (!isUnarmed || provoked)) ? rawTarget : null;
 
     if (target) {
       const tp   = target.getPosition();
@@ -174,9 +177,9 @@ class Bot {
       p.body.setRotation(this._currentAngle + (90 * Constants.TO_RADIANS));
 
       if (!hesitating) {
-        if (this.isMelee) {
-          // Use pathfinding to chase target, recalculating periodically to handle moving targets
-          this._updateTargetPursuit(target, myPos, map);
+        if (this.isMelee || dist > hitRange * 0.85) {
+          // Melee, or a gun that can't reach yet: chase (pathfinding, refreshed as the target moves).
+          this._updateTargetPursuit(target, myPos, map, dt);
           this._moveAlongTargetPath(dt);
         } else {
           // Ranged bot: focus on maintaining line of sight using pathfinding
@@ -188,7 +191,7 @@ class Bot {
           
           if (!hasLineOfSight) {
             // No line of sight - use pathfinding to move toward target to find a vantage point
-            this._updateTargetPursuit(target, myPos, map);
+            this._updateTargetPursuit(target, myPos, map, dt);
             this._moveAlongTargetPath(dt);
           } else if (withinRetreatingDistance) {
             // Target is dangerously close - use pathfinding to back away
@@ -198,7 +201,7 @@ class Bot {
               x: myPos.x - (dx / dist) * backAwayDist,
               y: myPos.y - (dy / dist) * backAwayDist
             };
-            this._updateTargetRetreat(backAwayPoint, myPos, map);
+            this._updateTargetRetreat(backAwayPoint, myPos, map, dt);
             this._moveAlongTargetPath(dt);
           } else {
             // Target is at good distance: hold position and clear any retreat path
@@ -308,9 +311,17 @@ class Bot {
   }
 
   /** Fire the current weapon and apply damage to the target locally. */
+  // Damage only lands if the shot's real hit shape (from where the bot is
+  // actually facing) reaches the target, the same test players get.
   _tryShoot(target) {
     this.player.shoot();
-    botManager._applyDamage(this, target);
+    const shape = this.player.currentWeapon?.hitShape ?? { type: 'cone', maxRange: 50, spreadAngle: 80 };
+    const from = this.player.getPosition(), to = target.getPosition(), rot = this._currentAngle;
+    let hit;
+    if (shape.type === 'ray') hit = Physics.isRayHit(from, to, rot, shape.maxRange);
+    else if (shape.type === 'circle') hit = Physics.isCircleHit(from, to, shape.maxRange);
+    else hit = Physics.isConeHit(from, to, rot, shape.maxRange, shape.spreadAngle ?? 80);
+    if (hit && !Physics.checkForObstacles(from, to)) botManager._applyDamage(this, target);
   }
 
   /** Walk over pickups and collect them via the shared PickupManager pipeline. */
@@ -330,8 +341,17 @@ class Bot {
   _handleStuck(dt, myPos) {
     const moved = this._dist(myPos, this._lastPos);
     this._lastPos = { x: myPos.x, y: myPos.y };
+    // Judged over ~0.3 s windows so it works the same at 60, 120 or 240 fps
+    // (per-frame distance at high refresh rates looked "stuck" every frame).
+    this._stuckAcc = (this._stuckAcc || 0) + moved;
+    this._stuckWin = (this._stuckWin || 0) + dt;
+    if (this._stuckWin >= 0.3) {
+      const expected = Constants.SPEED * (this.player.currentWeapon?.walkSpeed ?? 1) * this._stuckWin;
+      this._isStuck = this._stuckAcc < expected * 0.15;
+      this._stuckAcc = 0; this._stuckWin = 0;
+    }
 
-    if (moved < 1.5) {
+    if (this._isStuck) {
       this._stuckTimer += dt;
       if (this._stuckTimer > 1.0) {
         this._stuckEscapeAngle = Math.random() * Math.PI * 2;
@@ -501,8 +521,8 @@ class Bot {
    * Update pursuit path to target: periodically recalculate the path to the target's current position
    * using A* to navigate around obstacles. This is mainly used for melee bots.
    */
-  _updateTargetPursuit(targetPlayer, myPos, mapObj) {
-    this._targetPathRefreshTimer += 1 / 60; // Approximate dt (assuming 60 FPS)
+  _updateTargetPursuit(targetPlayer, myPos, mapObj, dt = 1 / 60) {
+    this._targetPathRefreshTimer += dt;
 
     // Recalculate path periodically to handle moving targets
     if (this._targetPathRefreshTimer >= this._targetPathRefreshInterval) {
@@ -564,8 +584,8 @@ class Bot {
    * Update retreat path to a destination point: calculates path using A* to navigate
    * around obstacles while retreating. Used by ranged bots when too close to enemies.
    */
-  _updateTargetRetreat(retreatPoint, myPos, mapObj) {
-    this._targetPathRefreshTimer += 1 / 60; // Approximate dt (assuming 60 FPS)
+  _updateTargetRetreat(retreatPoint, myPos, mapObj, dt = 1 / 60) {
+    this._targetPathRefreshTimer += dt;
 
     // Recalculate path periodically to handle dynamic retreat
     if (this._targetPathRefreshTimer >= this._targetPathRefreshInterval) {

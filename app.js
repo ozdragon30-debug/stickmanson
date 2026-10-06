@@ -389,6 +389,9 @@ io.on("connection", (socket) => {
     if (typeof victimId !== 'string' || !Object.hasOwn(players, victimId) || victimId === socket.id) return;
     if (game.phase !== 'playing') return;
     if (!validWeaponId(weaponId)) return;
+    // Only the weapon the server knows this player holds (pickups, deaths and
+    // round resets are tracked here) can deal damage.
+    if (weaponId !== (players[socket.id].weaponId ?? 0)) return;
     const weapon = weaponsData[weaponId];
 
     // Token bucket per victim: refills one hit per weapon cooldown, holds two,
@@ -426,6 +429,8 @@ io.on("connection", (socket) => {
       playerId:  socket.id,
       playerPos: pos
     });
+    // Others show the corpse until this arrives, so everyone sees the respawn at the same moment.
+    socket.to(room.id).emit("playerRespawned", { playerId: socket.id, playerPos: pos });
   });
 
   // AFK flag (menu open / tab hidden) — purely informational for other players.
@@ -492,7 +497,11 @@ io.on("connection", (socket) => {
     const { spawnIndex } = data;
     if (!Number.isInteger(spawnIndex)) return;
     const pickup = game.pickups[spawnIndex];
-    if (!pickup || !pickup.available) return;
+    if (!pickup || !pickup.available) {
+      // Someone else got it first: tell this client to put its old weapon back.
+      socket.emit("pickupRejected", { spawnIndex, weaponId: players[socket.id].weaponId ?? 0 });
+      return;
+    }
 
     pickup.available = false;
     pickup.respawnAt = Date.now() + pickup.respawnTime;

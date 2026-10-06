@@ -190,6 +190,9 @@ class SettingsManager {
   // Sync only spinner identity (hue + shape) without touching the name.
   _syncIdentity() {
     if (typeof playerManager === 'undefined' || !playerManager.mainPlayer) return;
+    // Perks changed: never keep health above the new maximum.
+    const me = playerManager.mainPlayer;
+    if (!me.isRespawning) me.health = Math.min(me.health, me.maxHealth());
     playerManager.mainPlayer.indicatorHue        = this.settings.spinnerHue;
     playerManager.mainPlayer.indicatorShapeIndex = this.settings.spinnerShapeIndex;
     if (typeof socketManager !== 'undefined') {

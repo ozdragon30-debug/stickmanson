@@ -2,6 +2,25 @@
 
 ## 2026 modernisation
 
+### Gameplay fixes
+
+- Online: a killed player stays a corpse on everyone's screen until their
+  own client respawns them (no more invisible attackers or hittable ghosts).
+- Melee/cone weapons no longer miss half their arc when aiming west.
+- Line of sight is checked every 10 px: shots and bots no longer see or hit
+  through wall corners and thin walls.
+- Bots: damage only lands when their real shot would hit (they can miss
+  now), they close in when out of range, fight back with fists when
+  provoked, behave the same at 60–240 Hz, tesla bots get close; bot count
+  scales with map size (3–6).
+- Bot matches pause behind menus also when connected to an empty server;
+  bots freeze while a map loads and on the server's round-end screen.
+- Coins: rounds cut short (e.g. `!next`) pay nothing; a win needs a strict
+  lead. Health perks apply from the first life, swapping perks clamps
+  health, pet regeneration stops behind menus and updates the heart.
+- Server: hits only count with the weapon the server knows the player holds;
+  a pickup someone else got first is rejected and the old weapon restored.
+
 ### Stick Clash: new name, logo, sounds, pets and VIP
 
 - The game is now called **Stick Clash**, with a new logo and app icon.

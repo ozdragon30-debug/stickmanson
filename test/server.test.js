@@ -75,8 +75,14 @@ test('hits use canonical weapon damage and reject self/bogus hits', async () => 
   const b = await connect();
   await new Promise(r => setTimeout(r, 100));
 
+  // A hit with a weapon the server doesn't think the attacker holds is dropped.
+  let got = next(b, 'playerGotHit', 200);
+  a.emit('playerHit', { playerId: b.id, damage: 13, weaponId: 2 });
+  assert.strictEqual(await got, null);
+  app.player(a.id).weaponId = 2;   // as if a glock had been picked up
+
   // Forged damage is replaced by the weapon table value (glock = 13).
-  let got = next(b, 'playerGotHit');
+  got = next(b, 'playerGotHit');
   a.emit('playerHit', { playerId: b.id, damage: 9999, weaponId: 2 });
   let hit = await got;
   assert.ok(hit, 'hit relayed');

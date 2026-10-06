@@ -58,8 +58,10 @@ class Player {
       this.body.resetAnimation();
     });
 
-    // Death animation finished — respawn.
+    // Death animation finished — respawn (remote players wait for their own
+    // client's respawn instead, see remoteRespawn).
     this.deathBody.addEventListener("animationcomplete", () => {
+      if (this.awaitRespawn) return;
       this.health = this.maxHealth();
       this.canShoot = true;
       this.canMove = true;
@@ -327,6 +329,21 @@ class Player {
     this.deathBody.isVisible = true;
   }
 
+  // A remote player's client respawned them (or the fallback timer fired).
+  remoteRespawn(pos) {
+    clearTimeout(this._respawnFallback);
+    if (!this.awaitRespawn) return;
+    this.awaitRespawn = false;
+    if (pos) { this.body.setPosition(pos.x, pos.y); this._netTarget = { x: pos.x, y: pos.y }; }
+    this.health = 100;
+    this.canShoot = true;
+    this.canMove = true;
+    this.isRespawning = false;
+    this.deathBody.isVisible = false;
+    this.body.isVisible = true;
+    this.deathBody.setAnimation('death_0');
+  }
+
   respawn() {
     const pts = (typeof map !== 'undefined' && map.ready && map.spawnPoints.length)
       ? map.spawnPoints
@@ -340,6 +357,8 @@ class Player {
 
   // Called on round start — resets the player to a spawn point regardless of death state.
   forceRespawn(spawnPoints = []) {
+    this.awaitRespawn = false;
+    clearTimeout(this._respawnFallback);
     const pts = spawnPoints.length ? spawnPoints : [{ x: 400, y: 300 }];
     const { x, y } = pts[Math.floor(Math.random() * pts.length)];
 
@@ -449,8 +468,11 @@ class Player {
     this._regenAt = now;
     const rate = typeof shopManager !== 'undefined' ? shopManager.regenPerSec() : 0;
     if (!rate || this.isRespawning || this.health <= 0) return;
+    if (typeof isOfflinePaused === 'function' && isOfflinePaused()) return;   // no healing behind a menu
     if (now - (this._hitFxAt || -1e9) < 4000) return;
     this.health = Math.min(this.maxHealth(), this.health + rate * dt);
+    const anim = this.health >= 75 ? 'heartbeat_healthy' : this.health > 20 ? 'heartbeat_impacted' : 'heartbeat_critical';
+    if (this.healthbarHeart.animName !== anim) this.healthbarHeart.setAnimation(anim);
   }
 
   // Pet companion: trots after its owner, a little behind and to the side.

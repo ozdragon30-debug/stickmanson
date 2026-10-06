@@ -234,9 +234,10 @@ function drawMap(nowMs, viewX0 = 0, viewX1 = VIEW_W, viewY0 = 0, viewY1 = VIEW_H
   }
 }
 
-// Offline bot matches pause while a menu is open (online matches can't pause).
+// Bot matches pause while a menu is open (they run locally, also when
+// connected to an empty server); real online matches can't pause.
 function isOfflinePaused() {
-  return botManager.active && !socketManager.isConnected && isUiBlocking();
+  return botManager.active && isUiBlocking();
 }
 
 function update(dt) {

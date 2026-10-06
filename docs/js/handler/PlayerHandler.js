@@ -120,6 +120,23 @@ socketManager.on("playerDied", (data) => {
   const player = playerManager.getPlayer(playerId);
   if (!player) return;
   player.death();
+  // Stay a corpse until that player's own respawn arrives (their death
+  // animation length differs from ours), so nobody fights an invisible player
+  // or a hittable ghost. Old servers don't send it: fall back after 6 s.
+  player.awaitRespawn = true;
+  clearTimeout(player._respawnFallback);
+  player._respawnFallback = setTimeout(() => player.remoteRespawn(null), 6000);
+});
+
+socketManager.on("playerRespawned", (data) => {
+  const player = playerManager.getPlayer(data.playerId);
+  if (player && !botManager.isBot(data.playerId)) player.remoteRespawn(data.playerPos);
+});
+
+// Someone else took that pickup first: put back the weapon the server knows we hold.
+socketManager.on("pickupRejected", (data) => {
+  const me = playerManager.mainPlayer;
+  if (me && !me.isRespawning && Number.isInteger(data?.weaponId)) me.equipWeapon(data.weaponId, true);
 });
 
 // After a reconnect the server sees a brand-new player: re-send who we are.
@@ -138,6 +155,7 @@ socketManager.on("connect", () => {
 socketManager.on("gameState", (data) => {
   scoreboardManager.updateScores(data.scores);
   scoreboardManager.roundEndsAt = data.roundEndsAt;
+  botManager.serverPhase = data.phase;
   if (data.phase === 'roundEnd') scoreboardManager.showRoundEnd(data.scores);
   else scoreboardManager.hideRoundEnd();
   const previousMap = currentMapFile;
@@ -152,6 +170,13 @@ socketManager.on("gameState", (data) => {
     botManager.considerSpawning(data.scores);
   }));
 });
+
+// First place only counts as a win (and earns the win bonus) with more kills than second.
+function _strictLead(scores, myId = socketManager.socket?.id) {
+  const sorted = Object.entries(scores).sort(compareScores);
+  if (!sorted.length || sorted[0][0] !== myId) return false;
+  return sorted.length < 2 ? sorted[0][1].kills > 0 : sorted[0][1].kills > sorted[1][1].kills;
+}
 
 function _myRank(scores) {
   const myId = socketManager.socket?.id;
@@ -192,16 +217,18 @@ socketManager.on("scoreUpdate", (data) => {
 });
 
 socketManager.on("roundEnd", (data) => {
+  botManager.serverPhase = 'roundEnd';
   let scores = data.scores;
   if (botManager.active) { botManager._updateScoreboard(); scores = scoreboardManager.scores; }
   scoreboardManager.showRoundEnd(scores);
   const rank = _myRank(scores);
   soundManager.play(rank === 1 ? 'win' : 'lose');
-  statsManager.onRoundEnd(rank === 1);
+  statsManager.onRoundEnd(rank === 1 && _strictLead(scores));
   _prevMyRank = null; // reset for next round
 });
 
 socketManager.on("roundStart", (data) => {
+  botManager.serverPhase = 'playing';
   // A server round also resets a bot match played while waiting for players.
   if (botManager.active) {
     if (playerManager.mainPlayer) { playerManager.mainPlayer.kills = 0; playerManager.mainPlayer.deaths = 0; }

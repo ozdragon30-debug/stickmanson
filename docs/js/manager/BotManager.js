@@ -50,11 +50,13 @@ class BotManager {
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
+  // Enough bots to keep the action going (the generated maps are 29 tiles
+  // wide, 15–25 tall), but fewer than the spawn points.
   static getBotCount(map) {
     const area = map.width * map.height;
-    if (area <= 900) return 2;
-    if (area <= 2500) return 4;
-    return 7;
+    const n = Math.max(3, Math.min(6, Math.round(area / 150)));
+    const spawns = map.spawnPoints?.length || n + 1;
+    return Math.max(1, Math.min(n, spawns - 1));
   }
 
   static getInstance() {
@@ -207,7 +209,9 @@ class BotManager {
     if (!this.active) return;
     if (this._offlineRounds) {
       this._tickOfflineRound();
-      if (this._roundPhase === 'roundEnd') return; // everyone freezes on the scoreboard
+      if (this._roundPhase !== 'playing') return; // frozen on the scoreboard and while a map loads
+    } else if (this.serverPhase === 'roundEnd') {
+      return; // waiting mode: freeze with the server's round-end scoreboard too
     }
     for (const bot of Object.values(this.bots)) bot.think(dt);
   }
@@ -218,6 +222,7 @@ class BotManager {
     this._offlineRounds = true;
     this._roundPhase = 'playing';
     this._lastTick = performance.now();
+    this._roundPlayedMs = 0;   // real play time (pauses excluded), for round rewards
     scoreboardManager.roundEndsAt = Date.now() + BotManager.ROUND_MS;
   }
 
@@ -226,6 +231,7 @@ class BotManager {
     // Time spent paused (menus, hidden tab) doesn't count against the round.
     const gap = nowPerf - (this._lastTick || nowPerf);
     this._lastTick = nowPerf;
+    if (this._roundPhase === 'playing' && gap <= 250) this._roundPlayedMs = (this._roundPlayedMs || 0) + gap;
     if (gap > 250) {
       if (this._roundPhase === 'playing') scoreboardManager.roundEndsAt += gap;
       else this._nextRoundAt += gap;
@@ -239,9 +245,11 @@ class BotManager {
       scoreboardManager.showRoundEnd(scores);
       const myId = socketManager.socket?.id ?? 'local_player';
       const ranked = Object.entries(scores).sort(compareScores);
-      const won = !!ranked[0] && ranked[0][0] === myId;
+      const lead = ranked.length < 2 ? (ranked[0]?.[1].kills > 0) : ranked[0][1].kills > ranked[1][1].kills;
+      const won = !!ranked[0] && ranked[0][0] === myId && lead;
       soundManager.play(won ? 'win' : 'lose');
-      statsManager.onRoundEnd(won);
+      // Rounds cut short (e.g. "!next") don't pay out, so coins can't be farmed.
+      statsManager.onRoundEnd(won, (this._roundPlayedMs || 0) >= 60000);
       chatManager.addMessage('Server', `Round over! Next round starting in ${BotManager.ROUND_END_MS / 1000} seconds...`, null);
       this._nextRoundAt = now + BotManager.ROUND_END_MS;
     } else if (this._roundPhase === 'roundEnd' && now >= this._nextRoundAt) {
