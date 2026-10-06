@@ -231,10 +231,25 @@ function drawDebugHitshape(ctx) {
 
 let lastTime = 0;
 let _loopErrors = 0;
+// Optional frame-rate cap (Settings → Video). Unlimited by default: the game
+// runs at the monitor's refresh rate (60/120/144/240 Hz). All movement and
+// timers use real elapsed time, so the cap never changes game speed.
+let _frameInterval = 0;  // ms between rendered frames; 0 = every display refresh
+let _nextFrameAt = 0;
+function setFpsLimit(v) {
+  const n = parseInt(v, 10);
+  _frameInterval = n > 0 ? 1000 / n : 0;
+  _nextFrameAt = 0;
+}
 function loop(nowMs) {
   // Schedule the next frame first: an exception in one frame used to stop the
   // rAF chain and freeze the game permanently.
   requestAnimationFrame(loop);
+  if (_frameInterval) {
+    // 1 ms of slack so a 120 cap on a 120 Hz screen never drops refreshes.
+    if (nowMs < _nextFrameAt - 1) return;
+    _nextFrameAt = Math.max(_nextFrameAt + _frameInterval, nowMs - _frameInterval);
+  }
   try {
     frame(nowMs);
   } catch (err) {
@@ -249,7 +264,9 @@ function loop(nowMs) {
 
 function frame(nowMs) {
   if (!lastTime) lastTime = nowMs;
-  display.reportFrame(nowMs - lastTime);
+  // A deliberately low cap is not a slow device: don't let adaptive
+  // resolution react to it.
+  if (!_frameInterval || _frameInterval < 20) display.reportFrame(nowMs - lastTime);
   const dt = Math.min((nowMs - lastTime) / 1000, 0.1);  // seconds; capped to avoid spiral after tab switch
   lastTime = nowMs;
 
@@ -294,6 +311,7 @@ settingsManager.onChange((key, value) => {
   else if (key === 'muted') soundManager.setMuted(value);
   else if (key === 'spatialAudio') soundManager.setSpatial(value);
   else if (key === 'renderQuality') display.setQuality(value);
+  else if (key === 'fpsLimit') setFpsLimit(value);
   else if (key === 'pixelArt') document.body.classList.toggle('pixel-art', !!value);
   else if (key === 'touchControls') updateTouchControls();
   else if (key === 'language') {
@@ -325,6 +343,8 @@ Constants._weaponsReady.then(() => {
   for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(ev, preload, { once: true, capture: true });
 });
 
+
+setFpsLimit(settingsManager.get('fpsLimit'));
 
 let loopStarted = false;
 

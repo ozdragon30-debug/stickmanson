@@ -2,6 +2,13 @@
 
 ## 2026 modernisation
 
+### High refresh rate
+
+- Runs at the monitor's refresh rate (120/144/240 Hz); optional frame-rate
+  limit in Settings → Video (240/144/120/60/30). Movement uses elapsed time,
+  so speed is identical at any frame rate; a low cap no longer triggers
+  adaptive resolution.
+
 ### Modern effects (render-only, Settings → Video → Modern effects)
 
 - Soft drop shadows under characters, corpses and weapon pickups.

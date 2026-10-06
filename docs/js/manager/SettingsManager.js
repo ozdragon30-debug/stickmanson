@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS = {
   spatialAudio:      true,
   // Video
   renderQuality:     'auto',   // auto | high | low
+  fpsLimit:          'off',    // off (monitor refresh rate) | 240 | 144 | 120 | 60 | 30
   pixelArt:          false,    // nearest-neighbour sprite scaling
   modernFx:          true,     // shadows, glow, lights (render-only)
   showFps:           false,
@@ -315,6 +316,17 @@ class SettingsManager {
             <option value="auto" data-i18n="set.res.auto">Auto (sharp, up to 2×)</option>
             <option value="high" data-i18n="set.res.high">High (native, up to 3×)</option>
             <option value="low" data-i18n="set.res.low">Low (1× – fastest)</option>
+          </select>
+        </div>
+        <div class="sar-sec">
+          <label class="sar-lbl" for="sar-fps" data-i18n="set.fpsLimit">Frame rate limit</label>
+          <select id="sar-fps" class="sar-select" data-setting="fpsLimit">
+            <option value="off" data-i18n="set.fpsLimit.off">Monitor refresh rate (unlimited)</option>
+            <option value="240">240 FPS</option>
+            <option value="144">144 FPS</option>
+            <option value="120">120 FPS</option>
+            <option value="60">60 FPS</option>
+            <option value="30" data-i18n="set.fpsLimit.30">30 FPS (battery saver)</option>
           </select>
         </div>
         <label class="sar-check"><input type="checkbox" data-setting="modernFx"> <span data-i18n="set.fx">Modern effects</span>
