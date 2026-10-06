@@ -376,7 +376,10 @@ class SettingsManager {
     panel.querySelector('#sar-done').onclick  = () => this.close();
     panel.querySelector('#sar-menu').onclick  = () => { this.close(); if (typeof menu !== 'undefined') menu.open(); };
     panel.querySelector('#sar-reset').onclick = () => this.resetDefaults();
-    panel.querySelector('#sar-fullscreen').onclick = () => toggleFullscreen();
+    const fsBtn = panel.querySelector('#sar-fullscreen');
+    fsBtn.onclick = () => toggleFullscreen();
+    // Always full screen in the Android app; no API on iPhone.
+    if (window.Capacitor || !document.fullscreenEnabled) fsBtn.parentElement.hidden = true;
 
     const tabs = [...panel.querySelectorAll('.sar-tabs button')];
     tabs.forEach((b, i) => {

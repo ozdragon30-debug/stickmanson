@@ -25,7 +25,11 @@ class Menu {
     this.nameEl.addEventListener('keyup', e => e.stopPropagation());
     this.playBtn.addEventListener('click', () => this.play());
     document.getElementById('menu-settings').addEventListener('click', () => settingsManager.open());
-    document.getElementById('menu-fullscreen').addEventListener('click', () => toggleFullscreen());
+    const fsBtn = document.getElementById('menu-fullscreen');
+    fsBtn.addEventListener('click', () => toggleFullscreen());
+    // The Android app is always full screen; browsers without the API (iPhone)
+    // can't toggle it: no button that does nothing.
+    if (window.Capacitor || !document.fullscreenEnabled) fsBtn.hidden = true;
 
     const install = document.getElementById('menu-install');
     // iOS Safari has no install prompt: explain "Add to Home Screen" instead.
@@ -157,7 +161,7 @@ class Menu {
     this._firstRunHint();
     canvas.focus({ preventScroll: true });
     // Phones: go fullscreen + landscape on first play for a console-like feel.
-    if (inputMode.mode === 'touch' && !document.fullscreenElement) toggleFullscreen();
+    if (inputMode.mode === 'touch' && !document.fullscreenElement && !window.Capacitor) toggleFullscreen();
   }
 
   // First game ever: show the controls for the device being used.

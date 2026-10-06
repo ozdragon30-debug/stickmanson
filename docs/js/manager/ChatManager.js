@@ -122,16 +122,27 @@ class ChatManager {
     if (!this.messages.length && !this.isOpen) return;
 
     ctx.save();
-    hudTransform(ctx, 0, VIEW_H); // grows from the bottom-left corner on phones
-
-    const x      = 50;   // aligned with the input box, clear of the ⚙ button
     const lineH  = 18;
     const msgFontSize = 13;
     const inputH = this.isOpen ? 24 : 0;
     const bottomPad = 12;
     // Chat input box starts further right to avoid overlapping the gear button in the lower-left corner.
     const inputX = 50;
-    const baseY  = VIEW_H - bottomPad - inputH - (this.messages.length * lineH);
+    let x = 50;   // aligned with the input box, clear of the ⚙ button
+    let baseY;
+    const touch = document.body.classList.contains('touch-ui');
+    if (touch) {
+      // Touch: the move stick owns the bottom-left, so messages go under the
+      // toolbar (top-left); typing happens in the on-screen field anyway.
+      hudTransform(ctx, 0, 0);
+      const cssPerUnit = (canvas.clientHeight / display.viewH) * (display.uiScale || 1);
+      x = 12 / cssPerUnit;
+      const top = canvas.getBoundingClientRect().top;
+      baseY = Math.max(0, 106 - top) / cssPerUnit + 12;
+    } else {
+      hudTransform(ctx, 0, VIEW_H); // grows from the bottom-left corner on phones
+      baseY = VIEW_H - bottomPad - inputH - (this.messages.length * lineH);
+    }
 
     // Draw message history — fade out older messages when chat is closed.
     this.messages.forEach((msg, i) => {
@@ -165,8 +176,8 @@ class ChatManager {
       ctx.fillText(msg.text, x + nameWidth, y);
     });
 
-    // Draw input box when open.
-    if (this.isOpen) {
+    // Draw input box when open (touch uses the on-screen field at the top).
+    if (this.isOpen && !touch) {
       const inputY = VIEW_H - bottomPad - inputH;
       ctx.fillStyle = 'rgba(0,0,0,0.65)';
       ctx.fillRect(inputX - 4, inputY, 340, inputH);

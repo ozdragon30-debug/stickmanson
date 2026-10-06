@@ -2,6 +2,19 @@
 
 ## 2026 modernisation
 
+### Touch controls and menus redesigned
+
+- Joysticks: base pad with ring, gradient knob and icon (arrows to move,
+  crosshair to aim). The move pad lights the direction being pushed (8 marks);
+  the aim pad shows the firing direction and pulses while firing. Idle pads
+  sit in the corners with a small label.
+- Toolbar under the health bar with SVG icons: settings, chat, scoreboard
+  (tap to toggle). No longer covers the kill feed.
+- On touch, chat messages appear under the toolbar instead of under the move
+  stick.
+- Main menu: two columns on landscape phones (nothing cut off). Fullscreen
+  buttons are hidden where they do nothing (Android app, iPhone).
+
 ### Bigger view on phones, faster kills
 
 - Screen → "Fill screen" (new default): the whole display is the play view,
