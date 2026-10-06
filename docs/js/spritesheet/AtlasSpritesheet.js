@@ -119,11 +119,11 @@ class AtlasSpritesheet {
 AtlasSpritesheet.NO_FRAME = Object.freeze({ x: 0, y: 0, w: 1, h: 1, origin: { ox: 0, oy: 0 }, tx: 0, ty: 0, sw: 1, sh: 1 });
 
 // Singleton indicator (spinner) atlas
-const indicatorAtlas = new AtlasSpritesheet(
-  'indicator',
-  'sprites/indicator/spritesheet.png',
-  'sprites/indicator/spritesheet.json'
-);
+// Spinners (64, code-drawn: render/Emblems.js), tinted per player by TintCache.
+const indicatorAtlas = (() => {
+  const { canvas, data } = Emblems.buildSpinnerSheet();
+  return new AtlasSpritesheet('indicator', null, data, { image: canvas });
+})();
 
 // Singleton player atlas loaded once
 // Player body, weapons and legs — drawn from code (StickFigure.body).
@@ -140,18 +140,10 @@ const pickupAtlas = (() => {
 })();
 
 // Singleton heartbeat atlas (HUD health indicator)
-const heartbeatAtlas = new AtlasSpritesheet(
-  'heartbeat',
-  'sprites/player/heartbeat.png',
-  'sprites/player/heartbeat.json'
-);
+const heartbeatAtlas = new AtlasSpritesheet('heartbeat', null, { animations: Emblems.HEART_ANIMS }, { renderer: Emblems.heart });
 
 // Singleton blood atlas loaded once
-const bloodAtlas = new AtlasSpritesheet(
-  'blood',
-  'sprites/blood/spritesheet.png',
-  'sprites/blood/spritesheet.json'
-);
+const bloodAtlas = new AtlasSpritesheet('blood', null, { animations: Emblems.BLOOD_ANIMS }, { renderer: Emblems.blood });
 
 // Singleton map atlas loaded once
 const mapAtlas = new AtlasSpritesheet(
@@ -161,11 +153,10 @@ const mapAtlas = new AtlasSpritesheet(
 );
 
 // Singleton cursor atlas
-const cursorAtlas = new AtlasSpritesheet(
-  'cursor',
-  'sprites/cursor/spritesheet.png',
-  'sprites/cursor/spritesheet.json'
-);
+const cursorAtlas = (() => {
+  const { canvas, data } = Emblems.buildCursorSheet();
+  return new AtlasSpritesheet('cursor', null, data, { image: canvas });
+})();
 
 // Singleton particle atlas — muzzle flash / shoot effect sprites
 const particleAtlas = new AtlasSpritesheet('particles', null, 'data/anims/particles.json', { renderer: StickFigure.particles });

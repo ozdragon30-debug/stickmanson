@@ -11,6 +11,13 @@
   shadows, plus trees, bushes, rocks, tables and parked props. Outdoor maps
   get themed surroundings beyond the border so wide screens are filled.
 
+### Own spinners, cursors, blood and heart
+
+- 64 new spinners and 12 new cursors, drawn in code (`js/render/Emblems.js`);
+  pricier spinners get extra inner rings and a halo. Blood splats and the HUD
+  heart are code-drawn too. The last original sprite sheets (indicator,
+  cursor, blood, heartbeat) and their packing tools are removed.
+
 ### Spinner shop (gameplay change, on request)
 
 - Coins are earned by playing (kill +10, round +5, win +25) and shown under

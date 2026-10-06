@@ -527,7 +527,7 @@ class SettingsManager {
     names.forEach((anim, i) => {
       const fd = indicatorAtlas.getFrameData(anim, 0);
       if (!fd) return;
-      const scale = Math.min(1.6, 32 / Math.max(fd.w, fd.h));
+      const scale = Math.min(1.6, 40 / Math.max(fd.w, fd.h));
       const c = document.createElement('canvas');
       c.width = 40; c.height = 40;
       const cx = c.getContext('2d');

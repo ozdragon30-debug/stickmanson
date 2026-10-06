@@ -67,6 +67,7 @@
   "js/manager/StatsManager.js",
   "js/map/MapLoader.js",
   "js/pwa.js",
+  "js/render/Emblems.js",
   "js/render/StickFigure.js",
   "js/render/WeaponArt.js",
   "js/spritesheet/AtlasSpritesheet.js",
@@ -140,15 +141,7 @@
   "sounds/tesla_helmet_pickup.mp3",
   "sounds/tesla_helmet_shoot_0.mp3",
   "sounds/win.mp3",
-  "sprites/blood/spritesheet.json",
-  "sprites/blood/spritesheet.webp",
-  "sprites/cursor/spritesheet.json",
-  "sprites/cursor/spritesheet.webp",
-  "sprites/indicator/spritesheet.json",
-  "sprites/indicator/spritesheet.webp",
   "sprites/maps/atlas.json",
-  "sprites/maps/atlas.webp",
-  "sprites/player/heartbeat.json",
-  "sprites/player/heartbeat.webp"
+  "sprites/maps/atlas.webp"
  ]
 }
