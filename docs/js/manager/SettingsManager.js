@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
   fpsLimit:          'off',    // off (monitor refresh rate) | 240 | 144 | 120 | 60 | 30
   pixelArt:          false,    // nearest-neighbour sprite scaling
   modernFx:          true,     // shadows, glow, lights (render-only)
+  smoothAnim:        true,     // 60 fps in-between drawings (render-only)
   showFps:           false,
   showPing:          true,
   // HUD feedback
@@ -329,6 +330,8 @@ class SettingsManager {
             <option value="30" data-i18n="set.fpsLimit.30">30 FPS (battery saver)</option>
           </select>
         </div>
+        <label class="sar-check"><input type="checkbox" data-setting="smoothAnim"> <span data-i18n="set.smooth">Smooth animations (60 fps)</span>
+          <span class="sar-hint" data-i18n="set.smooth.hint">— in-between drawings; game speed unchanged</span></label>
         <label class="sar-check"><input type="checkbox" data-setting="modernFx"> <span data-i18n="set.fx">Modern effects</span>
           <span class="sar-hint" data-i18n="set.fx.hint">— shadows, weapon glow, muzzle light (looks only)</span></label>
         <label class="sar-check"><input type="checkbox" data-setting="pixelArt"> <span data-i18n="set.pixel">Pixel-art scaling</span>

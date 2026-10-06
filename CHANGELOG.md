@@ -2,6 +2,16 @@
 
 ## 2026 modernisation
 
+### 60 fps animations
+
+- The hand-drawn 12 fps player animations are shown at 60 fps: 4 in-between
+  drawings per frame pair, generated offline by optical-flow interpolation
+  (`tools/gen-inbetweens.py`). Motions too large to track keep the original
+  drawing instead of a ghosted blend.
+- Drawing-only: frame indices, timing and animation events still run on the
+  original frames (parity test unchanged). Settings → Video → Smooth
+  animations. Sheets are split per weapon (6.9 MB total) and load on demand.
+
 ### High refresh rate
 
 - Runs at the monitor's refresh rate (120/144/240 Hz); optional frame-rate

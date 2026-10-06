@@ -4,8 +4,9 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..', 'docs');
-const SKIP = [/(^|\/)\./, /\.png$/i, /^precache\.json$/, /^sw\.js$/, /\.md$/];
+const SKIP = [/(^|\/)\./, /\.png$/i, /inbetween_\w+\.webp$/, /^precache\.json$/, /^sw\.js$/, /\.md$/];
 // The PNG atlases are only a fallback for browsers without WebP; icons are needed.
+// In-between sheets (60 fps animations) load on demand and are optional offline.
 const KEEP = [/^icons\//];
 
 function walk(dir, prefix = '') {

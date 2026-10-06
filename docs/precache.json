@@ -157,6 +157,7 @@
   "js/map/MapLoader.js",
   "js/pwa.js",
   "js/spritesheet/AtlasSpritesheet.js",
+  "js/spritesheet/Inbetween.js",
   "js/ui/Menu.js",
   "js/utils/Constants.js",
   "js/utils/Fx.js",
@@ -243,6 +244,7 @@
   "sprites/pickup/spritesheet.webp",
   "sprites/player/heartbeat.json",
   "sprites/player/heartbeat.webp",
+  "sprites/player/inbetween.json",
   "sprites/player/spritesheet.json",
   "sprites/player/spritesheet.webp"
  ]

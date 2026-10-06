@@ -85,16 +85,39 @@ class AtlasGameObject {
 
   // ── Draw helpers ──────────────────────────────────────────────────────────
 
+  // Which in-between drawing (see Inbetween.js) to show right now, if any.
+  // Read-only: frame index and timing are never touched, so animation events
+  // fire exactly as before.
+  _inbetween() {
+    if (this.atlas !== playerAtlas || typeof inbetweens === 'undefined' || !inbetweens.enabled) return null;
+    if (this.frameIndex < 0 || (this.repeatTimes !== -1 && this.repeatTimes <= 0)) return null;
+    const anim = this.atlas.getAnimation(this.animName);
+    if (!anim || anim.frames.length < 2) return null;
+    // Last drawing of a one-shot animation: there is nothing to move towards.
+    if (this.frameIndex === anim.frames.length - 1 && this.repeatTimes === 1) return null;
+    const elapsed = performance.now() - this.lastUpdated;
+    const k = Math.min(inbetweens.steps - 1, Math.floor(elapsed * (anim.fps || 12) / 1000 * inbetweens.steps));
+    if (k <= 0) return null;
+    return inbetweens.lookup(anim.frames[this.frameIndex], k);
+  }
+
   // Draw anchoring the sprite's origin point at (this.x, this.y).
   draw(ctx) {
     if (!this.isVisible) return;
-    const f = this.atlas.getFrameData(this.animName, Math.max(0, this.frameIndex));
+    const sub = this._inbetween();
+    let img = this.atlas.image, f;
+    if (sub && sub.img) {
+      img = sub.img;
+      f = { x: sub.f.x, y: sub.f.y, w: sub.f.w, h: sub.f.h, origin: { ox: sub.f.ox, oy: sub.f.oy } };
+    } else {
+      f = this.atlas.getFrameData(this.animName, Math.max(0, this.frameIndex) + (sub && sub.next ? 1 : 0));
+    }
     if (!f) return;
 
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rotation);
-    ctx.drawImage(this.atlas.image, f.x, f.y, f.w, f.h,
+    ctx.drawImage(img, f.x, f.y, f.w, f.h,
       -f.origin.ox, -f.origin.oy, f.w, f.h);
     ctx.restore();
   }
