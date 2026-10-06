@@ -18,7 +18,7 @@ import json, os, sys
 from PIL import Image
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', 'docs', 'sprites')
-DEFAULT = ['player/spritesheet', 'particles/spritesheet', 'death/spritesheet', 'blood/spritesheet']
+DEFAULT = ['blood/spritesheet']
 PAD = 2
 MAX = 4096
 

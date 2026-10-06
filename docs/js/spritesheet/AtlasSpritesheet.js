@@ -1,16 +1,27 @@
 class AtlasSpritesheet {
-  constructor(name, imageUrl, jsonData) {
+  // opts.renderer: draw frames from code instead of an image (see
+  //   js/render/StickFigure.js); the JSON then only holds animation timing.
+  // opts.image: use an already-drawn canvas as the sheet (weapon pickups).
+  constructor(name, imageUrl, jsonData, opts = {}) {
     this.spritesheetName = name;
-    this.image = new Image();
-    this.image.decoding = 'async';
-    // Prefer the lossless WebP copy (pixel-identical, ~40% smaller download);
-    // fall back to the original PNG if the browser can't decode it.
-    const webp = imageUrl.replace(/\.png$/, '.webp');
-    if (webp !== imageUrl) {
-      this.image.onerror = () => { this.image.onerror = null; this.image.src = imageUrl; };
-      this.image.src = webp;
+    this.renderer = opts.renderer || null;
+    if (opts.image || !imageUrl) {
+      // Canvas sheets are ready at once (`complete` like a loaded <img>).
+      this.image = opts.image || document.createElement('canvas');
+      this.image.complete = true;
+      this.image.naturalWidth = this.image.width || 1;
     } else {
-      this.image.src = imageUrl;
+      this.image = new Image();
+      this.image.decoding = 'async';
+      // Prefer the lossless WebP copy (pixel-identical, ~40% smaller download);
+      // fall back to the original PNG if the browser can't decode it.
+      const webp = imageUrl.replace(/\.png$/, '.webp');
+      if (webp !== imageUrl) {
+        this.image.onerror = () => { this.image.onerror = null; this.image.src = imageUrl; };
+        this.image.src = webp;
+      } else {
+        this.image.src = imageUrl;
+      }
     }
     this.frames = {};
     this.animationMap = {};  // name -> { fps, frames: [frameKey, ...], offset?: [x, y] }
@@ -22,7 +33,9 @@ class AtlasSpritesheet {
       const rawFrames = data.frames || {};
       this.frames = rawFrames;
       for (const anim of (data.animations || [])) {
-        this.animationMap[anim.name] = { fps: anim.fps, frames: anim.frames, offset: anim.offset || null, pinned: anim.pinned || false };
+        // Renderer timing files give a frame count instead of frame keys.
+        const frames = typeof anim.frames === 'number' ? Array.from({ length: anim.frames }, (_, i) => i) : anim.frames;
+        this.animationMap[anim.name] = { fps: anim.fps, frames, offset: anim.offset || null, pinned: anim.pinned || false };
       }
       this.animationNames = Object.keys(this.animationMap);
       this.tileAnimations = data.tileAnimations || {};
@@ -61,6 +74,7 @@ class AtlasSpritesheet {
     const cache = anim._fd || (anim._fd = []);
     if (cache[i] !== undefined) return cache[i];
     const key = anim.frames[i];
+    if (this.renderer) return (cache[i] = AtlasSpritesheet.NO_FRAME);
     const raw = this.frames[key];
     if (!raw) return (cache[i] = null);
 
@@ -101,6 +115,9 @@ class AtlasSpritesheet {
   }
 }
 
+// Placeholder frame for code-drawn atlases (nothing to cut out of an image).
+AtlasSpritesheet.NO_FRAME = Object.freeze({ x: 0, y: 0, w: 1, h: 1, origin: { ox: 0, oy: 0 }, tx: 0, ty: 0, sw: 1, sh: 1 });
+
 // Singleton indicator (spinner) atlas
 const indicatorAtlas = new AtlasSpritesheet(
   'indicator',
@@ -109,25 +126,18 @@ const indicatorAtlas = new AtlasSpritesheet(
 );
 
 // Singleton player atlas loaded once
-const playerAtlas = new AtlasSpritesheet(
-  'player',
-  'sprites/player/spritesheet.png',
-  'sprites/player/spritesheet.json'
-);
+// Player body, weapons and legs — drawn from code (StickFigure.body).
+const playerAtlas = new AtlasSpritesheet('player', null, 'data/anims/player.json', { renderer: StickFigure.body });
 
 // Singleton death atlas loaded once
-const deathAtlas = new AtlasSpritesheet(
-  'death',
-  'sprites/death/spritesheet.png',
-  'sprites/death/spritesheet.json'
-);
+const deathAtlas = new AtlasSpritesheet('death', null, 'data/anims/death.json', { renderer: StickFigure.death });
 
 // Singleton pickup atlas loaded once
-const pickupAtlas = new AtlasSpritesheet(
-  'pickup',
-  'sprites/pickup/spritesheet.png',
-  'sprites/pickup/spritesheet.json'
-);
+// Weapon pickups / HUD icons — drawn once from code into a canvas sheet.
+const pickupAtlas = (() => {
+  const { canvas, data } = WeaponArt.buildPickupSheet();
+  return new AtlasSpritesheet('pickup', null, data, { image: canvas });
+})();
 
 // Singleton heartbeat atlas (HUD health indicator)
 const heartbeatAtlas = new AtlasSpritesheet(
@@ -158,8 +168,4 @@ const cursorAtlas = new AtlasSpritesheet(
 );
 
 // Singleton particle atlas — muzzle flash / shoot effect sprites
-const particleAtlas = new AtlasSpritesheet(
-  'particles',
-  'sprites/particles/spritesheet.png',
-  'sprites/particles/spritesheet.json'
-);
+const particleAtlas = new AtlasSpritesheet('particles', null, 'data/anims/particles.json', { renderer: StickFigure.particles });

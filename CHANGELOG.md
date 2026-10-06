@@ -2,6 +2,20 @@
 
 ## 2026 modernisation
 
+### New characters and weapons, drawn from code
+
+- The stick figure, all 12 weapons (in hand, floor pickups, HUD icons),
+  death animations and shot effects (muzzle flashes, tracers, shotgun
+  pellets, railgun beam, flamethrower jet, tesla lightning, hammer impact) are
+  new vector drawings made in code (`js/render/WeaponArt.js`,
+  `js/render/StickFigure.js`). The original character, death, particle and
+  pickup images are removed.
+- Poses are computed for any point in time, so animation is smooth at every
+  frame rate (the generated in-between sheets are no longer needed: −7 MB).
+- Timing is unchanged: animation lengths, frame rates and the moment a shot
+  lands still come from the original data (`data/anims/*.json`); the parity
+  test still matches the original game.
+
 ### Touch controls and menus redesigned
 
 - Joysticks: base pad with ring, gradient knob and icon (arrows to move,

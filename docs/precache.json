@@ -1,6 +1,9 @@
 {
  "files": [
   "css/style.css",
+  "data/anims/death.json",
+  "data/anims/particles.json",
+  "data/anims/player.json",
   "data/maps/abandonedcity.dat",
   "data/maps/alientestlab.dat",
   "data/maps/anarchystreets.dat",
@@ -156,8 +159,9 @@
   "js/manager/StatsManager.js",
   "js/map/MapLoader.js",
   "js/pwa.js",
+  "js/render/StickFigure.js",
+  "js/render/WeaponArt.js",
   "js/spritesheet/AtlasSpritesheet.js",
-  "js/spritesheet/Inbetween.js",
   "js/ui/Menu.js",
   "js/utils/Constants.js",
   "js/utils/Fx.js",
@@ -232,21 +236,11 @@
   "sprites/blood/spritesheet.webp",
   "sprites/cursor/spritesheet.json",
   "sprites/cursor/spritesheet.webp",
-  "sprites/death/inbetween.json",
-  "sprites/death/spritesheet.json",
-  "sprites/death/spritesheet.webp",
   "sprites/indicator/spritesheet.json",
   "sprites/indicator/spritesheet.webp",
   "sprites/maps/atlas.json",
   "sprites/maps/atlas.webp",
-  "sprites/particles/spritesheet.json",
-  "sprites/particles/spritesheet.webp",
-  "sprites/pickup/spritesheet.json",
-  "sprites/pickup/spritesheet.webp",
   "sprites/player/heartbeat.json",
-  "sprites/player/heartbeat.webp",
-  "sprites/player/inbetween.json",
-  "sprites/player/spritesheet.json",
-  "sprites/player/spritesheet.webp"
+  "sprites/player/heartbeat.webp"
  ]
 }

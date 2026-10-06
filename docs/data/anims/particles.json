@@ -1,0 +1,1 @@
+{"animations":[{"name":"sledgehammer_particle","fps":24,"frames":75,"offset":[0,-100],"pinned":true},{"name":"shotgun_particle","fps":24,"frames":22},{"name":"glock_particle","fps":24,"frames":21},{"name":"ak47_particle","fps":24,"frames":15},{"name":"railgun_particle","fps":24,"frames":68}]}
