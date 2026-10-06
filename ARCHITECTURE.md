@@ -3,9 +3,19 @@
 ## Layout
 
 ```
-app.js              Express + socket.io server (HTTP, validation, limits, socket handlers)
-server/Room.js      One game room: players, map rotation, round timer, pickups
-server/models/      Server-side player record
+app.js              Entry point: HTTP server + socket.io, start-up and shutdown
+server/             The multiplayer server
+  config.js         Environment settings
+  GameServer.js     Admission (bans, per-address cap, packet budget, room capacity)
+  ClientSession.js  One socket's events: validation and relaying to its room
+  chatCommands.js   !login and the admin commands
+  Room.js           One game room: players, map rotation, round timer, pickups
+  RoomRegistry.js   Room lookup/cleanup and the reconnect grace ledger
+  access.js         Client addresses, admin trust, persistent ban list
+  throttle.js       Rate limits (chat/rename/status windows, hit budget, floods)
+  checks.js         Input validation and text sanitising
+  httpSite.js       Static files, /healthz and /status
+  models/Player.js  Server-side player record
 docs/               The web client — served by app.js, or as-is by any static host
   index.html        Loads every script in order (no bundler, no modules)
   js/               Game code (see below)
