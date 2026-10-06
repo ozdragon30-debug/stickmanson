@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..', 'docs');
-const SKIP = [/\.png$/i, /^precache\.json$/, /^sw\.js$/, /\.md$/];
+const SKIP = [/(^|\/)\./, /\.png$/i, /^precache\.json$/, /^sw\.js$/, /\.md$/];
 // The PNG atlases are only a fallback for browsers without WebP; icons are needed.
 const KEEP = [/^icons\//];
 
