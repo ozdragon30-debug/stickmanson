@@ -11,8 +11,7 @@
 
 class SoundManager {
   static getInstance() {
-    if (!SoundManager.instance) SoundManager.instance = new SoundManager();
-    return SoundManager.instance;
+    return SoundManager.instance || (SoundManager.instance = new SoundManager());
   }
 
   static MAX_VOICES_PER_SOUND = 6;
@@ -152,11 +151,12 @@ class SoundManager {
     src.start();
   }
 
+  // No Web Audio: an <audio> copy per play.
   _playFallback(name) {
-    if (!this._fallback[name]) this._fallback[name] = new Audio(`sounds/${name}.mp3`);
-    const clone = this._fallback[name].cloneNode();
-    clone.volume = this.volume;
-    clone.play().catch(() => {});
+    const base = this._fallback[name] || (this._fallback[name] = new Audio(`sounds/${name}.mp3`));
+    const voice = base.cloneNode();
+    voice.volume = this.volume;
+    voice.play().catch(() => {});
   }
 
   playRandom(names, pos = null) {
