@@ -493,8 +493,13 @@ class Player {
       fx.light(ctx, this.body.x, this.body.y, 46, this._fxRgb, 0.13);
     }
     if (modern) this._drawMuzzleLight(ctx);
-    ctx.save();
-    if (modern) fx.setShadow(ctx);
+    if (modern) {
+      const x = this.body.x + 4, y = this.body.y + 6;
+      fx.shadow(ctx, x, y, this.isRespawning ? 30 : 24, 0.9);
+      // Energy weapons light up the floor around their holder.
+      const glow = !this.isRespawning && FX_GLOW[this.currentWeapon?.name];
+      if (glow) fx.light(ctx, this.body.x, this.body.y, 60, glow, 0.28);
+    }
     // Legs are drawn first (behind body).
     if (!this.canMove) {
       this.legs.draw(ctx);
@@ -502,24 +507,12 @@ class Player {
     if (this.isRespawning) {
       this.deathBody.draw(ctx);
     } else {
-      // Energy weapons glow (an extra pass under the shadowed body).
-      const glow = modern && !fx.lite && FX_GLOW[this.currentWeapon?.name];
-      if (glow) {
-        ctx.save();
-        fx.setGlow(ctx, glow, 12);
-        this.body.drawWithHeadPivot(ctx);
-        ctx.restore();
-      }
       // Body rotates around the head pivot so the character aims correctly.
       this.body.drawWithHeadPivot(ctx);
-      // Red rim for a moment after taking a hit.
+      // Red flash for a moment after taking a hit.
       const since = performance.now() - (this._hitFxAt || -1e9);
-      if (modern && since < 160) {
-        fx.setGlow(ctx, `rgba(255,40,40,${0.9 * (1 - since / 160)})`, 10);
-        this.body.drawWithHeadPivot(ctx);
-      }
+      if (modern && since < 160) fx.light(ctx, this.body.x, this.body.y, 42, [255, 40, 40], 0.7 * (1 - since / 160));
     }
-    ctx.restore();
     this.hitsplat.drawCentered(ctx);
     const pOff = (!this.muzzleFlashPinned && this.currentWeapon.shootParticle && particleAtlas.animationMap[this.currentWeapon.shootParticle]?.offset) || [0, 0];
     this.muzzleFlash.drawCenteredRotated(ctx, this.muzzleFlashPinned ? 0 : this.body.rotation, pOff[0], pOff[1]);

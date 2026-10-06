@@ -218,10 +218,10 @@ class HudManager {
       ctx.fillText(k.killer, x, y + 1);
       x += kw + 8;
       if (f) {
-        ctx.shadowColor = 'rgba(255,255,255,0.9)';
-        ctx.shadowBlur = 5;
+        // Light backing instead of a canvas blur (blur is slow on phones).
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.fillRect(x - 3, y - iconH / 2 - 2, iconW + 6, iconH + 4);
         ctx.drawImage(pickupAtlas.image, f.x, f.y, f.w, f.h, x, y - iconH / 2, iconW, iconH);
-        ctx.shadowBlur = 0;
       }
       else { ctx.fillStyle = '#fff'; ctx.fillText('✊', x, y + 1); }
       x += iconW + 8;

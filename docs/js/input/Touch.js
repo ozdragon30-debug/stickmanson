@@ -162,9 +162,12 @@ class TouchInput {
       ctx.beginPath(); ctx.arc(mx, hy, R, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath(); ctx.arc(ax, hy, R, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 0.7; ctx.fillStyle = '#fff';
-      ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.font = `${Math.round(13 * u)}px system-ui, sans-serif`; ctx.textAlign = 'center';
-      ctx.fillText(t('hud.move'), mx, hy + 4 * u);
-      ctx.fillText(t('hud.aim'), ax, hy + 4 * u);
+      ctx.font = `${Math.round(13 * u)}px system-ui, sans-serif`; ctx.textAlign = 'center';
+      ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 3 * u; ctx.lineJoin = 'round';
+      for (const [label, lx] of [[t('hud.move'), mx], [t('hud.aim'), ax]]) {
+        ctx.strokeText(label, lx, hy + 4 * u);
+        ctx.fillText(label, lx, hy + 4 * u);
+      }
     }
     ctx.restore();
   }

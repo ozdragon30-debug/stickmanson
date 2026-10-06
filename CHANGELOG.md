@@ -29,9 +29,13 @@
 - Muzzle light pools and additive flash bloom for firearms.
 - Pickups: pulsing colour halo by weapon class and a contact shadow that
   shrinks as the weapon bobs, so it reads as floating.
-- Soft ground light in each player's colour; screen vignette.
-- Draw-only (`docs/js/utils/Fx.js`): parity and golden tests unchanged; slow
-  devices drop the blur automatically.
+- Soft ground light in each player's colour.
+- Draw-only (`docs/js/utils/Fx.js`): parity and golden tests unchanged.
+- Performance: every effect is drawn from small sprites rendered once; no
+  per-frame canvas blur (`shadowBlur`) or full-screen gradient, which made
+  phones stutter. Effects now cost ~2 ms/frame instead of ~11 ms (measured,
+  emulated phone). In-between sheets are decoded off the main thread before
+  first use (previously a one-off freeze the first time a weapon was drawn).
 
 Everything below keeps **gameplay and physics identical** to the original —
 proven by `npm run parity`, which runs the original game and this one side by

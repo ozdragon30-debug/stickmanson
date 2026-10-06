@@ -26,6 +26,7 @@ class InbetweenFrames {
         }
         this.ready = true;
         this._sheet('legs'); // walking legs are on screen all the time
+        this._sheet('fist'); // everyone spawns with fists
       })
       .catch(err => console.info('[Inbetween] not available, animations stay at 12 fps:', err));
   }
@@ -39,8 +40,13 @@ class InbetweenFrames {
     if (!s) {
       s = this._sheets[group] = { img: new Image(), loaded: false };
       s.img.decoding = 'async';
-      s.img.onload = () => { s.loaded = true; };
       s.img.src = `${this.base}_${group}.webp`;
+      // Only used once fully decoded: drawing a still-encoded sheet decoded it
+      // on the main thread mid-game (a visible freeze the first time a weapon
+      // was used).
+      const ready = () => { s.loaded = true; };
+      if (s.img.decode) s.img.decode().then(ready, () => { s.img.onload = ready; });
+      else s.img.onload = ready;
     }
     return s;
   }

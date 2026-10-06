@@ -149,12 +149,6 @@ function draw(nowMs) {
   pickupManager.draw(ctx);
   playerManager.drawPlayers(ctx);
   if (debugTiles) drawDebugHitshape(ctx);
-  if (fx.enabled) {
-    ctx.save();
-    resetScreenTransform(ctx);
-    fx.vignette(ctx);
-    ctx.restore();
-  }
   hudManager.draw(ctx);
   scoreboardManager.draw(ctx, canvas);
   // Chat history would draw over the scoreboard; keep it while typing.
