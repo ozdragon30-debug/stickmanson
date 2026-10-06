@@ -160,6 +160,28 @@ test('duplicate names in a room get a suffix', async () => {
   assert.strictEqual(app.player(b.id).name, 'twin 2');
 });
 
+test('join is announced on Play with the chosen name; renames are announced', async () => {
+  const watcher = await connect({ query: { room: 'announce' } });
+  const a = await connect({ query: { room: 'announce' } });
+  a.emit('setName', { name: 'Chosen' });
+  const early = next(watcher, 'chatMessage', 300, m => / joined the game/.test(m.text));
+  assert.strictEqual(await early, null, 'not announced while still in the menu');
+  const joined = next(watcher, 'chatMessage', 500, m => / joined the game/.test(m.text));
+  a.emit('playerStatus', { afk: false });
+  assert.strictEqual((await joined).text, 'Chosen joined the game.');
+  const renamed = next(watcher, 'chatMessage', 500, m => /now known as/.test(m.text));
+  a.emit('setName', { name: 'Later' });
+  assert.strictEqual((await renamed).text, 'Chosen is now known as Later.');
+});
+
+test('reserved names are refused and the client is told its real name', async () => {
+  const a = await connect();
+  const assigned = next(a, 'nameAssigned', 400);
+  a.emit('setName', { name: 'Server' });
+  const got = await assigned;
+  assert.ok(got && got.name && got.name !== 'Server');
+});
+
 test('chat is rate limited', async () => {
   const a = await connect();
   const seen = [];
