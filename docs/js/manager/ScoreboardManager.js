@@ -73,7 +73,10 @@ class ScoreboardManager {
     }
 
     if (this.isVisible) {
-      resetScreenTransform(ctx);
+      // Grow on phones like the rest of the HUD, but keep the 620 px panel on screen.
+      const u = Math.min(display.uiScale || 1, VIEW_W / 660);
+      const s = display.scale;
+      ctx.setTransform(s * u, 0, 0, s * u, s * (VIEW_W / 2) * (1 - u), s * (VIEW_H / 2) * (1 - u));
       this._drawOverlay(ctx, canvas);
     }
 
