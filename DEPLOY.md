@@ -82,7 +82,7 @@ adresini yaz, ya da linke `?server=https://stick.ornek.com` ekle.
 
 `docs/` klasöründeki her değişiklikte GitHub Actions ("Android APK" iş akışı)
 bir APK derler ve reponun **Releases → Android APK (latest build)** sayfasına
-koyar. Telefondan `StickArenaReborn.apk` dosyasını indirip aç; Android
+koyar. Telefondan `StickClash.apk` dosyasını indirip aç; Android
 "bilinmeyen kaynaklardan yükleme" izni ister.
 
 - Uygulama yatay ve tam ekran açılır, ekran kapanmaz.

@@ -24,8 +24,8 @@ socketManager.on("newPlayer", (data) => {
   soundManager.play('join_lobby');
   // Waiting in another tab? Flag it in the tab title until the player returns.
   if (document.hidden) {
-    document.title = '● ' + t('tab.joined') + ' — Stick Arena';
-    const restore = () => { if (!document.hidden) { document.title = 'Stick Arena: Reborn'; document.removeEventListener('visibilitychange', restore); } };
+    document.title = '● ' + t('tab.joined') + ' — Stick Clash';
+    const restore = () => { if (!document.hidden) { document.title = 'Stick Clash'; document.removeEventListener('visibilitychange', restore); } };
     document.addEventListener('visibilitychange', restore);
   }
 });

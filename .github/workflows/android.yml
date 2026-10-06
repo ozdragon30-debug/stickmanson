@@ -47,11 +47,11 @@ jobs:
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug
       - name: Rename
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk StickArenaReborn.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk StickClash.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: StickArenaReborn-apk
-          path: StickArenaReborn.apk
+          name: StickClash-apk
+          path: StickClash.apk
       - name: Publish on the android-latest release
         uses: softprops/action-gh-release@v2
         with:
@@ -60,7 +60,7 @@ jobs:
           prerelease: true
           target_commitish: ${{ github.sha }}
           body: |
-            Telefona yükle: StickArenaReborn.apk dosyasını indir, aç ve "bilinmeyen kaynaklardan yükleme" iznini ver.
-            Install: download StickArenaReborn.apk on your phone and open it (allow installs from unknown sources).
+            Telefona yükle: StickClash.apk dosyasını indir, aç ve "bilinmeyen kaynaklardan yükleme" iznini ver.
+            Install: download StickClash.apk on your phone and open it (allow installs from unknown sources).
             Built from ${{ github.sha }}.
-          files: StickArenaReborn.apk
+          files: StickClash.apk

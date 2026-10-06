@@ -171,6 +171,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   line-height: 1;
   text-shadow: 0 3px 0 #0a0f16;
 }
+.logo img { display: block; width: 64px; height: 64px; margin: 0 auto 8px; border-radius: 14px; box-shadow: 0 4px 14px #0008; }
+.logo b {
+  font-weight: 900;
+  background: linear-gradient(180deg, #ffd27a, #ff7a1f);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: none; filter: drop-shadow(0 3px 0 #0a0f16);
+}
 .logo span {
   display: block;
   margin-top: 6px;
@@ -307,6 +314,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   .menu-main { flex: 1 1 0; display: flex; flex-direction: column; justify-content: center; align-self: stretch; }
   .menu-side { flex: 1.15 1 0; max-height: calc(100vh - 54px); overflow-y: auto; padding-right: 2px; }
   .logo { margin-bottom: 12px; font-size: 30px; }
+  .logo img { width: 44px; height: 44px; margin-bottom: 4px; }
   .menu-play { margin-top: 10px; padding: 11px; }
   .menu-status { margin: 8px 0 0; font-size: 12px; }
   .menu-help { margin-top: 10px; padding-top: 8px; }

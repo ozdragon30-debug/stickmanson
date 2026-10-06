@@ -1,6 +1,6 @@
 {
   "appId": "io.github.stickarena.reborn",
-  "appName": "Stick Arena Reborn",
+  "appName": "Stick Clash",
   "webDir": "build/android-www",
   "android": {
     "backgroundColor": "#0e1621"

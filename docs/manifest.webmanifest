@@ -1,7 +1,7 @@
 {
-  "name": "Stick Arena: Reborn",
-  "short_name": "Stick Arena",
-  "description": "The classic Flash arena shooter, rebuilt in HTML5. Play online or offline against bots.",
+  "name": "Stick Clash",
+  "short_name": "Stick Clash",
+  "description": "A fast top-down stick-figure arena shooter. Play online or offline against bots.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

@@ -1,4 +1,6 @@
-# Stick Arena: Reborn
+# Stick Clash
+
+_A top-down stick-figure arena shooter in HTML5, inspired by Stick Arena (formerly "Stick Arena: Reborn")._
 
 A modern, open-source **HTML5 reimplementation** of the Flash game [Stick Arena](https://www.xgenstudios.com/play/stickarena) by XGenStudios.
 

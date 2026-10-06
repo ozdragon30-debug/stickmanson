@@ -268,7 +268,7 @@ class Menu {
     const link = location.href;
     try {
       if (navigator.share && inputMode.mode === 'touch') {
-        await navigator.share({ title: 'Stick Arena: Reborn', text: t('menu.room.shareText'), url: link });
+        await navigator.share({ title: 'Stick Clash', text: t('menu.room.shareText'), url: link });
         return;
       }
       await navigator.clipboard.writeText(link);
