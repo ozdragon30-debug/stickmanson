@@ -2,6 +2,21 @@
 
 ## 2026 modernisation
 
+### Engine rewritten
+
+- All remaining engine code from the original import was rewritten in a new
+  structure: physics, map loading, player, bots and pathfinding, bot matches,
+  network handlers, input, chat, scoreboard, sprites, settings panel, the
+  game loop, and the whole server (now split into `server/*.js`).
+- Gameplay is unchanged: `npm run regression` runs the pre-rewrite version
+  (9948cb8) and the current one side by side on a fake clock with seeded
+  randomness and compares map parsing, movement, every weapon's hits in 16
+  directions, death/respawn timing and six full bot matches (every shot) —
+  0 differences. A two-player online run (chat, hits, kill, respawn sync)
+  was also checked against the new server.
+- Every APK build is now kept as `StickClash-<commit>.apk` on the release, so
+  any earlier version can be reinstalled (pre-rewrite: StickClash-f076cf4.apk).
+
 ### Gameplay fixes
 
 - Online: a killed player stays a corpse on everyone's screen until their
