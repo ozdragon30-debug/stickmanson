@@ -3,6 +3,11 @@
 name: Android APK
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Build an older version (commit) as a separate side-by-side app; empty = current'
+        required: false
+        default: ''
   push:
     paths:
       - 'docs/**'
@@ -19,6 +24,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Older version as a separate app (manual runs with a ref)
+        if: ${{ github.event.inputs.ref != '' && github.event.inputs.ref != null }}
+        run: |
+          REF='${{ github.event.inputs.ref }}'
+          git checkout "$REF" -- docs tools capacitor.config.json
+          SHORT=$(git rev-parse --short=7 "$REF")
+          # Own app id and name, so it installs next to the current game.
+          python3 - <<'PY'
+          import json
+          c = json.load(open('capacitor.config.json'))
+          c['appId'] = 'io.github.stickarena.classic'
+          c['appName'] = 'Stick Arena Eski'
+          json.dump(c, open('capacitor.config.json', 'w'), indent=2)
+          PY
+          echo "OLD_APK=StickArena-eski-$SHORT.apk" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -50,13 +72,20 @@ jobs:
         # StickClash.apk is always the newest build; every build is also kept
         # as StickClash-<commit>.apk so any older version can be reinstalled.
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk StickClash.apk
-          cp StickClash.apk "StickClash-${GITHUB_SHA::7}.apk"
-          echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          if [ -n "$OLD_APK" ]; then
+            cp android/app/build/outputs/apk/debug/app-debug.apk "$OLD_APK"
+            echo "MAIN_APK=$OLD_APK" >> "$GITHUB_ENV"
+            echo "COPY_APK=$OLD_APK" >> "$GITHUB_ENV"
+          else
+            cp android/app/build/outputs/apk/debug/app-debug.apk StickClash.apk
+            cp StickClash.apk "StickClash-${GITHUB_SHA::7}.apk"
+            echo "MAIN_APK=StickClash.apk" >> "$GITHUB_ENV"
+            echo "COPY_APK=StickClash-${GITHUB_SHA::7}.apk" >> "$GITHUB_ENV"
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: StickClash-apk
-          path: StickClash.apk
+          path: ${{ env.MAIN_APK }}
       - name: Publish on the android-latest release
         uses: softprops/action-gh-release@v2
         with:
@@ -70,5 +99,5 @@ jobs:
             Built from ${{ github.sha }}.
             Older builds: StickClash-<commit>.apk (each build is kept, so you can go back).
           files: |
-            StickClash.apk
-            StickClash-${{ env.SHORT_SHA }}.apk
+            ${{ env.MAIN_APK }}
+            ${{ env.COPY_APK }}
