@@ -66,6 +66,7 @@
   "js/pwa.js",
   "js/render/Emblems.js",
   "js/render/Pets.js",
+  "js/render/WeaponArt.js",
   "js/spritesheet/AtlasSpritesheet.js",
   "js/spritesheet/Inbetween.js",
   "js/ui/Menu.js",
@@ -145,8 +146,6 @@
   "sprites/maps/water.webp",
   "sprites/particles/spritesheet.json",
   "sprites/particles/spritesheet.webp",
-  "sprites/pickup/spritesheet.json",
-  "sprites/pickup/spritesheet.webp",
   "sprites/player/inbetween.json",
   "sprites/player/spritesheet.json",
   "sprites/player/spritesheet.webp"

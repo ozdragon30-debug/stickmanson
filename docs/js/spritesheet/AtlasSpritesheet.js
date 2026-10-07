@@ -134,12 +134,11 @@ const deathAtlas = new AtlasSpritesheet(
   'sprites/death/spritesheet.json'
 );
 
-// Singleton pickup atlas loaded once
-const pickupAtlas = new AtlasSpritesheet(
-  'pickup',
-  'sprites/pickup/spritesheet.png',
-  'sprites/pickup/spritesheet.json'
-);
+// Weapon pickups: Stick Clash's own art, drawn from code (render/WeaponArt.js).
+const pickupAtlas = (() => {
+  const { canvas, data } = WeaponArt.buildSheet();
+  return new AtlasSpritesheet('pickup', null, data, { image: canvas });
+})();
 
 // Singleton heartbeat atlas (HUD health indicator)
 const heartbeatAtlas = new AtlasSpritesheet('heartbeat', null, { animations: Emblems.HEART_ANIMS }, { renderer: Emblems.heart });

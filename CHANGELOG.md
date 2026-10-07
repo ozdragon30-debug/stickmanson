@@ -9,6 +9,14 @@ classic ones. Our own:
   the classic arena look without copying it: warm orange arena dirt, purple
   alien ground, studded concrete barriers, planks and scrap lying around,
   livelier colours. The classic maps and map tiles are removed.
+- **Health panel:** heart badge and a segmented capsule bar that turns green →
+  amber → red as health drops (display only).
+- **Spinners redesigned:** lighter shading so the player's colour comes out
+  vivid, swept trails behind the motifs, geared and comet rings on higher tiers.
+  Prices and perks unchanged.
+- **Weapon pickups:** our own code-drawn art for the floor items, HUD and
+  kill-feed icons (render/WeaponArt.js), same frame sizes. Weapons in hand,
+  hits, sounds and blood are unchanged.
 - **Spinners, cursors, blood and HUD heart:** code-drawn (render/Emblems.js).
 - **Name and logo:** Stick Clash.
 - **Coins, spinner shop, pets, VIP groundwork** (short rounds pay no coins,
