@@ -4,15 +4,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Stick Arena: Reborn</title>
-  <meta name="description" content="Stick Arena: Reborn — the classic Flash top-down stick-figure shooter, rebuilt in HTML5. Play online or offline against bots.">
+  <title>Stick Clash</title>
+  <meta name="description" content="Stick Clash — a fast top-down stick-figure arena shooter in HTML5. Play online or offline against bots.">
   <meta name="theme-color" content="#0e1621">
   <meta name="color-scheme" content="dark">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta property="og:title" content="Stick Arena: Reborn">
-  <meta property="og:description" content="The classic Flash arena shooter, rebuilt in HTML5. Play in your browser — online or vs bots.">
+  <meta property="og:title" content="Stick Clash">
+  <meta property="og:description" content="A fast top-down stick-figure arena shooter. Play in your browser — online or vs bots.">
   <meta property="og:type" content="website">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -24,7 +24,7 @@
 
 <body>
   <main id="stage">
-    <canvas id="canvas" width="960" height="720" aria-label="Stick Arena game view"></canvas>
+    <canvas id="canvas" width="960" height="720" aria-label="Stick Clash game view"></canvas>
     <div id="touch-layer" aria-hidden="true"></div>
     <div class="rotate-hint" aria-hidden="true"><span>⟳</span> <span data-i18n="hud.rotate">Rotate your device for a bigger view</span></div>
   </main>
@@ -32,7 +32,7 @@
   <div id="menu" class="menu open" role="dialog" aria-modal="true" aria-labelledby="menu-title">
     <div class="menu-card">
       <div class="menu-main">
-      <h1 id="menu-title" class="logo">STICK ARENA<span>Reborn</span></h1>
+      <h1 id="menu-title" class="logo"><img src="icons/icon.svg" alt="" width="64" height="64">STICK <b>CLASH</b><span>Arena Shooter</span></h1>
 
       <label class="menu-label" for="menu-name" data-i18n="menu.name">Your name</label>
       <input id="menu-name" class="menu-input" type="text" maxlength="20" autocomplete="nickname" spellcheck="false">
@@ -85,14 +85,14 @@
 
       <details class="menu-help">
         <summary data-i18n="menu.about">About</summary>
-        <p data-i18n-html="menu.about.text"><strong>Stick Arena</strong> was a browser-based multiplayer shooter created by XGenStudios. After Flash was discontinued, the official servers went offline. This is an open-source <strong>HTML5 reimplementation</strong> with all original maps, weapons and sprites. Play offline against bots right here, or host your own server for multiplayer.</p>
+        <p data-i18n-html="menu.about.text"><strong>Stick Clash</strong> is based on Stick Arena, a browser-based multiplayer shooter created by XGenStudios. After Flash was discontinued, the official servers went offline. This is an open-source <strong>HTML5 reimplementation</strong> with all original maps, weapons and sprites. Play offline against bots right here, or host your own server for multiplayer.</p>
         <p class="menu-legal" data-i18n="menu.legal">Game assets &copy; XGenStudios — non-commercial use only (CC BY-NC-SA 4.0).</p>
       </details>
       </div>
     </div>
   </div>
 
-  <noscript><p class="noscript">Stick Arena: Reborn needs JavaScript enabled to run.</p></noscript>
+  <noscript><p class="noscript">Stick Clash needs JavaScript enabled to run.</p></noscript>
 
   <!-- socket.io client. Normally served by the game server itself. With
        ?server=https://host (e.g. the GitHub Pages build playing online) the
