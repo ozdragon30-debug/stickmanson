@@ -107,10 +107,10 @@ class Menu {
 
   // Offline only: pick the map for the next round (or keep the random rotation).
   _buildMapPicker() {
-    const groups = { '': [], 'feature/': [], 'ballistick/': [] };
+    const groups = { clash: [], '': [], 'feature/': [], 'ballistick/': [] };
     for (const f of BotManager.OFFLINE_MAPS) {
       if (f === 'debug.dat') continue;
-      const g = f.startsWith('feature/') ? 'feature/' : f.startsWith('ballistick/') ? 'ballistick/' : '';
+      const g = BotManager.CLASH_MAPS.includes(f) ? 'clash' : f.startsWith('feature/') ? 'feature/' : f.startsWith('ballistick/') ? 'ballistick/' : '';
       groups[g].push(f);
     }
     const sel = this.mapSelect;
@@ -120,7 +120,7 @@ class Menu {
     sel.appendChild(random);
     for (const [g, files] of Object.entries(groups)) {
       const og = document.createElement('optgroup');
-      og.label = g === '' ? 'Stick Arena' : g === 'feature/' ? t('menu.map.featured') : 'Ballistick';
+      og.label = g === 'clash' ? 'Stick Clash' : g === '' ? 'Stick Arena' : g === 'feature/' ? t('menu.map.featured') : 'Ballistick';
       for (const f of files.sort()) {
         const o = document.createElement('option');
         o.value = f;

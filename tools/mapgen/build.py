@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Builds the game's maps and map tileset from tools/mapgen/maps.py.
 
-Writes docs/data/maps/*.dat, docs/sprites/maps/atlas.{png,webp,json}.
+Writes the Stick Clash maps (docs/data/maps/<name>.dat + .webp) and their water
+atlas docs/sprites/maps/water.{png,webp,json}; the classic maps are left alone.
 Usage: python3 tools/mapgen/build.py   (needs: pip install pillow numpy)
 """
 import json, os, sys
@@ -203,11 +204,10 @@ def write_atlas():
         keys.append(key)
     frames['W00.png'] = frames[keys[0]]
     out = os.path.join(ROOT, 'sprites', 'maps')
-    for f in os.listdir(out): os.remove(os.path.join(out, f))
-    sheet.save(os.path.join(out, 'atlas.png'), optimize=True)
-    sheet.save(os.path.join(out, 'atlas.webp'), quality=90, method=6)
+    sheet.save(os.path.join(out, 'water.png'), optimize=True)
+    sheet.save(os.path.join(out, 'water.webp'), quality=90, method=6)
     json.dump({'frames': frames, 'tileAnimations': {'W00': {'fps': 8, 'frames': keys}}},
-              open(os.path.join(out, 'atlas.json'), 'w'), separators=(',', ':'))
+              open(os.path.join(out, 'water.json'), 'w'), separators=(',', ':'))
 
 
 THEMES = {
@@ -257,8 +257,7 @@ def main():
         print(f"{spec['file']:22s} {len(rows[0])}x{len(rows)}  spawns {len(spawns)}  weapons {len(weapons)}")
     mapdir = os.path.join(ROOT, 'data', 'maps')
     if not only:
-        for f in os.listdir(mapdir):
-            if f.endswith(('.dat', '.webp')): os.remove(os.path.join(mapdir, f))
+        pass  # each map's .dat/.webp is overwritten below; classic maps stay
     for i, b in enumerate(built):
         bg = write_background(b[0], seed=1000 + i * 17)
         write_dat(*b, bg)

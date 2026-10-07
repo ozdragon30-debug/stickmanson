@@ -22,6 +22,13 @@ class BotManager {
   static BOT_NAMES = ['Alpha', 'Beta', 'Delta', 'Omega', 'Gamma', 'Zeta', 'Theta'];
 
   // Maps known to play nicely for solo-vs-bots.
+  // The painted Stick Clash maps (tools/mapgen), played alongside the classic ones.
+  static CLASH_MAPS = [
+    'asphaltstreets.dat', 'officefloor.dat', 'stormchannel.dat', 'trailerpark.dat', 'orbitstation.dat',
+    'biolab.dat', 'containerport.dat', 'thepitarena.dat', 'hedgemaze.dat', 'shipyard.dat',
+    'foundry.dat', 'sandbase.dat', 'stonekeep.dat', 'rooftops.dat', 'metroline.dat',
+  ];
+
   static OFFLINE_MAPS = [
     'anarchystreets.dat',
     'battlegroundbase.dat',
@@ -148,6 +155,7 @@ class BotManager {
     'feature/universityofstick.dat',
     'feature/venicestreets.dat',
     'feature/voiders.dat',
+    ...BotManager.CLASH_MAPS,
   ];
 
   // Offline rounds mirror the server's rules: 5-minute rounds, 10 s scoreboard.

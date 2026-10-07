@@ -23,6 +23,10 @@ class MapLoader {
     this.collisionMap = [];   // 0=walkable, 1=solid (based on 6th char == '3')
     this.spawnPoints = [];    // [{x, y}]
     this.weaponSpawns = [];   // [{x, y, weaponId, respawnTime (ms)}]
+    this.bgImage = null;      // painted background (Stick Clash maps; drawing only)
+    this.bgFile = null;
+    this.bgPad = 0;
+    this.bgPx = 0;
   }
 
   async load(url) {
@@ -30,11 +34,23 @@ class MapLoader {
     if (!resp.ok) throw new Error(`Failed to load map: ${url}`);
     const text = await resp.text();
     this._parse(text);
+    if (this.bgFile) {
+      // Painted map: decode the picture before the map goes live.
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = url.slice(0, url.lastIndexOf('/') + 1) + this.bgFile;
+      try { await img.decode(); this.bgImage = img; } catch (e) { console.error('Map background failed to load:', e); }
+    }
     this.ready = true;
   }
 
   _parse(text) {
     const s = text.replace(/\r/g, '').trim();
+    // Optional painted background: &bg= file &bgpad= tiles around &bgpx= px per tile.
+    const bg = s.match(/&bg=\s*([\w.-]+)/i);
+    this.bgFile = bg ? bg[1] : null;
+    this.bgPad = parseInt((s.match(/&bgpad=\s*(\d+)/i) || [])[1] || '0', 10);
+    this.bgPx = parseInt((s.match(/&bgpx=\s*(\d+)/i) || [])[1] || '0', 10);
 
     // inf=W H Map Name
     const infMatch = s.match(/inf=(\d+)\s+(\d+)\s+([^\n&]+)/i);

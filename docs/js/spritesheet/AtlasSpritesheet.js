@@ -144,6 +144,9 @@ const bloodAtlas = new AtlasSpritesheet(
 );
 
 // Singleton map atlas loaded once
+// Water for the painted Stick Clash maps.
+const waterAtlas = new AtlasSpritesheet('water', 'sprites/maps/water.png', 'sprites/maps/water.json');
+
 const mapAtlas = new AtlasSpritesheet(
   'map',
   'sprites/maps/atlas.png',

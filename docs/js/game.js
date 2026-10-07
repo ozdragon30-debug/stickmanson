@@ -34,15 +34,20 @@ function parsedTiles() {
   return map._parsed;
 }
 
+// Stick Clash maps use their own small water atlas (tile keys "W…");
+// the classic maps use the big classic atlas.
+const atlasFor = tileType => (tileType[0] === 'W' && waterAtlas.ready ? waterAtlas : mapAtlas);
+
 function isAnimatedTile(tileType) {
-  const a = mapAtlas.tileAnimations[tileType];
+  const a = atlasFor(tileType).tileAnimations[tileType];
   return !!(a && a.frames.length > 1);
 }
 
 // Draws one tile in world coordinates. `seam` overdraws by ~1 device pixel so
 // anti-aliased edges at non-integer scales leave no hairline gaps.
 function drawTile(c, cell, x, y, nowMs, seam) {
-  const f = mapAtlas.getAnimatedMapTileFrame(cell.tileType, nowMs);
+  const atlas = atlasFor(cell.tileType);
+  const f = atlas.getAnimatedMapTileFrame(cell.tileType, nowMs);
   if (!f) return;
   const half = TILE / 2;
   c.save();
@@ -51,7 +56,7 @@ function drawTile(c, cell, x, y, nowMs, seam) {
   if (cell.flip !== 0) {
     c.scale((cell.flip === 1 || cell.flip === 3) ? -1 : 1, (cell.flip === 2 || cell.flip === 3) ? -1 : 1);
   }
-  c.drawImage(mapAtlas.image, f.x, f.y, f.w, f.h, -half - seam / 2, -half - seam / 2, TILE + seam, TILE + seam);
+  c.drawImage(atlas.image, f.x, f.y, f.w, f.h, -half - seam / 2, -half - seam / 2, TILE + seam, TILE + seam);
   c.restore();
 }
 
@@ -68,7 +73,8 @@ const mapCache = {
   draw(c, x0, x1, y0, y1, nowMs) {
     const res = Math.min(2.5, display.scale * worldScale()); // chunk pixels per world unit
     const smooth = !settingsManager.get('pixelArt');
-    if (this._for !== map.tiles || this._res !== res || this._smooth !== smooth) {
+    if (this._for !== map.tiles || this._res !== res || this._smooth !== smooth || this._bg !== map.bgImage) {
+      this._bg = map.bgImage;
       this._chunks.clear();
       this._for = map.tiles; this._res = res; this._smooth = smooth;
     }
@@ -109,6 +115,7 @@ const mapCache = {
     c.imageSmoothingEnabled = smooth;
     c.setTransform(res, 0, 0, res, -cx * size * res, -cy * size * res);
     const parsed = parsedTiles();
+    if (map.bgImage) return this._buildFromBackground(c, cx, cy, canvas, parsed);
     const animated = [], outside = [];
     for (let y = cy * C; y < (cy + 1) * C; y++) {
       for (let x = cx * C; x < (cx + 1) * C; x++) {
@@ -129,6 +136,30 @@ const mapCache = {
     }
     c.fillStyle = 'rgba(4,8,14,0.62)';
     for (const [x, y] of outside) c.fillRect(x * TILE - 0.5, y * TILE - 0.5, TILE + 1, TILE + 1);
+    return { canvas, animated };
+  },
+
+  // Painted Stick Clash maps: the chunk is a piece of the map's background
+  // picture (which also covers a few tiles of surroundings); animated water
+  // still goes on top.
+  _buildFromBackground(c, cx, cy, canvas, parsed) {
+    const C = this.CHUNK, size = C * TILE;
+    const img = map.bgImage, k = map.bgPx / TILE, pad = map.bgPad * map.bgPx;
+    c.imageSmoothingQuality = 'high';
+    let sx = cx * size * k + pad, sy = cy * size * k + pad, sw = size * k, sh = size * k;
+    let dx = cx * size, dy = cy * size, dw = size, dh = size;
+    if (sx < 0) { dx -= sx / k; dw += sx / k; sw += sx; sx = 0; }
+    if (sy < 0) { dy -= sy / k; dh += sy / k; sh += sy; sy = 0; }
+    if (sx + sw > img.width) { const cut = sx + sw - img.width; sw -= cut; dw -= cut / k; }
+    if (sy + sh > img.height) { const cut = sy + sh - img.height; sh -= cut; dh -= cut / k; }
+    if (sw > 0 && sh > 0) c.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+    const animated = [];
+    for (let y = Math.max(0, cy * C); y < Math.min(map.height, (cy + 1) * C); y++) {
+      for (let x = Math.max(0, cx * C); x < Math.min(map.width, (cx + 1) * C); x++) {
+        const cell = parsed[y * map.width + x];
+        if (cell && isAnimatedTile(cell.tileType)) animated.push([x, y]);
+      }
+    }
     return { canvas, animated };
   },
 };
@@ -478,7 +509,7 @@ settingsManager.onChange((key, value) => {
     if (menu._ready) menu.playBtn.textContent = t('menu.play');
     menu._renderRecentRooms();
     const groups = document.querySelectorAll('#menu-map-select optgroup');
-    if (groups[1]) groups[1].label = t('menu.map.featured');
+    if (groups[2]) groups[2].label = t('menu.map.featured');
     if (settingsManager.isOpen()) settingsManager._refresh();
   }
 });
