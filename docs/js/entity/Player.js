@@ -14,6 +14,9 @@ class Player {
     // Both are synced to/from the server so all clients see the same spinner.
     this.indicatorShapeIndex = Math.floor(Math.random() * 64);
     this.indicatorHue = Math.floor(Math.random() * 360);
+    // Shop extras shown to everyone: pet companion (-1 = none) and VIP badge.
+    this.petId = -1;
+    this.vip = false;
 
     // Current weapon definition (from Constants.WEAPON_ID_MAP).
     this.currentWeapon = Constants.WEAPON_ID_MAP[0]; // fist default
@@ -57,7 +60,7 @@ class Player {
 
     // Death animation finished — respawn.
     this.deathBody.addEventListener("animationcomplete", () => {
-      this.health = 100;
+      this.health = this.maxHealth();
       this.canShoot = true;
       this.canMove = true;
 
@@ -341,7 +344,7 @@ class Player {
     const { x, y } = pts[Math.floor(Math.random() * pts.length)];
 
     clearTimeout(this._cooldownTimer);
-    this.health = 100;
+    this.health = this.maxHealth();
     this.isRespawning = false;
     this.canShoot = true;
     this.canMove = true;
@@ -358,6 +361,11 @@ class Player {
     }
   }
 
+  // 100, plus the local player's health perk from the spinner shop.
+  maxHealth() {
+    return this.isMainPlayer && typeof shopManager !== 'undefined' ? shopManager.maxHealth() : 100;
+  }
+
   showHitsplat(damage, attackerWeaponId, attackerPos = null) {
     const attackerWeapon = Constants.WEAPON_ID_MAP[attackerWeaponId];
     // Weapons without an impactSound fell back to 'impact', a file that doesn't
@@ -370,7 +378,9 @@ class Player {
     this.hitsplat.setPosition(this.body.x, this.body.y);
     this.hitsplat.isVisible = true;
     this._hitFxAt = performance.now(); // render-only (hit rim flash)
-    this.health -= (damage ?? this.currentWeapon.damage) * Constants.DAMAGE_MULTIPLIER;
+    // Spinner perk (shop): armor reduces what the local player takes.
+    const armor = this.isMainPlayer && typeof shopManager !== 'undefined' ? shopManager.armorFactor() : 1;
+    this.health -= (damage ?? this.currentWeapon.damage) * Constants.DAMAGE_MULTIPLIER * armor;
 
     if (this.isMainPlayer) {
       if (typeof hudManager !== 'undefined') hudManager.onDamaged(attackerPos);
@@ -397,6 +407,7 @@ class Player {
 
     if (this.isMainPlayer) {
       this.healthbarHeart.update();
+      this._regen();
     }
 
     // Legs stop as soon as the player stops (they used to keep running until the
@@ -424,6 +435,45 @@ class Player {
         this.previousPosition = currentPosition;
       }
     }
+  }
+
+  // Pet perk: slow health regeneration once out of combat for 4 s.
+  _regen() {
+    const now = performance.now(), dt = Math.min(0.25, (now - (this._regenAt || now)) / 1000);
+    this._regenAt = now;
+    const rate = typeof shopManager !== 'undefined' ? shopManager.regenPerSec() : 0;
+    if (!rate || this.isRespawning || this.health <= 0) return;
+    if (typeof isOfflinePaused === 'function' && isOfflinePaused()) return;   // no healing behind a menu
+    if (now - (this._hitFxAt || -1e9) < 4000) return;
+    this.health = Math.min(this.maxHealth(), this.health + rate * dt);
+    const anim = this.health >= 75 ? 'heartbeat_healthy' : this.health > 20 ? 'heartbeat_impacted' : 'heartbeat_critical';
+    if (this.healthbarHeart.animName !== anim) this.healthbarHeart.setAnimation(anim);
+  }
+
+  // Pet companion: trots after its owner, a little behind and to the side.
+  _drawPet(ctx) {
+    const id = this.isMainPlayer && typeof shopManager !== 'undefined' ? shopManager.pet : this.petId;
+    if (id == null || id < 0 || this.isRespawning || typeof Pets === 'undefined') { this._pet = null; return; }
+    const now = performance.now(), face = this.body.rotation - Math.PI / 2;
+    const tx = this.body.x - Math.cos(face) * 26 - Math.sin(face) * 16;
+    const ty = this.body.y - Math.sin(face) * 26 + Math.cos(face) * 16;
+    let p = this._pet;
+    if (!p || Math.hypot(p.x - tx, p.y - ty) > 300) p = this._pet = { x: tx, y: ty, a: face, t: now };
+    const dt = Math.min(0.1, (now - p.t) / 1000); p.t = now;
+    const k = 1 - Math.exp(-dt * 7), dx = (tx - p.x) * k, dy = (ty - p.y) * k;
+    p.x += dx; p.y += dy;
+    const moving = Math.hypot(dx, dy) > 0.25 * (dt * 60);
+    const want = moving ? Math.atan2(dy, dx) : face;
+    let da = want - p.a; da = Math.atan2(Math.sin(da), Math.cos(da));
+    p.a += da * Math.min(1, dt * 10);
+    const time = now / 1000, fly = Pets.FLYING.has(id);
+    if (fx.enabled) fx.shadow(ctx, p.x + 3, p.y + (fly ? 12 : 4), fly ? 9 : 11, fly ? 0.45 : 0.7);
+    ctx.save();
+    ctx.translate(p.x, p.y - (fly ? 6 + Math.sin(time * 3) * 2 : 0));
+    ctx.rotate(p.a + Math.PI / 2);
+    ctx.scale(1.3, 1.3);
+    Pets.draw(ctx, id, time, moving);
+    ctx.restore();
   }
 
   _drawIndicator(ctx) {
@@ -470,7 +520,8 @@ class Player {
     const u = display.uiScale || 1;
     const label = this.afk ? `💤 ${this.name}` : this.name;
     const res = Math.max(1, display.scale * worldScale());
-    const key = label + '|' + u + '|' + res;
+    const vip = this.isMainPlayer && typeof shopManager !== 'undefined' ? shopManager.vip : this.vip;
+    const key = label + '|' + u + '|' + res + '|' + vip;
     if (this._tag && this._tag.key === key) return this._tag;
     const font = `bold ${Math.round(11 * u)}px monospace`;
     const pad = 3, th = Math.round(13 * u);
@@ -487,7 +538,7 @@ class Player {
     c.font = font;
     c.textAlign = 'center';
     c.textBaseline = 'bottom';
-    c.fillStyle = this.afk ? '#9fb3c8' : '#ffffff';
+    c.fillStyle = this.afk ? '#9fb3c8' : vip ? '#ffd166' : '#ffffff';
     c.fillText(label, w / 2, th);
     this._tag = { key, canvas, w, h: th };
     return this._tag;
@@ -513,6 +564,7 @@ class Player {
   draw(ctx) {
     // Indicator spinner drawn first (below everything).
     this._drawIndicator(ctx);
+    this._drawPet(ctx);
     const modern = fx.enabled;
     if (modern && !this.isRespawning) {
       // Soft ground light in the player's colour, so everyone reads at a glance.

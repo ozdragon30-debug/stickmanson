@@ -336,6 +336,7 @@ class BotManager {
     this._offlineRounds = true;
     this._roundPhase = 'playing';
     this._lastTick = performance.now();
+    this._roundPlayedMs = 0;   // real play time (pauses excluded), for round coins
     scoreboardManager.roundEndsAt = Date.now() + BotManager.ROUND_MS;
   }
 
@@ -344,6 +345,7 @@ class BotManager {
     // Time spent paused (menus, hidden tab) doesn't count against the round.
     const gap = nowPerf - (this._lastTick || nowPerf);
     this._lastTick = nowPerf;
+    if (this._roundPhase === 'playing' && gap <= 250) this._roundPlayedMs = (this._roundPlayedMs || 0) + gap;
     if (gap > 250) {
       if (this._roundPhase === 'playing') scoreboardManager.roundEndsAt += gap;
       else this._nextRoundAt += gap;
@@ -357,9 +359,11 @@ class BotManager {
       scoreboardManager.showRoundEnd(scores);
       const myId = socketManager.socket?.id ?? 'local_player';
       const ranked = Object.entries(scores).sort(compareScores);
-      const won = !!ranked[0] && ranked[0][0] === myId;
+      const lead = ranked.length < 2 ? (ranked[0]?.[1].kills > 0) : ranked[0][1].kills > ranked[1][1].kills;
+      const won = !!ranked[0] && ranked[0][0] === myId && lead;
       soundManager.play(won ? 'win' : 'lose');
-      statsManager.onRoundEnd(won);
+      // Rounds cut short (e.g. "!next") pay no coins, so they can't be farmed.
+      statsManager.onRoundEnd(won, (this._roundPlayedMs || 0) >= 60000);
       chatManager.addMessage('Server', `Round over! Next round starting in ${BotManager.ROUND_END_MS / 1000} seconds...`, null);
       this._nextRoundAt = now + BotManager.ROUND_END_MS;
     } else if (this._roundPhase === 'roundEnd' && now >= this._nextRoundAt) {
@@ -467,7 +471,7 @@ class BotManager {
     const dmg = damage ?? playerManager.mainPlayer?.currentWeapon?.damage ?? 5;
     const wid = weaponId ?? playerManager.mainPlayer?.currentWeapon?.id ?? 0;
 
-    bot.player.showHitsplat(dmg, wid);
+    bot.player.showHitsplat(dmg * shopManager.attackFactor(), wid);
     if (bot.player.health > 0) return;
 
     bot.deaths++;

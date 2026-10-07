@@ -233,7 +233,7 @@ THEMES = {
 def write_background(spec, seed):
     img = PT.paint_map(spec['_info'], THEMES.get(spec['file'], {}), seed=seed)
     name = spec['file'].replace('.dat', '.webp')
-    Image.fromarray(img).save(os.path.join(ROOT, 'data', 'maps', name), quality=85, method=6)
+    Image.fromarray(img).save(os.path.join(ROOT, 'data', 'maps', name), quality=74, method=6)
     return name
 
 
@@ -250,7 +250,7 @@ def main():
     only = sys.argv[1:]
     registry = Registry()
     built = []
-    for spec in MAPS + [DEBUG_MAP]:
+    for spec in MAPS:   # the classic debug map stays as it is
         if only and spec['file'] not in only: continue
         rows, codes, spawns, weapons = build_map(spec, registry)
         built.append((spec, rows, codes, spawns, weapons))

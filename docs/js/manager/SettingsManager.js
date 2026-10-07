@@ -60,7 +60,7 @@ class SettingsManager {
     const saved = this._loadRaw();
     // Randomise identity on very first load (no saved prefs).
     if (saved.spinnerHue        == null) DEFAULT_SETTINGS.spinnerHue        = Math.floor(Math.random() * 360);
-    if (saved.spinnerShapeIndex == null) DEFAULT_SETTINGS.spinnerShapeIndex = Math.floor(Math.random() * 64);
+    if (saved.spinnerShapeIndex == null) DEFAULT_SETTINGS.spinnerShapeIndex = Math.floor(Math.random() * 4);  // a free one
     if (saved.cursorIndex       == null) DEFAULT_SETTINGS.cursorIndex       = Math.floor(Math.random() * 8);
     if (!saved.name)                     DEFAULT_SETTINGS.name              = 'Player' + Math.random().toString(36).slice(2, 5).toUpperCase();
 
@@ -184,19 +184,20 @@ class SettingsManager {
     p.indicatorShapeIndex = this.settings.spinnerShapeIndex;
     if (typeof socketManager !== 'undefined') {
       socketManager.emit('setName',        { name:       this.settings.name });
-      socketManager.emit('playerIdentity', { hue:        this.settings.spinnerHue,
-                                             shapeIndex: this.settings.spinnerShapeIndex });
+      socketManager.emit('playerIdentity', shopManager.identity());
     }
   }
 
   // Sync only spinner identity (hue + shape) without touching the name.
   _syncIdentity() {
     if (typeof playerManager === 'undefined' || !playerManager.mainPlayer) return;
+    // Perks changed: never keep health above the new maximum.
+    const me = playerManager.mainPlayer;
+    if (!me.isRespawning) me.health = Math.min(me.health, me.maxHealth());
     playerManager.mainPlayer.indicatorHue        = this.settings.spinnerHue;
     playerManager.mainPlayer.indicatorShapeIndex = this.settings.spinnerShapeIndex;
     if (typeof socketManager !== 'undefined') {
-      socketManager.emit('playerIdentity', { hue:        this.settings.spinnerHue,
-                                             shapeIndex: this.settings.spinnerShapeIndex });
+      socketManager.emit('playerIdentity', shopManager.identity());
     }
   }
 
@@ -274,8 +275,25 @@ class SettingsManager {
           <div id="sar-cursor-grid" class="sar-grid"></div>
         </div>
         <div class="sar-sec">
-          <div class="sar-lbl" data-i18n="set.spinner">Spinner Shape</div>
+          <div class="sar-lbl"><span data-i18n="set.spinner">Spinner Shape</span> — <span class="sar-coins" id="sar-coins"></span></div>
+          <div class="sar-hint" data-i18n="shop.hint"></div>
           <div id="sar-spin-grid" class="sar-grid sar-scroll"></div>
+          <div id="sar-spin-info" class="sar-spin-info"></div>
+        </div>
+        <div class="sar-sec">
+          <div class="sar-lbl" data-i18n="shop.pet">Pet</div>
+          <div class="sar-hint" data-i18n="shop.petHint"></div>
+          <div id="sar-pet-grid" class="sar-grid"></div>
+          <div id="sar-pet-info" class="sar-spin-info"></div>
+        </div>
+        <div class="sar-sec sar-vip">
+          <div class="sar-lbl">VIP <span class="sar-vip-badge">★</span></div>
+          <ul class="sar-vip-list">
+            <li data-i18n="vip.coins">+20% coins from every kill and round</li>
+            <li data-i18n="vip.name">Gold name above your player</li>
+            <li data-i18n="vip.more">More VIP spinners and pets are coming</li>
+          </ul>
+          <button class="sar-btn sar-buy" id="sar-vip-btn" disabled></button>
         </div>
         <div class="sar-sec">
           <label class="sar-lbl" for="sar-hue"><span data-i18n="set.color">Spinner Color</span> — <span id="sar-hue-lbl"></span></label>
@@ -455,6 +473,7 @@ class SettingsManager {
     this._syncControls();
     this._buildCursorPicker();
     this._buildSpinnerPicker();
+    this._buildPetPicker();
     this._buildKeybinds();
     this._showTab();
   }
@@ -526,6 +545,7 @@ class SettingsManager {
     grid.innerHTML = '';
     const names = Object.keys(indicatorAtlas.animationMap);
     const selIdx = this.settings.spinnerShapeIndex % names.length;
+    if (this._spinFocus == null) this._spinFocus = selIdx;
     names.forEach((anim, i) => {
       const fd = indicatorAtlas.getFrameData(anim, 0);
       if (!fd) return;
@@ -534,22 +554,135 @@ class SettingsManager {
       c.width = 40; c.height = 40;
       const cx = c.getContext('2d');
       cx.imageSmoothingEnabled = false;
+      const owned = shopManager.owns(i);
       const src = tintCache.get(indicatorAtlas, fd, this.settings.spinnerHue);
-      if (src) cx.drawImage(src.canvas, src.x, src.y, fd.w, fd.h,
-        (40 - fd.w * scale) / 2, (40 - fd.h * scale) / 2,
-        fd.w * scale, fd.h * scale);
+      if (src) {
+        if (!owned) cx.globalAlpha = 0.45;
+        cx.drawImage(src.canvas, src.x, src.y, fd.w, fd.h,
+          (40 - fd.w * scale) / 2, (40 - fd.h * scale) / 2,
+          fd.w * scale, fd.h * scale);
+      }
+      const perk = ShopManager.perk(i);
       const tile = document.createElement('button');
-      tile.className = 'sar-tile sar-tile-sm' + (i === selIdx ? ' sel' : '');
-      tile.setAttribute('aria-label', `Spinner ${i + 1}`);
+      tile.className = 'sar-tile sar-tile-sm' + (i === selIdx ? ' sel' : '') + (owned ? '' : ' locked')
+        + (i === this._spinFocus ? ' focus' : '') + (perk.stat ? ' perk-' + perk.stat : '');
+      tile.setAttribute('aria-label', `Spinner ${i + 1}: ${ShopManager.perkLabel(i)}`);
       tile.appendChild(c);
+      if (!owned) {
+        const tag = document.createElement('span');
+        tag.className = 'sar-price'; tag.textContent = perk.price;
+        tile.appendChild(tag);
+      }
       tile.onclick = () => {
-        this.settings.spinnerShapeIndex = i;
-        this._save();
-        this._syncIdentity();
-        grid.querySelectorAll('.sar-tile').forEach((el, j) => el.classList.toggle('sel', j === i));
+        this._spinFocus = i;
+        if (shopManager.owns(i)) {
+          this.settings.spinnerShapeIndex = i;
+          this._save();
+          this._syncIdentity();
+        }
+        this._buildSpinnerPicker();
       };
       grid.appendChild(tile);
     });
+    this._renderSpinInfo();
+  }
+
+  // ── Pet picker (shop) ─────────────────────────────────────────────────────
+  _buildPetPicker() {
+    const grid = this._panel.querySelector('#sar-pet-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    if (this._petFocus == null) this._petFocus = shopManager.pet;
+    for (let id = -1; id < ShopManager.PETS.length; id++) {
+      const tile = document.createElement('button');
+      const owned = id === -1 || shopManager.ownsPet(id);
+      tile.className = 'sar-tile sar-tile-pet' + (id === shopManager.pet ? ' sel' : '') + (owned ? '' : ' locked') + (id === this._petFocus ? ' focus' : '');
+      const c = document.createElement('canvas');
+      c.width = 46; c.height = 46;
+      const cx = c.getContext('2d');
+      if (id >= 0) {
+        cx.translate(23, 25); cx.scale(1.45, 1.45);
+        if (!owned) cx.globalAlpha = 0.55;
+        Pets.draw(cx, id, 0.4, false);
+      } else {
+        cx.strokeStyle = '#556677'; cx.lineWidth = 2;
+        cx.beginPath(); cx.arc(23, 23, 10, 0, Math.PI * 2); cx.moveTo(16, 30); cx.lineTo(30, 16); cx.stroke();
+      }
+      tile.appendChild(c);
+      if (!owned) {
+        const tag = document.createElement('span');
+        tag.className = 'sar-price'; tag.textContent = ShopManager.PETS[id].price;
+        tile.appendChild(tag);
+      }
+      tile.setAttribute('aria-label', id < 0 ? t('shop.none') : t(ShopManager.PETS[id].name));
+      tile.onclick = () => {
+        this._petFocus = id;
+        if (id === -1 || shopManager.ownsPet(id)) { shopManager.equipPet(id); this._syncIdentity(); }
+        this._buildPetPicker();
+      };
+      grid.appendChild(tile);
+    }
+    this._renderPetInfo();
+  }
+
+  _renderPetInfo() {
+    const box = this._panel.querySelector('#sar-pet-info');
+    const vipBtn = this._panel.querySelector('#sar-vip-btn');
+    if (vipBtn) vipBtn.textContent = shopManager.vip ? '★ ' + t('vip.active') : t('vip.soon');
+    if (!box) return;
+    box.innerHTML = '';
+    const id = this._petFocus;
+    const lbl = document.createElement('span');
+    lbl.textContent = id < 0 ? t('shop.none') : `${t(ShopManager.PETS[id].name)} · ${ShopManager.petLabel(id)}`;
+    box.appendChild(lbl);
+    if (id < 0 || shopManager.ownsPet(id)) return;
+    const price = ShopManager.PETS[id].price, afford = shopManager.coins >= price;
+    const btn = document.createElement('button');
+    btn.className = 'sar-btn sar-buy';
+    btn.textContent = afford ? `${t('shop.buy')} — ${price}` : `${t('shop.need')} (${price})`;
+    btn.disabled = !afford;
+    btn.onclick = () => {
+      if (!shopManager.buyPet(id)) return;
+      this._syncIdentity();
+      this._buildPetPicker();
+      this._renderSpinInfo();
+    };
+    box.appendChild(btn);
+  }
+
+  // Coins + the focused spinner's perk, with a Buy button when it isn't owned.
+  _renderSpinInfo() {
+    const coins = this._panel.querySelector('#sar-coins');
+    if (coins) coins.textContent = `${t('shop.coins')}: ${shopManager.coins}`;
+    const box = this._panel.querySelector('#sar-spin-info');
+    if (!box) return;
+    const i = this._spinFocus ?? this.settings.spinnerShapeIndex;
+    const perk = ShopManager.perk(i);
+    box.innerHTML = '';
+    const lbl = document.createElement('span');
+    lbl.textContent = `#${i + 1} · ${ShopManager.perkLabel(i)}`;
+    box.appendChild(lbl);
+    if (shopManager.owns(i)) {
+      if (i === this.settings.spinnerShapeIndex) {
+        const eq = document.createElement('span');
+        eq.className = 'sar-hint'; eq.textContent = ' ✓ ' + t('shop.equipped');
+        box.appendChild(eq);
+      }
+      return;
+    }
+    const btn = document.createElement('button');
+    btn.className = 'sar-btn sar-buy';
+    const afford = shopManager.coins >= perk.price;
+    btn.textContent = afford ? `${t('shop.buy')} — ${perk.price}` : `${t('shop.need')} (${perk.price})`;
+    btn.disabled = !afford;
+    btn.onclick = () => {
+      if (!shopManager.buy(i)) return;
+      this.settings.spinnerShapeIndex = i;
+      this._save();
+      this._syncIdentity();
+      this._buildSpinnerPicker();
+    };
+    box.appendChild(btn);
   }
 
   // The keybind buttons are rebuilt on every change: keep keyboard focus on the same one.

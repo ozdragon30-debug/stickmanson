@@ -12,6 +12,8 @@ socketManager.on("currentPlayers", (players) => {
     if (info.weaponId        != null) player.equipWeapon(info.weaponId, true);
     if (info.indicatorHue        != null) player.indicatorHue        = info.indicatorHue;
     if (info.indicatorShapeIndex != null) player.indicatorShapeIndex = info.indicatorShapeIndex;
+    if (info.petId != null) player.petId = info.petId;
+    player.vip = !!info.vip;
     player.afk = !!info.afk;
     playerManager.addPlayer(playerId, player);
   }
@@ -87,7 +89,9 @@ socketManager.on("playerGotHit", (data) => {
   if (!player || player.isRespawning) return;
 
   const attacker = playerManager.getPlayer(attackerId);
-  player.showHitsplat(damage, weaponId, attacker ? { x: attacker.body.x, y: attacker.body.y } : null);
+  // Attacker's spinner perk (bots have none).
+  const atk = attacker && !botManager.isBot(attackerId) ? ShopManager.attackFactorFor(attacker.indicatorShapeIndex, attacker.petId ?? -1) : 1;
+  player.showHitsplat((damage ?? Constants.WEAPON_ID_MAP[weaponId]?.damage ?? 5) * atk, weaponId, attacker ? { x: attacker.body.x, y: attacker.body.y } : null);
 
   // Only the victim's own client triggers death, to avoid every player calling it.
   if (isMe && player.health <= 0) {
@@ -127,7 +131,7 @@ socketManager.on("connect", () => {
   // everyone sees the same weapon.
   me.equipWeapon(0, true);
   socketManager.emit('setName', { name: settingsManager.name });
-  socketManager.emit('playerIdentity', { hue: settingsManager.spinnerHue, shapeIndex: settingsManager.spinnerShapeIndex });
+  socketManager.emit('playerIdentity', shopManager.identity());
   socketManager.emit('playerMovement', me.getPosition());
 });
 
@@ -148,6 +152,13 @@ socketManager.on("gameState", (data) => {
     botManager.considerSpawning(data.scores);
   }));
 });
+
+// First place only counts as a win (and the win coins) with more kills than second.
+function _strictLead(scores, myId = socketManager.socket?.id) {
+  const sorted = Object.entries(scores).sort(compareScores);
+  if (!sorted.length || sorted[0][0] !== myId) return false;
+  return sorted.length < 2 ? sorted[0][1].kills > 0 : sorted[0][1].kills > sorted[1][1].kills;
+}
 
 function _myRank(scores) {
   const myId = socketManager.socket?.id;
@@ -193,7 +204,7 @@ socketManager.on("roundEnd", (data) => {
   scoreboardManager.showRoundEnd(scores);
   const rank = _myRank(scores);
   soundManager.play(rank === 1 ? 'win' : 'lose');
-  statsManager.onRoundEnd(rank === 1);
+  statsManager.onRoundEnd(rank === 1 && _strictLead(scores));
   _prevMyRank = null; // reset for next round
 });
 
@@ -251,6 +262,8 @@ socketManager.on("playerIdentityUpdate", (data) => {
   if (!player) return;
   player.indicatorHue        = data.indicatorHue;
   player.indicatorShapeIndex = data.indicatorShapeIndex;
+  player.petId = data.petId ?? -1;
+  player.vip = !!data.vip;
 });
 
 socketManager.on("pickupState", (states) => {
