@@ -1,7 +1,7 @@
 {
   "name": "stick-arena-reborn",
   "version": "1.0.0",
-  "description": "Stick Clash, a top-down stick-figure arena shooter in HTML5 (inspired by Stick Arena)",
+  "description": "HTML5 reimplementation of the Flash game Stick Arena",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
@@ -12,8 +12,7 @@
     "lint": "eslint .",
     "e2e": "node test/e2e/smoke.js",
     "maps": "node tools/gen-map-index.js",
-    "parity": "node test/e2e/parity.js",
-    "regression": "node test/e2e/regression.js"
+    "parity": "node test/e2e/parity.js"
   },
   "author": "",
   "license": "CC-BY-NC-SA-4.0",

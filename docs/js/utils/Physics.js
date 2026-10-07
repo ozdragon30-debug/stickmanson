@@ -1,107 +1,147 @@
-// Geometry used by gameplay: tile collision, line of sight and the hit tests
-// for each weapon shape. All positions are world pixels; tiles are 50 px.
-
-const TILE_PX = 50;
-
 class Physics {
-  // ── Small vector helpers ──────────────────────────────────────────────────
-  static distance(a, b) {
-    const dx = a.x - b.x, dy = a.y - b.y;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-
-  // Perpendicular distance from point p to the infinite line through a and b.
-  static distanceToLine(p, a, b) {
-    const cross = (b.y - a.y) * p.x - (b.x - a.x) * p.y + b.x * a.y - b.y * a.x;
-    return Math.abs(cross) / Physics.distance(a, b);
-  }
-
-  // Point (ox, oy) turned by `rotation` radians around (cx, cy).
-  static rotatePoint(cx, cy, ox, oy, rotation) {
-    const dx = ox - cx, dy = oy - cy;
-    const r = Math.sqrt(dx * dx + dy * dy);
-    const a = Math.atan2(dy, dx) + rotation;
-    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
-  }
-
-  // A circle touches a (rotated) rectangle when it is within `radius` of any
-  // of the lines through its four sides.
   static isCircleCollidingRect(circle, rect, radius = Constants.STICK_FIGURE_HEAD_RADIUS) {
-    const { topLeft: a, topRight: b, bottomLeft: c, bottomRight: d } = rect;
-    return Physics.distanceToLine(circle, a, b) <= radius ||
-           Physics.distanceToLine(circle, b, c) <= radius ||
-           Physics.distanceToLine(circle, c, d) <= radius ||
-           Physics.distanceToLine(circle, d, a) <= radius;
+    const corner1 = rect.topLeft;
+    const corner2 = rect.topRight;
+    const corner3 = rect.bottomLeft;
+    const corner4 = rect.bottomRight;
+
+    const distance1 = this.distanceToLine(circle, corner1, corner2);
+    const distance2 = this.distanceToLine(circle, corner2, corner3);
+    const distance3 = this.distanceToLine(circle, corner3, corner4);
+    const distance4 = this.distanceToLine(circle, corner4, corner1);
+
+    if (distance1 <= radius || distance2 <= radius || distance3 <= radius || distance4 <= radius) {
+      return true;
+    }
+
+    return false;
   }
 
-  // ── Tile collision ────────────────────────────────────────────────────────
-  // Collision code c: ≤2 open, 3 and 4 fully solid, 5–9 partly solid. The
-  // partial shapes are defined for an unrotated, unflipped tile; the point is
-  // mapped back into that frame (undo rotation r × 90°, then the flip f).
+  static distanceToLine(point, linePoint1, linePoint2) {
+    const lineLength = this.distance(linePoint1, linePoint2);
+    const numerator = Math.abs((linePoint2.y - linePoint1.y) * point.x - (linePoint2.x - linePoint1.x) * point.y + linePoint2.x * linePoint1.y - linePoint2.y * linePoint1.x);
+    return numerator / lineLength;
+  }
+
+  static distance(point1, point2) {
+    return Math.sqrt(Math.pow(point1.x - point2.x, 2) + Math.pow(point1.y - point2.y, 2));
+  }
+
+  // https://stackoverflow.com/a/22428650
+  static rotatePoint(playerX, playerY, otherX, otherY, rotation) {
+    const dx = otherX - playerX;
+    const dy = otherY - playerY;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const otherPointAngle = Math.atan2(dy, dx);
+    const screenX = playerX + length * Math.cos(otherPointAngle + rotation);
+    const screenY = playerY + length * Math.sin(otherPointAngle + rotation);
+
+    return ({
+      x: screenX,
+      y: screenY
+    });
+  }
+
+  // Returns true if the player's sub-tile position (localX, localY within the
+  // 50×50 tile) is inside the tile's blocked walk zone, accounting for rotation.
   static isTileWalkBlocked(tile, localX, localY) {
     const { c, r, f = 0 } = tile;
     if (c <= 2) return false;
     if (c === 3 || c === 4) return true;
-    const S = TILE_PX;
-    let x = localX, y = localY;
-    switch (r) {
-      case 1: [x, y] = [y, S - x]; break;
-      case 2: [x, y] = [S - x, S - y]; break;
-      case 3: [x, y] = [S - y, x]; break;
-    }
-    if (f & 1) x = S - x;
-    if (f & 2) y = S - y;
-    const half = S / 2;
+
+    // Partial collision (c=5–9): un-rotate then un-flip to reach the canonical
+    // (R=0, F=0) frame. Rotation is applied first in rendering (ctx.rotate),
+    // then flip is applied in the rotated coordinate system (ctx.scale).
+    // So we undo rotation FIRST to get back to unrotated space, then undo flip.
+    //
+    // Rendering uses ctx.rotate(r * π/2), which in Y-down canvas is visually CW:
+    //   r=1 → 90° CW on screen (top→right);  inverse: [lx,ly] = [ly, 50-lx]
+    //   r=3 → 90° CCW on screen (top→left);  inverse: [lx,ly] = [50-ly, lx]
+    let lx = localX, ly = localY;
+    if      (r === 1) { [lx, ly] = [ly, 50 - lx]; }
+    else if (r === 2) { [lx, ly] = [50 - lx, 50 - ly]; }
+    else if (r === 3) { [lx, ly] = [50 - ly, lx]; }
+    if (f === 1 || f === 3) lx = 50 - lx;  // undo horizontal flip
+    if (f === 2 || f === 3) ly = 50 - ly;  // undo vertical flip
+
     switch (c) {
-      case 5: return y < S * 0.75;
-      case 6: return y < half;
-      case 7: return y < S * 0.25;
-      case 8: return x < half && y < half;
-      case 9: return y < half || x < half;
+      case 5: return ly < 37.5;                           // top 3/4 blocked
+      case 6: return ly < 25;                             // top half blocked
+      case 7: return ly < 12.5;                           // top 1/4 blocked
+      case 8: return lx < 25 && ly < 25;                  // top-left corner blocked
+      case 9: return ly < 25 || (lx < 25 && ly >= 25);   // top half + bottom-left blocked
       default: return false;
     }
   }
 
-  // ── Weapon hit shapes ─────────────────────────────────────────────────────
-  // Ray: the target's centre lies ahead (0 … maxRange along the aim) and no
-  // further than `radius` from the aim line.
+  // Ray hit: checks if targetPos centre is within 'radius' pixels of the ray
+  // fired from 'origin' in direction 'rotation' (radians), up to 'maxRange'.
   static isRayHit(origin, targetPos, rotation, maxRange, radius = Constants.STICK_FIGURE_HEAD_RADIUS) {
-    const dx = targetPos.x - origin.x, dy = targetPos.y - origin.y;
-    const ux = Math.cos(rotation), uy = Math.sin(rotation);
-    const along = dx * ux + dy * uy;
-    const side = Math.abs(dx * uy - dy * ux);
-    return along >= 0 && along <= maxRange && side <= radius;
+    const dx = targetPos.x - origin.x;
+    const dy = targetPos.y - origin.y;
+    const fwdX = Math.cos(rotation);
+    const fwdY = Math.sin(rotation);
+    const t = dx * fwdX + dy * fwdY;           // scalar projection onto ray
+    const perp = Math.abs(dx * fwdY - dy * fwdX); // perpendicular distance
+    return t >= 0 && t <= maxRange && perp <= radius;
   }
 
-  // Circle: anything within maxRange, whatever the aim.
+  // Circle hit: checks if targetPos is within maxRange of origin (direction-independent).
   static isCircleHit(origin, targetPos, maxRange) {
-    return Physics.distance(targetPos, origin) <= maxRange;
+    const dx = targetPos.x - origin.x;
+    const dy = targetPos.y - origin.y;
+    return Math.sqrt(dx * dx + dy * dy) <= maxRange;
   }
 
-  // Cone: within maxRange and within spreadAngle/2 degrees of the aim.
+  // Cone hit: checks if targetPos is within 'maxRange' AND within half of
+  // 'spreadAngle' (degrees) either side of 'rotation' (radians).
   static isConeHit(origin, targetPos, rotation, maxRange, spreadAngle) {
-    const dx = targetPos.x - origin.x, dy = targetPos.y - origin.y;
-    if (Math.sqrt(dx * dx + dy * dy) > maxRange) return false;
-    let off = Math.atan2(dy, dx) - rotation;
-    off = Math.atan2(Math.sin(off), Math.cos(off));         // wrap to [-π, π]
-    return Math.abs(off) <= (spreadAngle * Math.PI / 180) / 2;
+    const dx = targetPos.x - origin.x;
+    const dy = targetPos.y - origin.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > maxRange) return false;
+    let angleDiff = Math.atan2(dy, dx) - rotation;
+    // Normalise to [-π, π]
+    angleDiff = ((angleDiff + Math.PI) % (2 * Math.PI)) - Math.PI;
+    return Math.abs(angleDiff) <= (spreadAngle * Math.PI / 180) / 2;
   }
 
-  // ── Line of sight ─────────────────────────────────────────────────────────
-  // True when a bullet-blocking tile (c = 3) lies between the two points. The
-  // segment is sampled every 10 px from `from` up to and including `to`.
-  static checkForObstacles(from, to) {
-    const dx = to.x - from.x, dy = to.y - from.y;
-    const steps = Math.sqrt(dx * dx + dy * dy) / 10;
-    const sx = dx / steps, sy = dy / steps;
-    const cols = (typeof map !== 'undefined' && map.ready) ? map.width : 35;
-    const haveGrid = obstacleGrid.length > 0;
-    let x = from.x, y = from.y;
-    for (let i = 0; i <= steps; i++) {
-      const tile = obstacleGrid[Math.floor(x / TILE_PX) + Math.floor(y / TILE_PX) * cols];
-      if (haveGrid && tile && tile.c === 3) return true;
-      x += sx; y += sy;
+  static checkForObstacles(playerPos, targetPlayerPos) {
+    // Calculate distance between players
+    const xDistance = targetPlayerPos.x - playerPos.x;
+    const yDistance = targetPlayerPos.y - playerPos.y;
+    const totalDistance = Math.sqrt(xDistance ** 2 + yDistance ** 2);
+
+    // Calculate number of tiles between players
+    const numTiles = totalDistance / 50;
+
+    // Calculate x and y increments for each tile
+    const xIncrement = xDistance / numTiles;
+    const yIncrement = yDistance / numTiles;
+
+    // Initialize variables for loop
+    let currentX = playerPos.x;
+    let currentY = playerPos.y;
+
+    // Iterate through tiles between players
+    for (let i = 0; i < numTiles; i++) {
+      // Convert current position to tile index
+      const tileX = Math.floor(currentX / 50);
+      const tileY = Math.floor(currentY / 50);
+      const mapWidth = (typeof map !== 'undefined' && map.ready) ? map.width : 35;
+      const tileIndex = tileX + tileY * mapWidth;
+
+      // Check if tile is an obstacle (only c=3 blocks bullets)
+      const tile = obstacleGrid[tileIndex];
+      if (obstacleGrid.length && tile && tile.c === 3) {
+        return true;
+      }
+
+      // Update current position
+      currentX += xIncrement;
+      currentY += yIncrement;
     }
+
     return false;
   }
 }

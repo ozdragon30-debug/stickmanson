@@ -1,46 +1,7 @@
-// A fighter in the arena: the local player or a networked/bot opponent.
-//
-// Sprite layers (all atlas driven):
-//   body       – torso + held weapon, loops the weapon's idle animation
-//   legs       – running cycle, shown only while walking
-//   deathBody  – one-shot death animation shown while respawning
-//   hitsplat   – one-shot blood burst when damaged
-//   muzzleFlash– one-shot particle when firing
-//
-// Only the local player ("main" player) performs hit tests, regenerates,
-// drives the heart icon and talks to the server; remote players are moved by
-// network updates which are eased to hide jitter.
-
 class Player {
-  // Hit area in front of the shooter for the default rectangular weapon
-  // shape, relative to the shooter position before rotation.
-  static GEOMETRY = {
-    spriteCenter: { x: 35, y: 485 },
-    hitboxOffsets: {
-      topLeft:     { x: 25, y: 0 },
-      topRight:    { x: 50, y: 0 },
-      bottomLeft:  { x: 25, y: 449 },
-      bottomRight: { x: 50, y: 449 }
-    }
-  };
-  static BASE_HEALTH = 100;
-  static FALLBACK_SPAWN = { x: 400, y: 300 };
-  static TILE = 50;
-
-  // Heart icon state for a given health value.
-  static heartAnimFor(health) {
-    if (health >= 75) return 'heartbeat_healthy';
-    if (health > 20) return 'heartbeat_impacted';
-    return 'heartbeat_critical';
-  }
-
-  // The shop/HUD singletons are absent on some test pages.
-  static hasShop() { return typeof shopManager !== 'undefined'; }
-  static hasHud() { return typeof hudManager !== 'undefined'; }
-
   constructor(x, y) {
-    this.health = Player.BASE_HEALTH;
-    this.kills = 0;
+    this.health = 100;
+    this.kills  = 0;
     this.deaths = 0;
     this.canMove = true;
     this.canShoot = true;
@@ -49,307 +10,296 @@ class Player {
     this.previousPosition = { x: -1, y: -1, rotation: -1 };
     this.name = '';
 
-    // Spinner identity (shape then hue), shared with other clients via the server.
+    // Indicator spinner — shape index + hue form the player's visual identity.
+    // Both are synced to/from the server so all clients see the same spinner.
     this.indicatorShapeIndex = Math.floor(Math.random() * 64);
     this.indicatorHue = Math.floor(Math.random() * 360);
-    // Cosmetics visible to everybody: companion pet (-1 means none), VIP tag.
-    this.petId = -1;
-    this.vip = false;
 
-    this.currentWeapon = Constants.WEAPON_ID_MAP[0];
+    // Current weapon definition (from Constants.WEAPON_ID_MAP).
+    this.currentWeapon = Constants.WEAPON_ID_MAP[0]; // fist default
 
+    // Body (upper half + weapon) — atlas-based, loops glock_idle by default.
     this.body = new AtlasGameObject(playerAtlas, 'fist_idle', x, y);
     this.body._defaultAnim = 'fist_idle';
+    // Provide hitbox data compatible with checkCollision (glock_shoot frame geometry).
     this.body.spritesheetData = {
-      spriteCenter: { ...Player.GEOMETRY.spriteCenter },
+      spriteCenter: { x: 35, y: 485 },
       hitboxOffsets: {
-        topLeft:     { ...Player.GEOMETRY.hitboxOffsets.topLeft },
-        topRight:    { ...Player.GEOMETRY.hitboxOffsets.topRight },
-        bottomLeft:  { ...Player.GEOMETRY.hitboxOffsets.bottomLeft },
-        bottomRight: { ...Player.GEOMETRY.hitboxOffsets.bottomRight }
+        topLeft:     { x: 25, y: 0 },
+        topRight:    { x: 50, y: 0 },
+        bottomLeft:  { x: 25, y: 449 },
+        bottomRight: { x: 50, y: 449 }
       }
     };
 
-    this.legs = this._oneShotSprite(playerAtlas, 'run', x, y);
-    this.hitsplat = this._oneShotSprite(bloodAtlas, 'blood_bullet_0', x, y);
-    this.muzzleFlash = this._oneShotSprite(particleAtlas, 'glock_particle', x, y);
-    this.muzzleFlashPinned = false; // pinned flashes stay where they were spawned
-    this.deathBody = this._oneShotSprite(deathAtlas, 'death_0', x, y);
+    // Legs — atlas-based, plays once per move call then hides.
+    this.legs = new AtlasGameObject(playerAtlas, 'run', x, y, 1);
+    this.legs.isVisible = false;
 
-    this._wireAnimationEvents();
-  }
+    // Hitsplat — atlas-based blood animation, picks variant from current weapon.
+    this.hitsplat = new AtlasGameObject(bloodAtlas, 'blood_bullet_0', x, y, 1);
+    this.hitsplat.isVisible = false;
 
-  _oneShotSprite(atlas, anim, x, y) {
-    const sprite = new AtlasGameObject(atlas, anim, x, y, 1);
-    sprite.isVisible = false;
-    return sprite;
-  }
+    // Muzzle flash / shoot particle effect.
+    this.muzzleFlash = new AtlasGameObject(particleAtlas, 'glock_particle', x, y, 1);
+    this.muzzleFlash.isVisible = false;
+    this.muzzleFlashPinned = false; // when true, particle stays at world position where it spawned
 
-  _wireAnimationEvents() {
-    // A finished shot returns the torso to its idle loop.
-    this.body.addEventListener('animationcomplete', () => {
+    // Death body — atlas-based, plays one random death anim then hides.
+    this.deathBody = new AtlasGameObject(deathAtlas, 'death_0', x, y, 1);
+    this.deathBody.isVisible = false;
+
+    // Body event: fires when a shoot animation finishes — resets visual state.
+    this.body.addEventListener("animationcomplete", () => {
       this.body.isShootingAnimation = false;
       this.body.resetAnimation();
     });
 
-    // Death animation over: come back to life, unless this is a remote fighter
-    // whose own client decides when it respawns (see remoteRespawn).
-    this.deathBody.addEventListener('animationcomplete', () => {
-      if (this.awaitRespawn) return;
-      this.health = this.maxHealth();
+    // Death animation finished — respawn.
+    this.deathBody.addEventListener("animationcomplete", () => {
+      this.health = 100;
       this.canShoot = true;
       this.canMove = true;
+
+      // Move body to the new spawn position BEFORE clearing isRespawning,
+      // so the body is never drawn at the death position.
       if (this.isMainPlayer) {
-        // Relocate first so the body never flashes at the corpse position.
         this.healthbarHeart.setAnimation('heartbeat_healthy');
         this.respawn();
-        if (Player.hasHud()) hudManager.onRespawn();
+        if (typeof hudManager !== 'undefined') hudManager.onRespawn();
       }
-      this._showAlive();
+
+      this.isRespawning = false;
+      this.deathBody.isVisible = false;
+      this.body.isVisible = true;
+
+      this.deathBody.setAnimation('death_0');
     });
 
-    this.legs.addEventListener('animationcomplete', () => this._stopLegs());
-    this.muzzleFlash.addEventListener('animationcomplete', () => { this.muzzleFlash.isVisible = false; });
-    this.hitsplat.addEventListener('animationcomplete', () => { this.hitsplat.isVisible = false; });
+    this.legs.addEventListener("animationcomplete", () => {
+      this.canMove = true;
+      this.legs.isVisible = false;
+      this.legs.resetAnimationRepeat(1);
+    });
 
-    this.body.addEventListener('shotsfired', this.checkCollision.bind(this));
+    this.muzzleFlash.addEventListener("animationcomplete", () => {
+      this.muzzleFlash.isVisible = false;
+    });
+
+    this.hitsplat.addEventListener("animationcomplete", () => {
+      this.hitsplat.isVisible = false;
+    });
+
+    this.body.addEventListener("shotsfired", this.checkCollision.bind(this));
   }
 
-  // Swap the corpse back for the living body.
-  _showAlive() {
-    this.isRespawning = false;
-    this.deathBody.isVisible = false;
-    this.body.isVisible = true;
-    this.deathBody.setAnimation('death_0');
-  }
-
-  _stopLegs() {
-    this.canMove = true;
-    this.legs.isVisible = false;
-    this.legs.resetAnimationRepeat(1);
-  }
-
-  // ---------------------------------------------------------------- combat
-
-  // Corners of the rectangular weapon hit area, rotated to the aim direction.
-  _rectHitArea(origin, aim) {
-    const offsets = this.body.spritesheetData.hitboxOffsets;
-    const area = {};
-    for (const corner of ['topLeft', 'topRight', 'bottomLeft', 'bottomRight']) {
-      const px = origin.x + offsets[corner].x;
-      const py = origin.y + offsets[corner].y;
-      const turned = Physics.rotatePoint(origin.x, origin.y, px, py, aim);
-      area[corner] = { x: turned.x, y: turned.y };
-    }
-    return area;
-  }
-
-  // Fired by the body sprite on the shooting frame: resolve which opponents
-  // the current weapon reached and report them to the server.
   checkCollision(data) {
     if (!this.isMainPlayer) return;
 
-    const shooterPos = data.playerPos;
-    // The sprite rotation carries a quarter turn for artwork orientation.
-    const aim = this.body.rotation - (90 * Constants.TO_RADIANS);
-    const origin = { x: shooterPos.x, y: shooterPos.y };
-    const shape = this.currentWeapon.hitShape ?? { type: 'rect' };
-    const rectArea = shape.type === 'rect' ? this._rectHitArea(origin, aim) : null;
+    const playerPos = data.playerPos;
+    // body.rotation has +90° baked in for sprite orientation — remove it for physics.
+    const rotation = this.body.rotation - (90 * Constants.TO_RADIANS);
+    const origin = { x: playerPos.x, y: playerPos.y };
+    const hitShape = this.currentWeapon.hitShape ?? { type: 'rect' };
 
-    const reaches = (targetPos) => {
-      switch (shape.type) {
-        case 'ray':    return Physics.isRayHit(origin, targetPos, aim, shape.maxRange);
-        case 'cone':   return Physics.isConeHit(origin, targetPos, aim, shape.maxRange, shape.spreadAngle);
-        case 'circle': return Physics.isCircleHit(origin, targetPos, shape.maxRange);
-        default:       return Physics.isCircleCollidingRect(targetPos, rectArea);
+    // Rectangle hitbox (default): pre-compute once, reused for all targets.
+    let hitboxRegion = null;
+    if (hitShape.type === 'rect') {
+      const { hitboxOffsets } = this.body.spritesheetData;
+      hitboxRegion = {
+        topLeft:     { x: origin.x + hitboxOffsets.topLeft.x,     y: origin.y + hitboxOffsets.topLeft.y },
+        topRight:    { x: origin.x + hitboxOffsets.topRight.x,    y: origin.y + hitboxOffsets.topRight.y },
+        bottomLeft:  { x: origin.x + hitboxOffsets.bottomLeft.x,  y: origin.y + hitboxOffsets.bottomLeft.y },
+        bottomRight: { x: origin.x + hitboxOffsets.bottomRight.x, y: origin.y + hitboxOffsets.bottomRight.y }
+      };
+      for (const corner in hitboxRegion) {
+        const p = hitboxRegion[corner];
+        const rotated = Physics.rotatePoint(origin.x, origin.y, p.x, p.y, rotation);
+        hitboxRegion[corner].x = rotated.x;
+        hitboxRegion[corner].y = rotated.y;
       }
-    };
-
-    let landed = false;
-    const everyone = playerManager.getPlayers();
-    for (const playerId in everyone) {
-      const target = everyone[playerId];
-      if (target.isMainPlayer || target.isRespawning) continue;
-      // Test against the last networked position rather than the eased one.
-      const targetPos = target.getHitPosition();
-      if (Physics.checkForObstacles(shooterPos, targetPos)) continue;
-      if (!reaches(targetPos)) continue;
-      socketManager.emit('playerHit', {
-        playerId,
-        damage: this.currentWeapon.damage ?? 5,
-        weaponId: this.currentWeapon.id ?? 0
-      });
-      landed = true;
     }
-    if (landed && Player.hasHud()) hudManager.onHitConfirmed();
+
+    let anyHit = false;
+    const otherPlayers = playerManager.getPlayers();
+    for (const playerId in otherPlayers) {
+      const otherPlayer = otherPlayers[playerId];
+      if (otherPlayer.isMainPlayer) continue;
+      if (otherPlayer.isRespawning) continue;
+      // Hit tests use the latest networked position (as the original did), not
+      // the eased on-screen position used for drawing remote players.
+      const targetPos = otherPlayer.getHitPosition();
+      if (Physics.checkForObstacles(playerPos, targetPos)) continue;
+
+      let hit = false;
+      if (hitShape.type === 'ray') {
+        hit = Physics.isRayHit(origin, targetPos, rotation, hitShape.maxRange);
+      } else if (hitShape.type === 'cone') {
+        hit = Physics.isConeHit(origin, targetPos, rotation, hitShape.maxRange, hitShape.spreadAngle);
+      } else if (hitShape.type === 'circle') {
+        hit = Physics.isCircleHit(origin, targetPos, hitShape.maxRange);
+      } else {
+        hit = Physics.isCircleCollidingRect(targetPos, hitboxRegion);
+      }
+
+      if (hit) {
+        socketManager.emit("playerHit", { playerId, damage: this.currentWeapon.damage ?? 5, weaponId: this.currentWeapon.id ?? 0 });
+        anyHit = true;
+      }
+    }
+    if (anyHit && typeof hudManager !== 'undefined') hudManager.onHitConfirmed();
   }
 
-  // ------------------------------------------------------------- position
-
-  // Remote update: rotation is applied at once, position glides toward the
-  // target; far jumps (spawns, teleports) and corpses snap.
+  // Network position update for a remote player: rotation applies immediately,
+  // position is eased over a few frames to hide network jitter. Large jumps
+  // (respawns, teleports) snap instantly.
   setNetPosition(x, y, rotation) {
     if (rotation) this.body.setRotation(rotation);
-    const offX = x - this.body.x;
-    const offY = y - this.body.y;
-    const farJump = offX * offX + offY * offY > 120 * 120;
-    if (!this._netTarget || farJump || this.isRespawning) {
+    const dx = x - this.body.x, dy = y - this.body.y;
+    if (!this._netTarget || dx * dx + dy * dy > 120 * 120 || this.isRespawning) {
       this.body.setPosition(x, y);
       this._netTarget = { x, y };
     } else {
       this._netTarget.x = x;
       this._netTarget.y = y;
     }
-    this._netReceivedAt = performance.now();
+    this._netTime = performance.now();
   }
 
-  _easeTowardNetTarget() {
-    const goal = this._netTarget;
-    if (!goal) return;
+  _smoothNetPosition() {
+    const target = this._netTarget;
+    if (!target) return;
     const now = performance.now();
-    const elapsed = Math.min(0.1, (now - (this._easedAt || now)) / 1000);
-    this._easedAt = now;
-    const blend = 1 - Math.exp(-elapsed * 40);
-    const gapX = goal.x - this.body.x;
-    const gapY = goal.y - this.body.y;
-    if (Math.abs(gapX) < 0.05 && Math.abs(gapY) < 0.05) {
-      this.body.setPosition(goal.x, goal.y);
-      return;
-    }
-    this.body.setPosition(this.body.x + gapX * blend, this.body.y + gapY * blend);
+    const dt = Math.min(0.1, (now - (this._smoothAt || now)) / 1000);
+    this._smoothAt = now;
+    const k = 1 - Math.exp(-dt * 40); // ~25 ms time constant
+    const dx = target.x - this.body.x, dy = target.y - this.body.y;
+    if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) { this.body.setPosition(target.x, target.y); return; }
+    this.body.setPosition(this.body.x + dx * k, this.body.y + dy * k);
   }
 
   setPosition(x, y, rotation) {
     this.body.setPosition(x, y);
-    if (rotation) this.body.setRotation(rotation);
+    if (rotation) {
+      this.body.setRotation(rotation);
+    }
   }
 
   getHitPosition() {
-    const goal = this._netTarget;
-    if (!goal) return this.getPosition();
-    return { x: goal.x, y: goal.y, rotation: this.body.rotation };
+    const target = this._netTarget;
+    return target ? { x: target.x, y: target.y, rotation: this.body.rotation } : this.getPosition();
   }
 
   getPosition() {
-    return { x: this.body.x, y: this.body.y, rotation: this.body.rotation };
+    return {
+      x: this.body.x,
+      y: this.body.y,
+      rotation: this.body.rotation
+    }
   }
 
-  isPositionChanged(pos) {
-    const last = this.previousPosition;
-    return pos.x !== last.x || pos.y !== last.y || pos.rotation !== last.rotation;
+  isPositionChanged(currentPosition) {
+    return currentPosition.x !== this.previousPosition.x
+      || currentPosition.y !== this.previousPosition.y
+      || currentPosition.rotation !== this.previousPosition.rotation;
   }
-
-  // ------------------------------------------------------------- movement
 
   playWalkingAnim(legRotation = 0) {
-    this._walkedAt = performance.now();
+    this._lastWalkAt = performance.now();
     this.legs.isVisible = true;
     this.canMove = false;
     this.legs.setPosition(this.body.x, this.body.y);
     this.legs.setRotation(legRotation * Constants.TO_RADIANS);
   }
 
-  // Whether a world point is unwalkable (outside the map or inside solid tile art).
-  _isSolidAt(px, py) {
-    if (!obstacleGrid.length) return false;
-    const col = Math.floor(px / Player.TILE);
-    const row = Math.floor(py / Player.TILE);
-    if (col < 0 || row < 0 || col >= map.width || row >= map.height) return true;
-    const tile = obstacleGrid[row * map.width + col];
-    return tile && Physics.isTileWalkBlocked(tile, px % Player.TILE, py % Player.TILE);
-  }
-
   move(speedX, speedY = null, legRotation = 0) {
-    const fromX = this.body.x;
-    const fromY = this.body.y;
-    const hasX = speedX != null;
-    const hasY = speedY != null;
-    const toX = hasX ? fromX + speedX : fromX;
-    const toY = hasY ? fromY + speedY : fromY;
+    const curX = this.body.x;
+    const curY = this.body.y;
+    const newX = speedX != null ? curX + speedX : curX;
+    const newY = speedY != null ? curY + speedY : curY;
 
-    if (!this._isSolidAt(toX, toY)) {
-      if (hasX) this.body.setVelocityX(speedX);
-      if (hasY) this.body.setVelocityY(speedY);
+    const _blocked = (x, y) => {
+      if (!obstacleGrid.length) return false;
+      const tx = Math.floor(x / 50), ty = Math.floor(y / 50);
+      if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return true;
+      const tile = obstacleGrid[ty * map.width + tx];
+      return tile && Physics.isTileWalkBlocked(tile, x % 50, y % 50);
+    };
+
+    // Try full diagonal move first.
+    if (!_blocked(newX, newY)) {
+      if (speedX != null) this.body.setVelocityX(speedX);
+      if (speedY != null) this.body.setVelocityY(speedY);
     } else {
-      // Blocked diagonally: keep whichever axis is still free (wall sliding).
-      const slideX = hasX && !this._isSolidAt(toX, fromY);
-      const slideY = hasY && !this._isSolidAt(fromX, toY);
-      if (slideX) this.body.setVelocityX(speedX);
-      if (slideY) this.body.setVelocityY(speedY);
-      if (!slideX && !slideY) return;
+      // Slide: try each axis independently so the player glides along walls.
+      const canX = speedX != null && !_blocked(newX, curY);
+      const canY = speedY != null && !_blocked(curX, newY);
+      if (canX) this.body.setVelocityX(speedX);
+      if (canY) this.body.setVelocityY(speedY);
+      if (!canX && !canY) return; // fully blocked — no anim either
     }
 
     this.playWalkingAnim(legRotation);
-    if (this.isMainPlayer) this._announceWalk(legRotation);
+
+    // Throttled: the leg animation only needs a refresh every few frames, and
+    // per-frame emits flooded the server on high-refresh (144/240 Hz) monitors.
+    if (this.isMainPlayer) {
+      const now = performance.now();
+      if (legRotation !== this._lastWalkRot || now - (this._lastWalkEmit || 0) >= 50) {
+        this._lastWalkEmit = now;
+        this._lastWalkRot = legRotation;
+        socketManager.emit("playedWalkingAnimation", { rotation: legRotation });
+      }
+    }
   }
 
-  // Leg animation broadcast, rate limited to one per 50 ms unless the
-  // direction changed (high refresh monitors would otherwise flood the server).
-  _announceWalk(legRotation) {
-    const now = performance.now();
-    if (legRotation === this._walkSentRot && now - (this._walkSentAt || 0) < 50) return;
-    this._walkSentAt = now;
-    this._walkSentRot = legRotation;
-    socketManager.emit('playedWalkingAnimation', { rotation: legRotation });
-  }
-
-  // Where sounds from this fighter originate; the local player is always centred (null).
+  // World position for positional audio; null for the local player (always centred).
   _soundPos() {
-    if (this.isMainPlayer) return null;
-    return { x: this.body.x, y: this.body.y };
+    return this.isMainPlayer ? null : { x: this.body.x, y: this.body.y };
   }
-
-  // -------------------------------------------------------------- weapons
 
   equipWeapon(weaponId, silent = false) {
     const weapon = Constants.WEAPON_ID_MAP[weaponId] ?? Constants.WEAPON_ID_MAP[2];
     this.currentWeapon = weapon;
-    const idle = `${weapon.name}_idle`;
-    this.body._defaultAnim = idle;
+    const idleAnim = weapon.name + '_idle';
+    this.body._defaultAnim = idleAnim;
     this.body.isShootingAnimation = false;
-    this.body.setAnimation(idle);
-    if (weapon.hasPickup && !silent) soundManager.play(`${weapon.name}_pickup`, this._soundPos());
+    this.body.setAnimation(idleAnim);
+    if (weapon.hasPickup && !silent) {
+      soundManager.play(weapon.name + '_pickup', this._soundPos());
+    }
   }
 
   shoot() {
     const weapon = this.currentWeapon;
-    soundManager.playRandom(weapon.shootSounds ?? [`${weapon.name}_shoot`], this._soundPos());
-
-    // Only one cooldown timer is ever live, so a stale one from an earlier
-    // weapon or life cannot re-enable shooting early.
+    const shootSounds = weapon.shootSounds ?? [weapon.name + '_shoot'];
+    soundManager.playRandom(shootSounds, this._soundPos());
     this.canShoot = false;
+    // Keep the handle: a cooldown from a previous life/round must not cut a
+    // later weapon's cooldown short (same cooldown lengths as before).
     clearTimeout(this._cooldownTimer);
     this._cooldownTimer = setTimeout(() => { this.canShoot = true; }, weapon.fireCooldown);
-
-    const anims = weapon.shootAnims;
+    const shootAnim = weapon.shootAnims[Math.floor(Math.random() * weapon.shootAnims.length)];
     this.body.isShootingAnimation = true;
-    this.body.setAnimation(anims[Math.floor(Math.random() * anims.length)], 1);
-
-    if (weapon.shootParticle && particleAtlas.ready) this._spawnMuzzleFlash(weapon.shootParticle);
+    this.body.setAnimation(shootAnim, 1);
+    if (weapon.shootParticle && particleAtlas.ready) {
+      const particleAnim = particleAtlas.animationMap[weapon.shootParticle];
+      const pOff = particleAnim?.offset || [0, 0];
+      this.muzzleFlashPinned = particleAnim?.pinned || false;
+      this.muzzleFlash.setAnimation(weapon.shootParticle, 1);
+      if (this.muzzleFlashPinned) {
+        // Bake offset into world position now so the particle stays put.
+        const r = this.body.rotation;
+        const wx = this.body.x + pOff[0] * Math.cos(r) - pOff[1] * Math.sin(r);
+        const wy = this.body.y + pOff[0] * Math.sin(r) + pOff[1] * Math.cos(r);
+        this.muzzleFlash.setPosition(wx, wy);
+      } else {
+        this.muzzleFlash.setPosition(this.body.x, this.body.y);
+      }
+      this.muzzleFlash.isVisible = true;
+    }
     if (this.isMainPlayer) socketManager.emit('playedShoot');
   }
-
-  _spawnMuzzleFlash(particle) {
-    const info = particleAtlas.animationMap[particle];
-    const offset = info?.offset || [0, 0];
-    this.muzzleFlashPinned = info?.pinned || false;
-    this.muzzleFlash.setAnimation(particle, 1);
-    if (this.muzzleFlashPinned) {
-      // Resolve the offset into world space now; the flash then stays put.
-      const rot = this.body.rotation;
-      const cos = Math.cos(rot);
-      const sin = Math.sin(rot);
-      this.muzzleFlash.setPosition(
-        this.body.x + offset[0] * cos - offset[1] * sin,
-        this.body.y + offset[0] * sin + offset[1] * cos
-      );
-    } else {
-      this.muzzleFlash.setPosition(this.body.x, this.body.y);
-    }
-    this.muzzleFlash.isVisible = true;
-  }
-
-  // ------------------------------------------------------ life and death
 
   death() {
     clearTimeout(this._cooldownTimer);
@@ -359,52 +309,39 @@ class Player {
     this.canMove = false;
 
     soundManager.playRandom(Constants.DEATH_SOUNDS, this._soundPos());
+
+    // Reset to fist.
     this.equipWeapon(0, true);
 
-    const deathAnim = `death_${Math.floor(Math.random() * 8)}`;
+    // Pick a random death animation.
+    const animName = 'death_' + Math.floor(Math.random() * 8);
     this.body.isShootingAnimation = false;
     this.body.setAnimation('fist_idle');
     this.body.isVisible = false;
     this.legs.isVisible = false;
     this.deathBody.setPosition(this.body.x, this.body.y);
-    this.deathBody.setAnimation(deathAnim, 1);
+    this.deathBody.setAnimation(animName, 1);
     this.deathBody.isVisible = true;
   }
 
-  // The remote fighter's own client respawned it (or our fallback timer gave up waiting).
-  remoteRespawn(pos) {
-    clearTimeout(this._respawnFallback);
-    if (!this.awaitRespawn) return;
-    this.awaitRespawn = false;
-    if (pos) {
-      this.body.setPosition(pos.x, pos.y);
-      this._netTarget = { x: pos.x, y: pos.y };
-    }
-    this.health = Player.BASE_HEALTH;
-    this.canShoot = true;
-    this.canMove = true;
-    this._showAlive();
-  }
-
-  _pickSpawn(points) {
-    return points[Math.floor(Math.random() * points.length)];
-  }
-
   respawn() {
-    const mapReady = typeof map !== 'undefined' && map.ready && map.spawnPoints.length;
-    const { x, y } = this._pickSpawn(mapReady ? map.spawnPoints : [Player.FALLBACK_SPAWN]);
+    const pts = (typeof map !== 'undefined' && map.ready && map.spawnPoints.length)
+      ? map.spawnPoints
+      : [{ x: 400, y: 300 }];
+    const { x, y } = pts[Math.floor(Math.random() * pts.length)];
+
     this.body.setPosition(x, y);
-    socketManager.emit('playerRespawn', { position: { x, y } });
+
+    socketManager.emit("playerRespawn", { position: { x, y } });
   }
 
-  // Round start: put the fighter on a spawn point whatever state it is in.
+  // Called on round start — resets the player to a spawn point regardless of death state.
   forceRespawn(spawnPoints = []) {
-    this.awaitRespawn = false;
-    clearTimeout(this._respawnFallback);
-    const { x, y } = this._pickSpawn(spawnPoints.length ? spawnPoints : [Player.FALLBACK_SPAWN]);
+    const pts = spawnPoints.length ? spawnPoints : [{ x: 400, y: 300 }];
+    const { x, y } = pts[Math.floor(Math.random() * pts.length)];
 
     clearTimeout(this._cooldownTimer);
-    this.health = this.maxHealth();
+    this.health = 100;
     this.isRespawning = false;
     this.canShoot = true;
     this.canMove = true;
@@ -414,54 +351,37 @@ class Player {
     this.equipWeapon(0, true);
     this.body.setPosition(x, y);
 
-    if (!this.isMainPlayer) return;
-    this.healthbarHeart.setAnimation('heartbeat_healthy');
-    if (Player.hasHud()) hudManager.onRespawn();
-    socketManager.emit('playerRespawn', { position: { x, y } });
-  }
-
-  // Base health, raised for the local player by the shop's health perk.
-  maxHealth() {
-    return this.isMainPlayer && Player.hasShop() ? shopManager.maxHealth() : Player.BASE_HEALTH;
-  }
-
-  _refreshHeart() {
-    const wanted = Player.heartAnimFor(this.health);
-    if (this.healthbarHeart.animName !== wanted) this.healthbarHeart.setAnimation(wanted);
+    if (this.isMainPlayer) {
+      this.healthbarHeart.setAnimation('heartbeat_healthy');
+      if (typeof hudManager !== 'undefined') hudManager.onRespawn();
+      socketManager.emit("playerRespawn", { position: { x, y } });
+    }
   }
 
   showHitsplat(damage, attackerWeaponId, attackerPos = null) {
     const attackerWeapon = Constants.WEAPON_ID_MAP[attackerWeaponId];
-    // Only weapons that define an impact sound make one.
-    const impact = attackerWeapon?.impactSound;
-    if (impact) soundManager.play(impact, this._soundPos());
-
-    const blood = this.currentWeapon.bloodAnims;
-    this.hitsplat.setAnimation(blood[Math.floor(Math.random() * blood.length)], 1);
+    // Weapons without an impactSound fell back to 'impact', a file that doesn't
+    // exist (silent + a 404 on every hit); keep them silent without the request.
+    const impactKey = attackerWeapon?.impactSound;
+    if (impactKey) soundManager.play(impactKey, this._soundPos());
+    const anims = this.currentWeapon.bloodAnims;
+    const anim = anims[Math.floor(Math.random() * anims.length)];
+    this.hitsplat.setAnimation(anim, 1);
     this.hitsplat.setPosition(this.body.x, this.body.y);
     this.hitsplat.isVisible = true;
-    this._hitFxAt = performance.now();
-
-    // Melee weapons also leave a slash/impact effect pointing away from the attacker.
-    const meleeName = attackerWeapon?.name;
-    if (StickFigure.HIT_TIME[meleeName]) {
-      const angle = attackerPos
-        ? Math.atan2(this.body.y - attackerPos.y, this.body.x - attackerPos.x)
-        : Math.random() * Math.PI * 2;
-      this._meleeFx = { weapon: meleeName, startedAt: performance.now(), angle, seed: Math.floor(Math.random() * 1000) };
-    }
-
-    // Shop armor perk softens hits on the local player.
-    const armor = this.isMainPlayer && Player.hasShop() ? shopManager.armorFactor() : 1;
-    this.health -= (damage ?? this.currentWeapon.damage) * Constants.DAMAGE_MULTIPLIER * armor;
+    this._hitFxAt = performance.now(); // render-only (hit rim flash)
+    this.health -= (damage ?? this.currentWeapon.damage) * Constants.DAMAGE_MULTIPLIER;
 
     if (this.isMainPlayer) {
-      if (Player.hasHud()) hudManager.onDamaged(attackerPos);
-      this._refreshHeart();
+      if (typeof hudManager !== 'undefined') hudManager.onDamaged(attackerPos);
+      const targetAnim = this.health >= 75 ? 'heartbeat_healthy'
+                       : this.health >  20 ? 'heartbeat_impacted'
+                                           : 'heartbeat_critical';
+      if (this.healthbarHeart.animName !== targetAnim) {
+        this.healthbarHeart.setAnimation(targetAnim);
+      }
     }
   }
-
-  // ---------------------------------------------------------------- tick
 
   update() {
     this.legs.update();
@@ -471,231 +391,171 @@ class Player {
     if (this.muzzleFlash.isVisible && !this.muzzleFlashPinned) {
       this.muzzleFlash.setPosition(this.body.x, this.body.y);
     }
-    if (this.isRespawning) this.deathBody.update();
+    if (this.isRespawning) {
+      this.deathBody.update();
+    }
 
     if (this.isMainPlayer) {
       this.healthbarHeart.update();
-      this._regenerate();
     }
 
-    // Hide the legs shortly after walking stops; remote fighters get more
-    // slack because their walk events arrive over the network.
-    if (this.legs.isVisible && this._walkedAt) {
-      const grace = this.isMainPlayer ? 120 : 260;
-      if (performance.now() - this._walkedAt > grace) this._stopLegs();
+    // Legs stop as soon as the player stops (they used to keep running until the
+    // 3-second run cycle finished). Remote players get extra slack for network jitter.
+    if (this.legs.isVisible && this._lastWalkAt) {
+      const idleMs = performance.now() - this._lastWalkAt;
+      if (idleMs > (this.isMainPlayer ? 120 : 260)) {
+        this.legs.isVisible = false;
+        this.canMove = true;
+        this.legs.resetAnimationRepeat(1);
+      }
     }
 
-    if (!this.isMainPlayer) this._easeTowardNetTarget();
+    if (!this.isMainPlayer) this._smoothNetPosition();
 
-    // Send our position at most every 15 ms; an unsent change is retried on
-    // the next frame because previousPosition only advances when sent.
-    const pos = this.getPosition();
-    if (this.isMainPlayer && this.isPositionChanged(pos)) {
+    // Position updates are capped at ~60 Hz regardless of monitor refresh rate.
+    // The latest position is always sent: an unsent change stays "changed" and
+    // goes out on the next eligible frame.
+    const currentPosition = this.getPosition();
+    if (this.isMainPlayer && this.isPositionChanged(currentPosition)) {
       const now = performance.now();
-      if (now - (this._posSentAt || 0) >= 15) {
-        this._posSentAt = now;
-        socketManager.emit('playerMovement', pos);
-        this.previousPosition = pos;
+      if (now - (this._lastNetSend || 0) >= 15) {
+        this._lastNetSend = now;
+        socketManager.emit("playerMovement", currentPosition);
+        this.previousPosition = currentPosition;
       }
     }
   }
 
-  // Shop pet perk: heal slowly after 4 s without being hit.
-  _regenerate() {
-    const now = performance.now();
-    const elapsed = Math.min(0.25, (now - (this._regenTickAt || now)) / 1000);
-    this._regenTickAt = now;
-    const perSecond = Player.hasShop() ? shopManager.regenPerSec() : 0;
-    if (!perSecond || this.isRespawning || this.health <= 0) return;
-    if (typeof isOfflinePaused === 'function' && isOfflinePaused()) return;
-    if (now - (this._hitFxAt || -1e9) < 4000) return;
-    this.health = Math.min(this.maxHealth(), this.health + perSecond * elapsed);
-    this._refreshHeart();
-  }
-
-  // ---------------------------------------------------------------- draw
-
-  // Companion pet following beside and slightly behind its owner.
-  _drawPet(ctx) {
-    const petId = this.isMainPlayer && Player.hasShop() ? shopManager.pet : this.petId;
-    if (petId == null || petId < 0 || this.isRespawning || typeof Pets === 'undefined') {
-      this._companion = null;
-      return;
-    }
-    const now = performance.now();
-    const facing = this.body.rotation - Math.PI / 2;
-    const cos = Math.cos(facing);
-    const sin = Math.sin(facing);
-    const goalX = this.body.x - cos * 26 - sin * 16;
-    const goalY = this.body.y - sin * 26 + cos * 16;
-
-    let pet = this._companion;
-    if (!pet || Math.hypot(pet.x - goalX, pet.y - goalY) > 300) {
-      pet = this._companion = { x: goalX, y: goalY, angle: facing, at: now };
-    }
-    const elapsed = Math.min(0.1, (now - pet.at) / 1000);
-    pet.at = now;
-    const follow = 1 - Math.exp(-elapsed * 7);
-    const stepX = (goalX - pet.x) * follow;
-    const stepY = (goalY - pet.y) * follow;
-    pet.x += stepX;
-    pet.y += stepY;
-    const walking = Math.hypot(stepX, stepY) > 0.25 * (elapsed * 60);
-    const heading = walking ? Math.atan2(stepY, stepX) : facing;
-    let turn = heading - pet.angle;
-    turn = Math.atan2(Math.sin(turn), Math.cos(turn));
-    pet.angle += turn * Math.min(1, elapsed * 10);
-
-    const seconds = now / 1000;
-    const flying = Pets.FLYING.has(petId);
-    if (fx.enabled) fx.shadow(ctx, pet.x + 3, pet.y + (flying ? 12 : 4), flying ? 9 : 11, flying ? 0.45 : 0.7);
-    ctx.save();
-    ctx.translate(pet.x, pet.y - (flying ? 6 + Math.sin(seconds * 3) * 2 : 0));
-    ctx.rotate(pet.angle + Math.PI / 2);
-    ctx.scale(1.3, 1.3);
-    Pets.draw(ctx, petId, seconds, walking);
-    ctx.restore();
-  }
-
-  // Tinted spinner under the fighter; single-frame shapes rotate, multi-frame ones animate.
   _drawIndicator(ctx) {
-    if (this.isRespawning || !indicatorAtlas.ready) return;
-    const shapes = indicatorAtlas.animationNames;
-    if (!shapes.length) return;
-    const shape = shapes[this.indicatorShapeIndex % shapes.length];
-    const anim = indicatorAtlas.getAnimation(shape);
+    // Hidden while dead.
+    if (this.isRespawning) return;
+    if (!indicatorAtlas.ready) return;
+
+    const names = indicatorAtlas.animationNames;
+    if (!names.length) return;
+    const animName = names[this.indicatorShapeIndex % names.length];
+    const anim = indicatorAtlas.getAnimation(animName);
     if (!anim || !anim.frames.length) return;
 
+    // Rotary spinners (1 frame) spin via ctx.rotate().
+    // Animated spinners (>1 frame) step through frames; no rotation needed.
     const now = Date.now();
-    const frameCount = anim.frames.length;
-    const spins = frameCount === 1;
-    const frame = indicatorAtlas.getFrameData(shape, spins ? 0 : Math.floor((now / 1000) * anim.fps) % frameCount);
-    if (!frame) return;
-    const tinted = tintCache.get(indicatorAtlas, frame, this.indicatorHue);
-    if (!tinted) return;
+    const isAnimated = anim.frames.length > 1;
+    const frameIndex = isAnimated
+      ? Math.floor((now / 1000) * anim.fps) % anim.frames.length
+      : 0;
 
-    // Drawn snug around the player, like the classic game's spinners.
-    const w = frame.w * 0.66;
-    const h = frame.h * 0.66;
+    const f = indicatorAtlas.getFrameData(animName, frameIndex);
+    if (!f) return;
+
+    const scale = 0.8;
+    const dw = f.w * scale;
+    const dh = f.h * scale;
+
+    const tinted = tintCache.get(indicatorAtlas, f, this.indicatorHue);
+    if (!tinted) return;
     ctx.save();
     ctx.translate(this.body.x, this.body.y);
-    if (spins) ctx.rotate((now % 3000) / 3000 * Math.PI * 2);
-    ctx.drawImage(tinted.canvas, tinted.x, tinted.y, frame.w, frame.h, -w / 2, -h / 2, w, h);
+    if (!isAnimated) {
+      ctx.rotate((now % 3000) / 3000 * Math.PI * 2);
+    }
+    ctx.drawImage(tinted.canvas, tinted.x, tinted.y, f.w, f.h, -dw / 2, -dh / 2, dw, dh);
     ctx.restore();
   }
 
-  // Name label pre-rendered to an offscreen canvas, rebuilt only when its
-  // text, colour, HUD scale or pixel ratio changes.
+  // The name tag is rendered to a small canvas once (text drawing every frame
+  // was one of the costlier calls on phones) and redrawn only when the label,
+  // HUD scale or resolution changes.
   _nameTag() {
-    const ui = display.uiScale || 1;
-    const text = this.afk ? `💤 ${this.name}` : this.name;
-    const pixelRatio = Math.max(1, display.scale * worldScale());
-    const vip = this.isMainPlayer && Player.hasShop() ? shopManager.vip : this.vip;
-    const cacheKey = `${text}|${ui}|${pixelRatio}|${vip}`;
-    if (this._label && this._label.key === cacheKey) return this._label;
-
-    const font = `bold ${Math.round(11 * ui)}px monospace`;
-    const height = Math.round(13 * ui);
-    const measure = document.createElement('canvas').getContext('2d');
-    measure.font = font;
-    const width = Math.ceil(measure.measureText(text).width) + 6;
-
+    const u = display.uiScale || 1;
+    const label = this.afk ? `💤 ${this.name}` : this.name;
+    const res = Math.max(1, display.scale * worldScale());
+    const key = label + '|' + u + '|' + res;
+    if (this._tag && this._tag.key === key) return this._tag;
+    const font = `bold ${Math.round(11 * u)}px monospace`;
+    const pad = 3, th = Math.round(13 * u);
+    const m = document.createElement('canvas').getContext('2d');
+    m.font = font;
+    const w = Math.ceil(m.measureText(label).width) + pad * 2;
     const canvas = document.createElement('canvas');
-    canvas.width = Math.ceil(width * pixelRatio);
-    canvas.height = Math.ceil(height * pixelRatio);
-    const g = canvas.getContext('2d');
-    g.scale(pixelRatio, pixelRatio);
-    g.fillStyle = 'rgba(0,0,0,0.55)';
-    g.fillRect(0, 0, width, height);
-    g.font = font;
-    g.textAlign = 'center';
-    g.textBaseline = 'bottom';
-    g.fillStyle = this.afk ? '#9fb3c8' : vip ? '#ffd166' : '#ffffff';
-    g.fillText(text, width / 2, height);
-    this._label = { key: cacheKey, canvas, w: width, h: height };
-    return this._label;
+    canvas.width = Math.ceil(w * res);
+    canvas.height = Math.ceil(th * res);
+    const c = canvas.getContext('2d');
+    c.scale(res, res);
+    c.fillStyle = 'rgba(0,0,0,0.55)';
+    c.fillRect(0, 0, w, th);
+    c.font = font;
+    c.textAlign = 'center';
+    c.textBaseline = 'bottom';
+    c.fillStyle = this.afk ? '#9fb3c8' : '#ffffff';
+    c.fillText(label, w / 2, th);
+    this._tag = { key, canvas, w, h: th };
+    return this._tag;
   }
 
-  // Additive glow ahead of the barrel while firing.
+  // Additive light pool in front of a firing gun (render-only).
   _drawMuzzleLight(ctx) {
     if (this.isRespawning) return;
     const weapon = this.currentWeapon;
-    const color = weapon && FX_MUZZLE[weapon.name];
-    if (!color || !String(this.body.animName).includes('shoot')) return;
-    // With a flash sprite the light follows it; without one it flickers.
-    let strength;
-    if (weapon.shootParticle) strength = this.muzzleFlash.isVisible ? 1 : 0;
-    else strength = 0.65 + 0.35 * Math.random();
-    if (!strength) return;
-    const rot = this.body.rotation;
-    fx.light(ctx, this.body.x + Math.sin(rot) * 34, this.body.y - Math.cos(rot) * 34, 110, color, 0.32 * strength);
-  }
-
-  _drawMeleeFx(ctx) {
-    const melee = this._meleeFx;
-    if (!melee) return;
-    const progress = (performance.now() - melee.startedAt) / 1000 / StickFigure.HIT_TIME[melee.weapon];
-    if (progress >= 1) {
-      this._meleeFx = null;
-      return;
-    }
-    ctx.save();
-    ctx.translate(this.body.x, this.body.y);
-    StickFigure.hit(ctx, melee.weapon, progress, melee.angle, melee.seed);
-    ctx.restore();
-  }
-
-  _drawMuzzleFlash(ctx, fancy) {
-    const pinned = this.muzzleFlashPinned;
-    const particle = this.currentWeapon.shootParticle;
-    const offset = (!pinned && particle && particleAtlas.animationMap[particle]?.offset) || [0, 0];
-    const rot = pinned ? 0 : this.body.rotation;
-    this.muzzleFlash.drawCenteredRotated(ctx, rot, offset[0], offset[1]);
-    if (!fancy || !this.muzzleFlash.isVisible) return;
-    // Bloom pass: the same flash again, additively blended.
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.55;
-    this.muzzleFlash.drawCenteredRotated(ctx, rot, offset[0], offset[1]);
-    ctx.restore();
+    const rgb = weapon && FX_MUZZLE[weapon.name];
+    if (!rgb || !String(this.body.animName).includes('shoot')) return;
+    // Weapons with a flash sprite light up with it; the others flicker while firing.
+    const k = weapon.shootParticle
+      ? (this.muzzleFlash.isVisible ? 1 : 0)
+      : 0.65 + 0.35 * Math.random();
+    if (!k) return;
+    const r = this.body.rotation;
+    const x = this.body.x + Math.sin(r) * 34;
+    const y = this.body.y - Math.cos(r) * 34;
+    fx.light(ctx, x, y, 110, rgb, 0.32 * k);
   }
 
   draw(ctx) {
+    // Indicator spinner drawn first (below everything).
     this._drawIndicator(ctx);
-    this._drawPet(ctx);
-
-    const fancy = fx.enabled;
-    const alive = !this.isRespawning;
-    if (fancy && alive) {
-      // Ground light in the fighter's colour for quick recognition.
-      if (this._glowHue !== this.indicatorHue) {
-        this._glowHue = this.indicatorHue;
-        this._glowRgb = fx.hueRgb(((this.indicatorHue ?? 0) + 36) % 360);
+    const modern = fx.enabled;
+    if (modern && !this.isRespawning) {
+      // Soft ground light in the player's colour, so everyone reads at a glance.
+      if (this._fxHue !== this.indicatorHue) {
+        this._fxHue = this.indicatorHue;
+        this._fxRgb = fx.hueRgb(((this.indicatorHue ?? 0) + 36) % 360);
       }
-      fx.light(ctx, this.body.x, this.body.y, 46, this._glowRgb, 0.13);
+      fx.light(ctx, this.body.x, this.body.y, 46, this._fxRgb, 0.13);
     }
-    if (fancy) {
-      this._drawMuzzleLight(ctx);
-      fx.shadow(ctx, this.body.x + 4, this.body.y + 6, alive ? 24 : 30, 0.9);
-      const weaponGlow = alive && FX_GLOW[this.currentWeapon?.name];
-      if (weaponGlow) fx.light(ctx, this.body.x, this.body.y, 60, weaponGlow, 0.28);
+    if (modern) this._drawMuzzleLight(ctx);
+    if (modern) {
+      const x = this.body.x + 4, y = this.body.y + 6;
+      fx.shadow(ctx, x, y, this.isRespawning ? 30 : 24, 0.9);
+      // Energy weapons light up the floor around their holder.
+      const glow = !this.isRespawning && FX_GLOW[this.currentWeapon?.name];
+      if (glow) fx.light(ctx, this.body.x, this.body.y, 60, glow, 0.28);
     }
-
-    if (!this.canMove) this.legs.draw(ctx);
-    if (alive) {
-      this.body.drawWithHeadPivot(ctx);
-      // Brief red flash after being hit.
-      const sinceHit = performance.now() - (this._hitFxAt || -1e9);
-      if (fancy && sinceHit < 160) fx.light(ctx, this.body.x, this.body.y, 42, FX_HIT, 0.7 * (1 - sinceHit / 160));
-    } else {
+    // Legs are drawn first (behind body).
+    if (!this.canMove) {
+      this.legs.draw(ctx);
+    }
+    if (this.isRespawning) {
       this.deathBody.draw(ctx);
+    } else {
+      // Body rotates around the head pivot so the character aims correctly.
+      this.body.drawWithHeadPivot(ctx);
+      // Red flash for a moment after taking a hit.
+      const since = performance.now() - (this._hitFxAt || -1e9);
+      if (modern && since < 160) fx.light(ctx, this.body.x, this.body.y, 42, FX_HIT, 0.7 * (1 - since / 160));
     }
-
     this.hitsplat.drawCentered(ctx);
-    this._drawMeleeFx(ctx);
-    this._drawMuzzleFlash(ctx, fancy);
-
-    if (alive && this.name) {
+    const pOff = (!this.muzzleFlashPinned && this.currentWeapon.shootParticle && particleAtlas.animationMap[this.currentWeapon.shootParticle]?.offset) || [0, 0];
+    this.muzzleFlash.drawCenteredRotated(ctx, this.muzzleFlashPinned ? 0 : this.body.rotation, pOff[0], pOff[1]);
+    if (modern && this.muzzleFlash.isVisible) {
+      // Bloom: a second, additive copy of the flash.
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.55;
+      this.muzzleFlash.drawCenteredRotated(ctx, this.muzzleFlashPinned ? 0 : this.body.rotation, pOff[0], pOff[1]);
+      ctx.restore();
+    }
+    // Name tag above the player (hidden while dead).
+    if (!this.isRespawning && this.name) {
       const tag = this._nameTag();
       if (tag) ctx.drawImage(tag.canvas, this.body.x - tag.w / 2, this.body.y - 48 - tag.h, tag.w, tag.h);
     }

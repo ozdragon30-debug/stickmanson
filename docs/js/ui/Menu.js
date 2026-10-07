@@ -107,30 +107,35 @@ class Menu {
 
   // Offline only: pick the map for the next round (or keep the random rotation).
   _buildMapPicker() {
+    const groups = { '': [], 'feature/': [], 'ballistick/': [] };
+    for (const f of BotManager.OFFLINE_MAPS) {
+      if (f === 'debug.dat') continue;
+      const g = f.startsWith('feature/') ? 'feature/' : f.startsWith('ballistick/') ? 'ballistick/' : '';
+      groups[g].push(f);
+    }
     const sel = this.mapSelect;
     const random = document.createElement('option');
     random.value = '';
     random.dataset.i18n = 'menu.map.random';
     sel.appendChild(random);
-    for (const f of BotManager.OFFLINE_MAPS) {
-      const o = document.createElement('option');
-      o.value = f;
-      o.textContent = BotManager.mapLabel(f);
-      sel.appendChild(o);
+    for (const [g, files] of Object.entries(groups)) {
+      const og = document.createElement('optgroup');
+      og.label = g === '' ? 'Stick Arena' : g === 'feature/' ? t('menu.map.featured') : 'Ballistick';
+      for (const f of files.sort()) {
+        const o = document.createElement('option');
+        o.value = f;
+        o.textContent = BotManager.mapLabel(f);
+        og.appendChild(o);
+      }
+      sel.appendChild(og);
     }
     sel.addEventListener('keydown', e => e.stopPropagation());
-    // Real (localised) map names once the index loads.
+    // Replace file-name labels with the real map names once the index loads.
     fetch('data/maps/index.json').then(r => r.json()).then(names => {
-      this._mapNames = names;
-      this.labelMaps();
+      for (const o of sel.querySelectorAll('option[value]')) {
+        if (o.value && names[o.value]) o.textContent = splitMapName(names[o.value]).title;
+      }
     }).catch(() => {});
-  }
-
-  labelMaps() {
-    if (!this._mapNames) return;
-    for (const o of this.mapSelect.querySelectorAll('option[value]')) {
-      if (o.value && this._mapNames[o.value]) o.textContent = mapLabelLocal(this._mapNames[o.value]);
-    }
   }
 
   // Show the current name; Play only pushes a name the user actually edited here.
@@ -268,7 +273,7 @@ class Menu {
     const link = location.href;
     try {
       if (navigator.share && inputMode.mode === 'touch') {
-        await navigator.share({ title: 'Stick Clash', text: t('menu.room.shareText'), url: link });
+        await navigator.share({ title: 'Stick Arena: Reborn', text: t('menu.room.shareText'), url: link });
         return;
       }
       await navigator.clipboard.writeText(link);

@@ -1,189 +1,259 @@
-// Grid route planner for the bot AI.
-//
-// Levels are laid out on a lattice of 50 px square tiles. A route is searched on
-// that lattice with A* (eight-way moves, Manhattan estimate) and handed back as a
-// list of tile-centre waypoints in world pixels, start tile first.
-//
-// How a tile is treated depends on the collision code `c` in the obstacle grid:
-//   no entry, or c <= 2   open      - step cost 1
-//   c is 3 or 4           solid     - never entered
-//   c from 5 to 9         partial   - entered only when the middle of the tile is
-//                                     free, and then priced so high (25) that the
-//                                     search avoids it whenever it can
-//   anything else         open      - step cost 1
-// A diagonal step costs 1.4 times the tile price and is only allowed when both
-// tiles it cuts past are enterable.
-
+/**
+ * A* pathfinding implementation for navigating bots across the map.
+ * Works with the tile grid system where tiles are 50x50 pixels.
+ * Prefers fully walkable tiles to minimize getting stuck on obstacles.
+ */
 class Pathfinder {
-  static TILE_PX = 50;
-  static SEARCH_CAP = 2000;        // stop once this many tiles carry a cost
-  static PARTIAL_TILE_COST = 25;
-  static DIAGONAL_FACTOR = 1.4;
-
-  // Moves are tried in this exact order (axis-aligned ones first); the order
-  // decides which of two equally cheap routes wins.
-  static AXIS_MOVES = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  static CORNER_MOVES = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
-
   /**
-   * Plan a walkable route between two world points.
-   * @param {{x:number,y:number}} start
-   * @param {{x:number,y:number}} goal
-   * @param {Object} map            Level description (needs width / height in tiles).
-   * @param {Array}  obstacleGrid   Row-major collision cells of the level.
-   * @returns {Array<{x:number,y:number}>|null} Waypoints, or null when no route exists.
+   * Find a path from start to goal position using A* algorithm.
+   * @param {Object} start - {x, y} world position
+   * @param {Object} goal - {x, y} world position
+   * @param {Object} map - Map object with width, height, and collision data
+   * @param {Array} obstacleGrid - Collision grid from map
+   * @returns {Array} Array of waypoint objects [{x, y}, ...] or null if unreachable
    */
   static findPath(start, goal, map, obstacleGrid) {
-    if (!map || !obstacleGrid || obstacleGrid.length === 0) return null;
+    if (!map || !obstacleGrid || obstacleGrid.length === 0) {
+      return null;
+    }
 
-    const from = Pathfinder._cellAt(start);
-    const dest = Pathfinder._cellAt(goal);
-    if (!Pathfinder._inside(from.col, from.row, map)) return null;
-    if (!Pathfinder._inside(dest.col, dest.row, map)) return null;
+    // Convert world positions to tile grid positions
+    const startTile = Pathfinder._worldToTile(start);
+    const goalTile = Pathfinder._worldToTile(goal);
 
-    // Already standing in the goal tile: walk straight to the point itself.
-    if (from.col === dest.col && from.row === dest.row) return [goal];
+    // Clamp to valid map bounds
+    if (!Pathfinder._isValidTile(startTile, map)) {
+      return null;
+    }
+    if (!Pathfinder._isValidTile(goalTile, map)) {
+      return null;
+    }
 
-    // Cells are identified by their row-major index.
-    const cols = map.width;
-    const originId = from.row * cols + from.col;
-    const targetId = dest.row * cols + dest.col;
+    // If start and goal are the same tile, return direct path
+    if (startTile.x === goalTile.x && startTile.y === goalTile.y) {
+      return [goal];
+    }
 
-    const frontier = new Set([originId]);   // insertion order matters for ties
-    const cameVia = new Map();
-    const spent = new Map([[originId, 0]]);
-    const ranking = new Map([[originId, Pathfinder._estimate(from.col, from.row, dest)]]);
+    // A* search
+    const openSet = new Set();
+    const cameFrom = new Map();
+    const gScore = new Map();
+    const fScore = new Map();
 
-    while (frontier.size > 0) {
-      const node = Pathfinder._bestCandidate(frontier, ranking);
-      if (node === targetId) return Pathfinder._traceBack(cameVia, node, cols);
+    const startKey = `${startTile.x},${startTile.y}`;
+    const goalKey = `${goalTile.x},${goalTile.y}`;
 
-      frontier.delete(node);
-      const col = node % cols;
-      const row = (node - col) / cols;
-      const soFar = spent.get(node) || 0;
+    openSet.add(startKey);
+    gScore.set(startKey, 0);
+    fScore.set(startKey, Pathfinder._heuristic(startTile, goalTile));
 
-      for (const step of Pathfinder._exits(col, row, map, obstacleGrid)) {
-        const id = step.row * cols + step.col;
-        const total = soFar + step.cost;
-        if (spent.has(id) && total >= spent.get(id)) continue;
-        cameVia.set(id, node);
-        spent.set(id, total);
-        ranking.set(id, total + Pathfinder._estimate(step.col, step.row, dest));
-        frontier.add(id);
+    while (openSet.size > 0) {
+      // Find node in openSet with lowest fScore
+      let current = null;
+      let lowestF = Infinity;
+      for (const key of openSet) {
+        const f = fScore.get(key) || Infinity;
+        if (f < lowestF) {
+          lowestF = f;
+          current = key;
+        }
       }
 
-      if (spent.size > Pathfinder.SEARCH_CAP) return null;
+      if (current === goalKey) {
+        // Path found - reconstruct it
+        return Pathfinder._reconstructPath(cameFrom, current, map);
+      }
+
+      openSet.delete(current);
+      const [curX, curY] = current.split(',').map(Number);
+
+      // Check all 8 neighbors (including diagonals)
+      const neighbors = Pathfinder._getNeighbors(curX, curY, map, obstacleGrid);
+      for (const { x: nx, y: ny, cost } of neighbors) {
+        const neighborKey = `${nx},${ny}`;
+        const tentativeG = (gScore.get(current) || 0) + cost;
+
+        if (!gScore.has(neighborKey) || tentativeG < gScore.get(neighborKey)) {
+          cameFrom.set(neighborKey, current);
+          gScore.set(neighborKey, tentativeG);
+          fScore.set(neighborKey, tentativeG + Pathfinder._heuristic({ x: nx, y: ny }, goalTile));
+
+          if (!openSet.has(neighborKey)) {
+            openSet.add(neighborKey);
+          }
+        }
+      }
+
+      // Safety limit to prevent infinite loops
+      if (gScore.size > 2000) {
+        return null;
+      }
     }
+
+    // No path found
     return null;
   }
 
+  // ── Private helpers ─────────────────────────────────────────────────────────
+
+  static _worldToTile(worldPos) {
+    return {
+      x: Math.floor(worldPos.x / 50),
+      y: Math.floor(worldPos.y / 50)
+    };
+  }
+
+  static _tileToWorld(tile) {
+    return {
+      x: tile.x * 50 + 25,
+      y: tile.y * 50 + 25
+    };
+  }
+
+  static _isValidTile(tile, map) {
+    return tile.x >= 0 && tile.x < map.width && tile.y >= 0 && tile.y < map.height;
+  }
+
   /**
-   * Thin out a waypoint list: from each kept point jump to the furthest later
-   * point that is in clear sight of it.
+   * Check if a tile is walkable.
+   * Strongly prefer fully walkable tiles. Partial collisions allowed only as last resort.
+   * @returns {Object|null} {x, y, cost} if walkable, null if blocked
+   */
+  static _getTileCost(x, y, map, obstacleGrid) {
+    if (!Pathfinder._isValidTile({ x, y }, map)) {
+      return null;
+    }
+
+    const tileIndex = y * map.width + x;
+    const tile = obstacleGrid[tileIndex];
+
+    if (!tile) {
+      // No collision data = fully walkable
+      return { x, y, cost: 1 };
+    }
+
+    const { c } = tile;
+
+    // Collision type 0-2: fully walkable
+    if (c <= 2) {
+      return { x, y, cost: 1 };
+    }
+
+    // Collision type 3, 4: not walkable
+    if (c >= 3 && c <= 4) {
+      return null;
+    }
+
+    // Collision type 5-9: partially blocked
+    // Check if the tile CENTER (25, 25) is actually walkable
+    if (c >= 5 && c <= 9) {
+      if (typeof Physics !== 'undefined' && Physics.isTileWalkBlocked(tile, 25, 25)) {
+        // Center is blocked; this tile cannot be walked through
+        return null;
+      }
+      // Center is walkable but with extreme penalty; only used as absolute last resort
+      return { x, y, cost: 25 };
+    }
+
+    return { x, y, cost: 1 };
+  }
+
+  /**
+   * Get valid neighbor tiles (8-directional, preferring clear paths).
+   * @returns {Array} Array of {x, y, cost} objects
+   */
+  static _getNeighbors(x, y, map, obstacleGrid) {
+    const neighbors = [];
+
+    // 4-directional (cardinal): cost 1
+    const cardinal = [
+      { x: x + 1, y }, { x: x - 1, y },
+      { x, y: y + 1 }, { x, y: y - 1 }
+    ];
+
+    // 4-directional (diagonal): cost 1.4 (sqrt(2))
+    const diagonal = [
+      { x: x + 1, y: y + 1 }, { x: x + 1, y: y - 1 },
+      { x: x - 1, y: y + 1 }, { x: x - 1, y: y - 1 }
+    ];
+
+    // Check cardinal neighbors first (prefer axis-aligned movement)
+    for (const pos of cardinal) {
+      const result = Pathfinder._getTileCost(pos.x, pos.y, map, obstacleGrid);
+      if (result) {
+        neighbors.push(result);
+      }
+    }
+
+    // Check diagonals (only if both adjacent tiles are walkable)
+    for (const pos of diagonal) {
+      // Check the two cardinal neighbors this diagonal would cross
+      const adj1 = Pathfinder._getTileCost(pos.x - (pos.x - x), pos.y, map, obstacleGrid);
+      const adj2 = Pathfinder._getTileCost(pos.x, pos.y - (pos.y - y), map, obstacleGrid);
+
+      if (adj1 && adj2) {
+        const result = Pathfinder._getTileCost(pos.x, pos.y, map, obstacleGrid);
+        if (result) {
+          result.cost = result.cost * 1.4; // diagonal multiplier
+          neighbors.push(result);
+        }
+      }
+    }
+
+    return neighbors;
+  }
+
+  /**
+   * Manhattan distance heuristic.
+   */
+  static _heuristic(a, b) {
+    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+  }
+
+  /**
+   * Reconstruct the path from start to goal using the cameFrom map.
+   */
+  static _reconstructPath(cameFrom, current, map) {
+    const path = [];
+    let curr = current;
+
+    while (cameFrom.has(curr)) {
+      const [x, y] = curr.split(',').map(Number);
+      path.unshift(Pathfinder._tileToWorld({ x, y }));
+      curr = cameFrom.get(curr);
+    }
+
+    // Add the starting tile
+    const [startX, startY] = curr.split(',').map(Number);
+    path.unshift(Pathfinder._tileToWorld({ x: startX, y: startY }));
+
+    return path;
+  }
+
+  /**
+   * Simplify a path by removing waypoints that can be reached directly.
+   * This reduces the number of target points the bot needs to visit.
    */
   static simplifyPath(path, obstacleGrid, map) {
     if (path.length <= 2) return path;
 
-    const kept = [path[0]];
-    let anchor = 0;
-    const last = path.length - 1;
-    while (anchor < last) {
-      let jump = anchor + 1;
-      for (let probe = last; probe > anchor + 1; probe--) {
-        if (!Physics.checkForObstacles(path[anchor], path[probe])) { jump = probe; break; }
+    const simplified = [path[0]];
+    let current = 0;
+
+    while (current < path.length - 1) {
+      let furthest = current + 1;
+
+      // Find the furthest point we can reach directly
+      for (let i = current + 2; i < path.length; i++) {
+        if (!Physics.checkForObstacles(path[current], path[i])) {
+          furthest = i;
+        }
       }
-      kept.push(path[jump]);
-      anchor = jump;
-    }
-    return kept;
-  }
 
-  // ── internals ──────────────────────────────────────────────────────────────
-
-  static _cellAt(point) {
-    return {
-      col: Math.floor(point.x / Pathfinder.TILE_PX),
-      row: Math.floor(point.y / Pathfinder.TILE_PX),
-    };
-  }
-
-  static _inside(col, row, map) {
-    return col >= 0 && col < map.width && row >= 0 && row < map.height;
-  }
-
-  static _estimate(col, row, dest) {
-    return Math.abs(col - dest.col) + Math.abs(row - dest.row);
-  }
-
-  /** Frontier entry with the strictly lowest ranking; earliest entry wins ties. */
-  static _bestCandidate(frontier, ranking) {
-    let pick = null;
-    let pickScore = Infinity;
-    for (const id of frontier) {
-      const score = ranking.get(id) || Infinity;
-      if (score < pickScore) {
-        pickScore = score;
-        pick = id;
-      }
-    }
-    return pick;
-  }
-
-  /** Price of stepping onto a cell, or null when it cannot be entered. */
-  static _entryCost(col, row, map, obstacleGrid) {
-    if (!Pathfinder._inside(col, row, map)) return null;
-
-    const cell = obstacleGrid[row * map.width + col];
-    if (!cell) return 1;
-
-    const code = cell.c;
-    if (code <= 2) return 1;
-    if (code >= 3 && code <= 4) return null;
-    if (code >= 5 && code <= 9) {
-      const half = Pathfinder.TILE_PX / 2;
-      const middleBlocked = typeof Physics !== 'undefined' && Physics.isTileWalkBlocked(cell, half, half);
-      return middleBlocked ? null : Pathfinder.PARTIAL_TILE_COST;
-    }
-    return 1;
-  }
-
-  /** Every cell reachable in one move from (col, row), with its move cost. */
-  static _exits(col, row, map, obstacleGrid) {
-    const out = [];
-
-    for (const [dc, dr] of Pathfinder.AXIS_MOVES) {
-      const cost = Pathfinder._entryCost(col + dc, row + dr, map, obstacleGrid);
-      if (cost !== null) out.push({ col: col + dc, row: row + dr, cost });
+      simplified.push(path[furthest]);
+      current = furthest;
     }
 
-    for (const [dc, dr] of Pathfinder.CORNER_MOVES) {
-      // No squeezing between two blocked tiles: both sides must be open.
-      const sideA = Pathfinder._entryCost(col, row + dr, map, obstacleGrid);
-      const sideB = Pathfinder._entryCost(col + dc, row, map, obstacleGrid);
-      if (sideA === null || sideB === null) continue;
-      const cost = Pathfinder._entryCost(col + dc, row + dr, map, obstacleGrid);
-      if (cost !== null) out.push({ col: col + dc, row: row + dr, cost: cost * Pathfinder.DIAGONAL_FACTOR });
-    }
-
-    return out;
-  }
-
-  /** Follow the parent links back to the origin and emit tile centres in walking order. */
-  static _traceBack(cameVia, endId, cols) {
-    const ids = [endId];
-    let id = endId;
-    while (cameVia.has(id)) {
-      id = cameVia.get(id);
-      ids.push(id);
-    }
-    ids.reverse();
-
-    const half = Pathfinder.TILE_PX / 2;
-    return ids.map(cellId => {
-      const col = cellId % cols;
-      const row = (cellId - col) / cols;
-      return { x: col * Pathfinder.TILE_PX + half, y: row * Pathfinder.TILE_PX + half };
-    });
+    return simplified;
   }
 }

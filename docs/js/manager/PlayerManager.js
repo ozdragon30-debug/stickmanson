@@ -1,44 +1,70 @@
-// The local player plus every other player (remote humans and bots) by id.
 class PlayerManager {
   static getInstance() {
-    return PlayerManager.instance || (PlayerManager.instance = new PlayerManager());
+    if (!PlayerManager.instance) {
+      PlayerManager.instance = new PlayerManager();
+    }
+    return PlayerManager.instance;
   }
 
   constructor() {
-    this.players = {};      // id → Player (insertion order = update/draw order)
+    this.players = {};
     this.mainPlayer = null;
   }
 
   createMainPlayer(spawnPoints = []) {
     const pts = spawnPoints.length ? spawnPoints : [{ x: 400, y: 300 }];
     const { x, y } = pts[Math.floor(Math.random() * pts.length)];
-    const me = this.mainPlayer = new Player(x, y);
-    me.isMainPlayer = true;
-    me.health = me.maxHealth();                  // shop health perks count from the first life
-    me.healthbarHeart = new AtlasGameObject(heartbeatAtlas, 'heartbeat_healthy', 30, 25);
-    me.name = settingsManager.name;
-    me.indicatorHue = settingsManager.spinnerHue;
-    me.indicatorShapeIndex = settingsManager.spinnerShapeIndex;
+
+    this.mainPlayer = new Player(x, y);
+    this.mainPlayer.isMainPlayer = true;
+    this.mainPlayer.healthbarHeart = new AtlasGameObject(heartbeatAtlas, 'heartbeat_healthy', 30, 25);
+
+    // Apply persisted settings (name, spinner appearance).
+    this.mainPlayer.name               = settingsManager.name;
+    this.mainPlayer.indicatorHue       = settingsManager.spinnerHue;
+    this.mainPlayer.indicatorShapeIndex = settingsManager.spinnerShapeIndex;
+
+    // Broadcast this player's name and visual identity to the server.
     socketManager.emit('setName', { name: settingsManager.name });
-    socketManager.emit('playerIdentity', shopManager.identity());
-    socketManager.emit('playerMovement', { x, y });
+    socketManager.emit('playerIdentity', {
+      hue:        settingsManager.spinnerHue,
+      shapeIndex: settingsManager.spinnerShapeIndex,
+    });
+
+    socketManager.emit("playerMovement", { x: x, y: y });
   }
 
-  // Own keys only: an id like "constructor" must never resolve to an Object member.
-  getPlayer(id) { return Object.hasOwn(this.players, id) ? this.players[id] : undefined; }
-  getPlayers() { return this.players; }
-  addPlayer(id, player) { this.players[id] = player; }
-  removePlayer(id) { delete this.players[id]; }
+  getPlayer(id) {
+    // Own properties only: ids like "constructor" must never resolve to Object members.
+    return Object.prototype.hasOwnProperty.call(this.players, id) ? this.players[id] : undefined;
+  }
+
+  getPlayers() {
+    return this.players;
+  }
+
+  addPlayer(id, player) {
+    this.players[id] = player;
+  }
+
+  removePlayer(id) {
+    delete this.players[id];
+  }
 
   updatePlayers() {
     this.mainPlayer.update();
     camera.setPos(this.mainPlayer.body);
-    for (const id in this.players) this.players[id].update();
+
+    for (const id in this.players) {
+      this.players[id].update();
+    }
   }
 
-  // Others first, so the local player is always drawn on top.
   drawPlayers(ctx) {
-    for (const id in this.players) this.players[id].draw(ctx);
+    for (const id in this.players) {
+      this.players[id].draw(ctx);
+    }
+
     this.mainPlayer.draw(ctx);
   }
 }

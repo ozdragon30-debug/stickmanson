@@ -23,14 +23,14 @@ const I18N = {
     'menu.help.3': '<b>Gamepad</b>: left stick move, right stick aim, RT attack',
     'menu.help.4': '<b>Touch</b>: left thumb move, right thumb aim &amp; attack',
     'menu.help.5': 'Walk over weapons to pick them up. Most kills when the timer ends wins.',
-    'menu.about.text': '<strong>Stick Clash</strong> is inspired by Stick Arena, a browser-based multiplayer shooter created by XGenStudios. After Flash was discontinued, the official servers went offline. This is an open-source <strong>HTML5 game</strong> inspired by it, with its own maps, characters, weapons and spinners, all drawn in code. Play offline against bots right here, or host your own server for multiplayer.',
+    'menu.about.text': '<strong>Stick Arena</strong> was a browser-based multiplayer shooter created by XGenStudios. After Flash was discontinued, the official servers went offline. This is an open-source <strong>HTML5 reimplementation</strong> with all original maps, weapons and sprites. Play offline against bots right here, or host your own server for multiplayer.',
     'menu.legal': 'Game assets © XGenStudios — non-commercial use only (CC BY-NC-SA 4.0).',
     'menu.stats': 'Your stats',
     'hint.title': 'HOW TO PLAY',
     'hint.keys': 'WASD move · Mouse aim · Click attack · Tab scores',
     'hint.touch': 'Left thumb move · Right thumb aim & fire',
     'hint.pad': 'Left stick move · Right stick aim · RT attack',
-    'menu.iosInstall': 'Tap the Share button, then "Add to Home Screen" to install Stick Clash.',
+    'menu.iosInstall': 'Tap the Share button, then "Add to Home Screen" to install Stick Arena.',
     'menu.recent': 'Recent rooms:',
     'menu.server.connect': 'Connect', 'menu.server.hint': 'Game server address, e.g. https://stick.example.com',
     'menu.map.featured': 'Featured',
@@ -44,20 +44,11 @@ const I18N = {
     'menu.room.create': 'Create private room',
     'menu.room.copy': 'Copy invite link',
     'menu.room.copied': 'Link copied!',
-    'menu.room.shareText': 'Join my Stick Clash room!',
+    'menu.room.shareText': 'Join my Stick Arena room!',
 
     'set.title': 'Settings',
     'set.tab.profile': 'Profile', 'set.tab.controls': 'Controls', 'set.tab.audio': 'Audio', 'set.tab.video': 'Video', 'set.tab.hud': 'HUD',
     'set.name': 'Player Name', 'set.cursor': 'Cursor', 'set.spinner': 'Spinner Shape', 'set.color': 'Spinner Color',
-    'shop.free': 'Free', 'shop.hp': 'Health', 'shop.atk': 'Attack', 'shop.armor': 'Armor',
-    'shop.buy': 'Buy', 'shop.coins': 'Coins', 'shop.need': 'Not enough coins', 'shop.equipped': 'Equipped',
-    'shop.pet': 'Pet', 'shop.none': 'None', 'shop.coinsBonus': 'Coins', 'shop.regen': 'Regen',
-    'shop.petHint': 'Pets follow you around and give a small bonus.',
-    'pet.cat': 'Cat', 'pet.dog': 'Dog', 'pet.crow': 'Crow', 'pet.slime': 'Slime', 'pet.drone': 'Drone',
-    'pet.ghost': 'Ghost', 'pet.fox': 'Fox', 'pet.dragon': 'Dragon whelp',
-    'vip.coins': '+20% coins from every kill and round', 'vip.name': 'Gold name above your player',
-    'vip.more': 'More VIP spinners and pets are coming', 'vip.soon': 'Coming soon (store release)', 'vip.active': 'VIP active',
-    'shop.hint': 'Earn coins by playing (kill +10, round +5, win +25). Spinners give a small bonus while worn.',
     'set.language': 'Language', 'set.lang.auto': 'Auto (browser)',
     'set.keybinds': 'Keybinds', 'set.arrows': '(arrow keys always move too)',
     'set.touch': 'Touch Controls', 'set.touch.auto': 'Auto (touch screens)', 'set.touch.on': 'Always on', 'set.touch.off': 'Off', 'set.touch.left': 'Left-handed (aim with the left thumb)',
@@ -71,6 +62,7 @@ const I18N = {
     'set.pixel': 'Pixel-art scaling', 'set.pixel.hint': '— crisp nearest-neighbour sprites',
     'set.fpsLimit': 'Frame rate limit', 'set.fpsLimit.off': 'Monitor refresh rate (unlimited)', 'set.fpsLimit.auto': 'Auto (refresh rate, steady 60 if the device can\'t keep up)', 'set.fpsLimit.30': '30 FPS (battery saver)',
     'set.view': 'Screen', 'set.view.wide': 'Fill screen (bigger, same view area)', 'set.view.classic': 'Classic 4:3 (dimmed map at the sides)', 'set.view.off': 'Classic 4:3 (black bars)',
+    'set.smooth': 'Smooth animations (60 fps)', 'set.smooth.hint': '— in-between drawings; game speed unchanged',
     'set.fx': 'Modern effects', 'set.fx.hint': '— shadows, weapon glow, muzzle light (looks only)',
     'set.fps': 'Show FPS', 'set.ping': 'Show ping', 'set.fullscreen': 'Toggle Fullscreen',
     'set.killfeed': 'Kill feed', 'set.hitmarkers': 'Hit markers', 'set.damageflash': 'Damage flash',
@@ -111,7 +103,7 @@ const I18N = {
     'menu.help.3': '<b>Gamepad</b>: sol çubuk hareket, sağ çubuk nişan, RT saldırı',
     'menu.help.4': '<b>Dokunmatik</b>: sol başparmak hareket, sağ başparmak nişan &amp; ateş',
     'menu.help.5': 'Silahları almak için üzerlerinden geç. Süre bittiğinde en çok öldüren kazanır.',
-    'menu.about.text': '<strong>Stick Clash</strong>, Stick Arena\'dan esinlendi. Stick Arena, XGenStudios\'un yaptığı tarayıcı tabanlı çok oyunculu bir nişancı oyunuydu. Flash kaldırılınca resmi sunucular kapandı. Bu, ondan esinlenen açık kaynak bir <strong>HTML5 oyunu</strong>; haritaları, karakterleri, silahları ve spinnerları kendine ait ve hepsi kodla çizildi. Burada botlara karşı çevrimdışı oyna ya da çok oyunculu için kendi sunucunu kur.',
+    'menu.about.text': '<strong>Stick Arena</strong>, XGenStudios\'un yaptığı tarayıcı tabanlı çok oyunculu bir nişancı oyunuydu. Flash kaldırılınca resmi sunucular kapandı. Bu, tüm orijinal haritalar, silahlar ve sprite\'larla açık kaynak bir <strong>HTML5 yeniden yapımı</strong>. Burada botlara karşı çevrimdışı oyna ya da çok oyunculu için kendi sunucunu kur.',
     'menu.legal': 'Oyun varlıkları © XGenStudios — yalnızca ticari olmayan kullanım (CC BY-NC-SA 4.0).',
     'menu.stats': 'İstatistiklerin',
     'hint.title': 'NASIL OYNANIR',
@@ -132,20 +124,11 @@ const I18N = {
     'menu.room.create': 'Özel oda oluştur',
     'menu.room.copy': 'Davet linkini kopyala',
     'menu.room.copied': 'Link kopyalandı!',
-    'menu.room.shareText': 'Stick Clash odama gel!',
+    'menu.room.shareText': 'Stick Arena odama gel!',
 
     'set.title': 'Ayarlar',
     'set.tab.profile': 'Profil', 'set.tab.controls': 'Kontroller', 'set.tab.audio': 'Ses', 'set.tab.video': 'Görüntü', 'set.tab.hud': 'Arayüz',
     'set.name': 'Oyuncu Adı', 'set.cursor': 'İmleç', 'set.spinner': 'Spinner Şekli', 'set.color': 'Spinner Rengi',
-    'shop.free': 'Ücretsiz', 'shop.hp': 'Can', 'shop.atk': 'Saldırı', 'shop.armor': 'Zırh',
-    'shop.buy': 'Satın al', 'shop.coins': 'Para', 'shop.need': 'Yetersiz para', 'shop.equipped': 'Takılı',
-    'shop.pet': 'Pet', 'shop.none': 'Yok', 'shop.coinsBonus': 'Para', 'shop.regen': 'Can yenileme',
-    'shop.petHint': 'Petler seni takip eder ve küçük bir bonus verir.',
-    'pet.cat': 'Kedi', 'pet.dog': 'Köpek', 'pet.crow': 'Karga', 'pet.slime': 'Jöle', 'pet.drone': 'Drone',
-    'pet.ghost': 'Hayalet', 'pet.fox': 'Tilki', 'pet.dragon': 'Ejderha yavrusu',
-    'vip.coins': 'Her öldürme ve rauntta +%20 para', 'vip.name': 'Oyuncunun üstünde altın renkli isim',
-    'vip.more': 'Yeni VIP spinner ve petler yolda', 'vip.soon': 'Yakında (mağaza sürümüyle)', 'vip.active': 'VIP aktif',
-    'shop.hint': 'Oynayarak para kazan (öldürme +10, raunt +5, galibiyet +25). Takılı spinner küçük bir bonus verir.',
     'set.language': 'Dil', 'set.lang.auto': 'Otomatik (tarayıcı)',
     'set.keybinds': 'Tuş Atamaları', 'set.arrows': '(ok tuşları her zaman hareket ettirir)',
     'set.touch': 'Dokunmatik Kontroller', 'set.touch.auto': 'Otomatik (dokunmatik ekranlar)', 'set.touch.on': 'Her zaman açık', 'set.touch.off': 'Kapalı', 'set.touch.left': 'Solak modu (sol başparmakla nişan al)',
@@ -159,6 +142,7 @@ const I18N = {
     'set.pixel': 'Piksel-art ölçekleme', 'set.pixel.hint': '— keskin, yumuşatmasız sprite\'lar',
     'set.fpsLimit': 'FPS sınırı', 'set.fpsLimit.off': 'Monitör yenileme hızı (sınırsız)', 'set.fpsLimit.auto': 'Otomatik (yenileme hızı; cihaz yetişemezse sabit 60)', 'set.fpsLimit.30': '30 FPS (pil tasarrufu)',
     'set.view': 'Ekran', 'set.view.wide': 'Ekranı doldur (daha büyük, aynı görüş alanı)', 'set.view.classic': 'Klasik 4:3 (kenarlarda soluk harita)', 'set.view.off': 'Klasik 4:3 (siyah kenarlar)',
+    'set.smooth': 'Akıcı animasyonlar (60 FPS)', 'set.smooth.hint': '— ara çizimler; oyun hızı değişmez',
     'set.fx': 'Modern efektler', 'set.fx.hint': '— gölgeler, silah parlaması, namlu ışığı (sadece görüntü)',
     'set.fps': 'FPS göster', 'set.ping': 'Ping göster', 'set.fullscreen': 'Tam Ekranı Aç/Kapat',
     'set.killfeed': 'Öldürme akışı', 'set.hitmarkers': 'İsabet işareti', 'set.damageflash': 'Hasar flaşı',
@@ -254,31 +238,10 @@ function splitMapName(name) {
   return { title, author: m ? m[2] : null };
 }
 
-// Turkish names of the maps (files carry the English name).
-const MAP_NAMES_TR = {
-  'Asphalt Streets': 'Asfalt Sokaklar',
-  'Office Floor': 'Ofis Katı',
-  'Storm Channel': 'Yağmur Kanalı',
-  'Trailer Park': 'Karavan Parkı',
-  'Orbit Station': 'Yörünge İstasyonu',
-  'Bio Lab': 'Biyo Laboratuvar',
-  'Container Port': 'Konteyner Limanı',
-  'The Pit Arena': 'Arena Çukuru',
-  'Hedge Maze': 'Çit Labirenti',
-  'Shipyard': 'Tersane',
-  'Foundry': 'Döküm Fabrikası',
-  'Sand Base': 'Kum Üssü',
-  'Stone Keep': 'Taş Kale',
-  'Rooftops': 'Çatılar',
-  'Metro Line': 'Metro Hattı',
-  'Test Room': 'Test Odası',
-};
-
-// Localised one-line map label ("… · by Author" when the name credits one).
+// Localised one-line map label: "Paris Streets · by Warjag" / "… · yapan: Warjag".
 function mapLabelLocal(name) {
   const { title, author } = splitMapName(name);
-  const local = i18n.lang === 'tr' ? (MAP_NAMES_TR[title] || title) : title;
-  return author ? `${local} · ${t('hud.mapBy', { name: author })}` : local;
+  return author ? `${title} · ${t('hud.mapBy', { name: author })}` : title;
 }
 
 function t(key, vars) {

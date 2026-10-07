@@ -16,17 +16,13 @@ const { chromium } = require('playwright');
 const ORIGINAL = process.env.PARITY_BASE || '1f035b2';
 const ROOT = path.join(__dirname, '..', '..');
 
-// `fallback`: files missing from `dir` are served from there. The current game
-// has its own (new) maps; the engine is compared on the original maps.
-function serve(dir, fallback) {
+function serve(dir) {
   const types = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.webp': 'image/webp', '.css': 'text/css', '.mp3': 'audio/mpeg' };
   const server = http.createServer((req, res) => {
     const p = path.join(dir, decodeURIComponent(new URL(req.url, 'http://x').pathname));
     if (!p.startsWith(dir)) { res.writeHead(403); return res.end(); }
     const file = req.url.split('?')[0].endsWith('/') ? path.join(p, 'index.html') : p;
-    const rel = path.relative(dir, file);
-    const pick = (fallback && rel.startsWith(path.join('data', 'maps')) && !fs.existsSync(file)) ? path.join(fallback, rel) : file;
-    fs.readFile(pick, (err, data) => {
+    fs.readFile(file, (err, data) => {
       if (err) { res.writeHead(404); return res.end(); }
       res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
       res.end(data);
@@ -118,7 +114,7 @@ async function run(url) {
   fs.writeFileSync(path.join(tmp, 'orig.tar'), tar);
   execFileSync('tar', ['-xf', 'orig.tar'], { cwd: tmp });
   const origSrv = await serve(path.join(tmp, 'docs'));
-  const curSrv = await serve(path.join(ROOT, 'docs'), path.join(tmp, 'docs'));
+  const curSrv = await serve(path.join(ROOT, 'docs'));
   try {
     const A = await run(`http://127.0.0.1:${origSrv.address().port}/`);
     const B = await run(`http://127.0.0.1:${curSrv.address().port}/?play`);
@@ -131,28 +127,17 @@ async function run(url) {
         if (a[i][0] !== b[i][0] || a[i][1] !== b[i][1]) { diffs++; if (diffs <= 3) console.log('DIFF', m, i, a[i], b[i]); }
       }
     }
-    let hitEvents = 0, hitDiff = 0, throughWall = 0;
-    // The sledgehammer was redesigned on request (one-hit kill, narrower
-    // strike, longer recovery: see data/weapons.json), so it is not compared.
-    const REDESIGNED = new Set(['11']);
+    let hitEvents = 0, hitDiff = 0;
     for (const m of MAPS) for (const w in A.out.hits[m]) {
-      if (REDESIGNED.has(w)) continue;
       hitEvents += A.out.hits[m][w] ? A.out.hits[m][w].split(',').length : 0;
-      if (A.out.hits[m][w] === B.out.hits[m][w]) continue;
-      // Line of sight is now checked every 10 px (it skipped wall corners and
-      // thin walls before), so the only allowed difference is a hit the
-      // original let through a wall disappearing.
-      const a = new Set((A.out.hits[m][w] || '').split(',').filter(Boolean));
-      const bHits = (B.out.hits[m][w] || '').split(',').filter(Boolean);
-      if (bHits.every(h => a.has(h))) { throughWall += a.size - bHits.length; continue; }
-      hitDiff++; console.log('HIT DIFF', m, w, A.out.hits[m][w], '|', B.out.hits[m][w]);
+      if (A.out.hits[m][w] !== B.out.hits[m][w]) { hitDiff++; console.log('HIT DIFF', m, w, A.out.hits[m][w], '|', B.out.hits[m][w]); }
     }
-    console.log(`movement: ${frames} frames, ${diffs} differ; hits: ${hitEvents} events, ${hitDiff} weapon/map combos differ, ${throughWall} through-wall hits now blocked`);
+    console.log(`movement: ${frames} frames, ${diffs} differ; hits: ${hitEvents} events, ${hitDiff} weapon/map combos differ`);
     assert.strictEqual(diffs, 0, 'movement differs from the original');
     assert.strictEqual(hitDiff, 0, 'hit detection differs from the original');
     assert.ok(hitEvents > 50, 'the hit test actually produced hits');
     assert.deepStrictEqual(B.errors, []);
-    console.log('parity: OK — movement identical to the original game, hits identical except shots through walls (damage taken ×' + 1.15 + ' by design, see Constants.DAMAGE_MULTIPLIER)');
+    console.log('parity: OK — movement and hit detection identical to the original game (damage taken ×' + 1.15 + ' by design, see Constants.DAMAGE_MULTIPLIER)');
   } finally {
     origSrv.close(); curSrv.close();
     fs.rmSync(tmp, { recursive: true, force: true });

@@ -1,70 +1,74 @@
-// Mouse aiming and firing. Pointer positions are converted to the logical
-// view (960×720 plus any wide-screen margin), so aim is the same at every
-// window size and pixel density. Pointer Events are used so the fake mouse
-// events browsers send after a touch never switch the game to mouse mode.
+// Mouse aiming / shooting. Coordinates are converted from CSS pixels to the
+// fixed 960×720 logical view, so aim is identical at any window size or DPI.
 
-let mouseScreenX = -100;     // cursor in logical view pixels (for drawing it)
+// Screen-space mouse position in logical view pixels (used for cursor rendering).
+let mouseScreenX = -100;
 let mouseScreenY = -100;
-let mouseInView = false;
-let mouseLMBDown = false;
+let mouseInView  = false;
 
-const isMousePointer = e => !e.pointerType || e.pointerType === 'mouse';
-
-// True while a menu or panel owns the input.
-function isUiBlocking() {
-  return (typeof settingsManager !== 'undefined' && settingsManager.isOpen()) ||
-         (typeof menu !== 'undefined' && !!menu.isOpen);
-}
-
-// The local player is always drawn at the view centre: face the given point.
 function aimAtViewPoint(vx, vy) {
-  const me = playerManager.mainPlayer;
-  if (!me || me.isRespawning) return;
-  const facing = Math.atan2(vy - VIEW_H / 2, vx - VIEW_W / 2);
-  me.body.setRotation(facing + 90 * Constants.TO_RADIANS);   // sprites face up
+  if (!playerManager.mainPlayer || playerManager.mainPlayer.isRespawning) return;
+  // The main player is always drawn at the centre of the view.
+  const spriteRotation = Math.atan2(vy - VIEW_H / 2, vx - VIEW_W / 2) + (90 * Constants.TO_RADIANS);
+  playerManager.mainPlayer.body.setRotation(spriteRotation);
 }
 
-function mouseMoveHandler(e) {
-  if (!isMousePointer(e)) return;
-  syncMouseButtons(e);
-  const p = display.toView(e.clientX, e.clientY);
+// Pointer Events are used (not mouse events) so the compatibility mouse events
+// browsers synthesise after a touch don't flip the game into mouse mode.
+function mouseMoveHandler(event) {
+  if (event.pointerType && event.pointerType !== 'mouse') return;
+  syncMouseButtons(event);
+  const p = display.toView(event.clientX, event.clientY);
   mouseScreenX = p.x;
   mouseScreenY = p.y;
-  const mx = display.extraX, my = display.extraY;
-  mouseInView = p.x >= -mx && p.y >= -my && p.x <= VIEW_W + mx && p.y <= VIEW_H + my;
+  mouseInView  = p.x >= -display.extraX && p.y >= -display.extraY && p.x <= VIEW_W + display.extraX && p.y <= VIEW_H + display.extraY;
   if (typeof inputMode !== 'undefined') inputMode.set('mouse');
-  if (!isUiBlocking()) aimAtViewPoint(p.x, p.y);
+  if (isUiBlocking()) return;
+  aimAtViewPoint(p.x, p.y);
 }
 
-function onMouseDown(e) {
-  if (!isMousePointer(e)) {
-    // A finger on the canvas before the touch layer took over: hand it on.
+let mouseLMBDown = false;
+
+function onMouseDown(event) {
+  if (event.pointerType && event.pointerType !== 'mouse') {
+    // A touch landed on the canvas (touch layer not active yet): hand it over.
     if (typeof touchInput !== 'undefined') {
       inputMode.set('touch');
       if (typeof updateTouchControls === 'function') updateTouchControls();
-      if (touchInput.enabled) touchInput._down(e);
+      if (touchInput.enabled) touchInput._down(event);
     }
     return;
   }
-  if (e.button === Constants.LEFT_MOUSE_BUTTON && !isUiBlocking()) mouseLMBDown = true;
+  if (event.button !== Constants.LEFT_MOUSE_BUTTON) return;
+  if (isUiBlocking()) return;
+  mouseLMBDown = true;
 }
 
-// Pointer events only report the first press / last release of a chord, so
-// the left button's state is re-read from the `buttons` bitmask.
-function syncMouseButtons(e) {
-  if (isMousePointer(e) && mouseLMBDown && !(e.buttons & 1)) mouseLMBDown = false;
+// Pointer events only report the first press / last release of a button chord,
+// so the left-button state is re-derived from the buttons bitmask.
+function syncMouseButtons(event) {
+  if (event.pointerType && event.pointerType !== 'mouse') return;
+  if (mouseLMBDown && !(event.buttons & 1)) mouseLMBDown = false;
 }
 
-// Listened for on window, so releasing outside the canvas also stops firing.
-function onMouseUp(e) {
-  if (!isMousePointer(e)) return;
-  if (e.button === Constants.LEFT_MOUSE_BUTTON || !(e.buttons & 1)) mouseLMBDown = false;
+// Listened for on window: releasing the button outside the canvas used to leave
+// the weapon firing forever.
+function onMouseUp(event) {
+  if (event.pointerType && event.pointerType !== 'mouse') return;
+  if (event.button === Constants.LEFT_MOUSE_BUTTON || !(event.buttons & 1)) mouseLMBDown = false;
 }
 
-// Called every frame: keep firing while the button is held.
 function mouseEvents() {
-  const me = playerManager.mainPlayer;
-  if (!me || !mouseLMBDown) return;
+  if (!playerManager.mainPlayer) return;
+  if (!mouseLMBDown) return;
   if (isUiBlocking()) { mouseLMBDown = false; return; }
-  if (me.canShoot && !me.isRespawning) me.shoot();
+  if (!playerManager.mainPlayer.canShoot || playerManager.mainPlayer.isRespawning) return;
+  playerManager.mainPlayer.shoot();
+}
+
+// True while a menu/overlay owns input (settings panel, start menu, …).
+function isUiBlocking() {
+  if (typeof settingsManager !== 'undefined' && settingsManager.isOpen()) return true;
+  if (typeof menu !== 'undefined' && menu.isOpen) return true;
+  return false;
 }

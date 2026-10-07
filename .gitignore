@@ -135,3 +135,4 @@ dist
 /android/
 .claude/worktrees/
 apk-download/
+__pycache__/

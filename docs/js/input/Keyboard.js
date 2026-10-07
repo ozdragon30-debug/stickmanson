@@ -1,168 +1,185 @@
-// Keyboard: movement / fire / sprint keys, the scoreboard key, chat and the
-// chat "!commands". Binds are stored as physical key codes
-// (KeyboardEvent.code, e.g. "KeyW") so every layout works the same; older
-// binds saved as KeyboardEvent.key values still match.
+let keys = {
+  up:     false,
+  left:   false,
+  down:   false,
+  right:  false,
+  sprint: false,
+  shoot:  false,
+};
 
-const ACTIONS = ['up', 'left', 'down', 'right', 'sprint', 'shoot'];
-const MOVE_AND_FIRE = ['up', 'left', 'down', 'right', 'shoot'];
-const noKeys = () => Object.fromEntries(ACTIONS.map(a => [a, false]));
-let keys = noKeys();
-
+// Keybinds are stored as physical key codes (KeyboardEvent.code, e.g. "KeyW"),
+// so they work on every layout (Turkish Q/F, AZERTY, Dvorak…) and with Caps Lock.
+// Legacy binds saved as KeyboardEvent.key values are still honoured.
 const CODE_RE = /^(Key[A-Z]|Digit\d|Numpad|Arrow|Space$|Shift|Control|Alt|Meta|F\d|Enter|Tab|Backspace|Comma|Period|Slash|Semicolon|Quote|Bracket|Minus|Equal|Backquote|Backslash|IntlBackslash|CapsLock)/;
 
-// Arrow keys always move too (as a second set).
+function keyMatches(event, action) {
+  const bound = settingsManager.getKey(action);
+  if (!bound) return false;
+  if (CODE_RE.test(bound)) return event.code === bound;
+  if (bound.length === 1) return event.key.toLowerCase() === bound.toLowerCase();
+  return event.key === bound;
+}
+
+// Arrow keys always work as a secondary movement set (unless rebound elsewhere).
 const ARROW_ACTIONS = { ArrowUp: 'up', ArrowLeft: 'left', ArrowDown: 'down', ArrowRight: 'right' };
 
-function keyMatches(e, action) {
-  const bind = settingsManager.getKey(action);
-  if (!bind) return false;
-  if (CODE_RE.test(bind)) return e.code === bind;
-  return bind.length === 1 ? e.key.toLowerCase() === bind.toLowerCase() : e.key === bind;
+function actionFor(event) {
+  for (const action of ['up', 'left', 'down', 'right', 'sprint', 'shoot']) {
+    if (keyMatches(event, action)) return action;
+  }
+  return ARROW_ACTIONS[event.code] || null;
 }
 
-function actionFor(e) {
-  return ACTIONS.find(a => keyMatches(e, a)) || ARROW_ACTIONS[e.code] || null;
+// Human-readable label for a stored bind (code or legacy key).
+function keyLabel(bound) {
+  if (!bound) return '—';
+  if (bound === ' ' || bound === 'Space') return 'Space';
+  if (/^Key[A-Z]$/.test(bound)) return bound.slice(3);
+  if (/^Digit\d$/.test(bound)) return bound.slice(5);
+  const arrows = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
+  if (arrows[bound]) return arrows[bound];
+  if (/^(Shift|Control|Alt|Meta)(Left|Right)$/.test(bound)) return bound.replace(/(Left|Right)$/, ' $1').replace('Control', 'Ctrl');
+  if (bound.length === 1) return bound.toUpperCase();
+  return bound.replace(/^Numpad/, 'Num ');
 }
 
-// Short label for a stored bind ("W", "Space", "↑", "Ctrl Left", "Num 4"…).
-function keyLabel(bind) {
-  if (!bind) return '—';
-  if (bind === ' ' || bind === 'Space') return 'Space';
-  const arrow = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }[bind];
-  if (arrow) return arrow;
-  let m = /^Key([A-Z])$/.exec(bind) || /^Digit(\d)$/.exec(bind);
-  if (m) return m[1];
-  m = /^(Shift|Control|Alt|Meta)(Left|Right)$/.exec(bind);
-  if (m) return `${m[1] === 'Control' ? 'Ctrl' : m[1]} ${m[2]}`;
-  if (bind.length === 1) return bind.toUpperCase();
-  return bind.replace(/^Numpad/, 'Num ');
-}
-
-// "!map name" → a map file of the offline list.
+// Resolve "!map name" to a map file using the full offline map list.
 function findMapFile(name) {
-  const base = name.toLowerCase().replace(/\.dat$/, '').replace(/\s+/g, '');
-  const list = BotManager.OFFLINE_MAPS;
-  return list.find(f => f === `${base}.dat`) || list.find(f => f.endsWith(`/${base}.dat`)) || null;
+  const n = name.toLowerCase().replace(/\.dat$/, '').replace(/\s+/g, '');
+  const maps = BotManager.OFFLINE_MAPS;
+  return maps.find(f => f === n + '.dat') || maps.find(f => f.endsWith('/' + n + '.dat')) || null;
 }
 
-const offlineBots = () => botManager.active && !socketManager.isConnected;
-
-// A line typed in chat: local "!" commands, otherwise a chat message.
+// Handles a submitted chat line: local "!" commands first, then sends to server.
 function submitChat(text) {
   if (!text) return;
-  const sys = (who, line) => chatManager.addMessage(who, line, null);
-  const mute = /^!(un)?mute\s+(\S.*)$/.exec(text);
   if (text === '!help') {
-    for (const line of t('chat.help').split('\n')) sys('?', line);
-  } else if (mute) {
-    const on = !mute[1];
-    chatManager.setMuted(mute[2], on);
-    sys('?', t(on ? 'chat.muted' : 'chat.unmuted', { name: mute[2] }));
+    for (const line of t('chat.help').split('\n')) chatManager.addMessage('?', line, null);
+  } else if (/^!(un)?mute\s+\S/.test(text)) {
+    const on = text.startsWith('!mute');
+    const who = text.replace(/^!(un)?mute\s+/, '');
+    chatManager.setMuted(who, on);
+    chatManager.addMessage('?', t(on ? 'chat.muted' : 'chat.unmuted', { name: who }), null);
   } else if (text === '!debug') {
     debugTiles = !debugTiles;
   } else if (text === '!fps') {
     settingsManager.set('showFps', !settingsManager.get('showFps'));
-  } else if (text === '!next' && offlineBots()) {
-    // Offline: end the round now, or start the next one.
+  } else if (text === '!next' && botManager.active && !socketManager.isConnected) {
+    // Offline: end the current round now (same as the server's !next).
     if (botManager._offlineRounds && botManager._roundPhase === 'playing') scoreboardManager.roundEndsAt = Date.now();
     else botManager.startOfflineRound(BotManager.randomMap(botManager._currentMap));
-  } else if (text.startsWith('!map ') && offlineBots()) {
-    const wanted = text.substring(5).trim();
-    const file = findMapFile(wanted);
-    if (!file) return sys('Server', `Unknown map: ${wanted}`);
-    botManager.preferredMap = file;
-    botManager.startOfflineRound(file);
+  } else if (text.startsWith('!map ') && !socketManager.isConnected && botManager.active) {
+    // Offline only (online the server owns the map); a fresh round on that map.
+    const mapFile = findMapFile(text.substring(5).trim());
+    if (mapFile) { botManager.preferredMap = mapFile; botManager.startOfflineRound(mapFile); }
+    else chatManager.addMessage('Server', `Unknown map: ${text.substring(5).trim()}`, null);
   } else if (socketManager.isConnected) {
     socketManager.emit('chatMessage', { text });
   } else {
-    // No server to echo it back: show it here.
+    // Offline: there is no server to echo the message back, so show it locally
+    // (it used to vanish silently).
     chatManager.addMessage(settingsManager.name, text.slice(0, 80), settingsManager.spinnerHue);
   }
 }
 
-// Shift shows the scoreboard unless it is bound to moving or firing.
-function shiftIsGameBind(e) {
-  return MOVE_AND_FIRE.some(a => keyMatches(e, a));
-}
-
-function keyDownHandler(e) {
-  if (chatManager.isOpen) return;                          // the chat field owns the keys
+function keyDownHandler(event) {
+  // While chat is open the focused <input> owns the keyboard.
+  if (chatManager.isOpen) return;
+  // Menus and focused form controls (Play button, name field…) keep their keys.
   if (typeof menu !== 'undefined' && menu.isOpen) return;
-  const tag = e.target?.tagName;
+  const tag = event.target && event.target.tagName;
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-  if (tag === 'BUTTON') {
-    if (isUiBlocking()) return;                            // a menu button keeps its keys
-    e.target.blur();
-  }
+  // A focused button only keeps keys while a menu is actually open.
+  if (tag === 'BUTTON' && isUiBlocking()) return;
+  if (tag === 'BUTTON') event.target.blur();
+
+  // Settings panel handles Escape via capture phase; suppress game input while open.
   if (settingsManager.isOpen()) return;
 
-  if (e.key === 'Enter') {
-    e.preventDefault();
+  if (event.key === 'Enter') {
+    event.preventDefault();
     chatManager.open();
     return;
   }
-  const action = actionFor(e);
+
+  const action = actionFor(event);
   if (action) {
     keys[action] = true;
     if (typeof inputMode !== 'undefined') inputMode.set('keyboard');
-    if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+    if (event.code.startsWith('Arrow') || event.code === 'Space') event.preventDefault();
   }
-  if (e.key === 'Tab') {
-    e.preventDefault();
+
+  if (event.key === 'Tab') {
+    event.preventDefault();
     scoreboardManager.tabHeld = true;
-  } else if (e.key === ' ') {
-    e.preventDefault();
-  } else if (e.key === 'Shift' && !shiftIsGameBind(e)) {
+  } else if (event.key === ' ') {
+    event.preventDefault();
+  } else if (event.key === 'Shift' && !shiftIsGameBind(event)) {
     scoreboardManager.tabHeld = true;
   }
 }
 
-function keyUpHandler(e) {
-  for (const a of ACTIONS) if (keyMatches(e, a)) keys[a] = false;   // a key may serve several actions
-  if (ARROW_ACTIONS[e.code]) keys[ARROW_ACTIONS[e.code]] = false;
-  if (e.key === 'Tab' || e.key === 'Shift') scoreboardManager.tabHeld = false;
+// Shift shows the scoreboard unless it is bound to a movement/attack action.
+function shiftIsGameBind(event) {
+  return ['up', 'left', 'down', 'right', 'shoot'].some(a => keyMatches(event, a));
 }
 
-// Losing focus releases everything (no stuck keys or buttons).
+function keyUpHandler(event) {
+  // Release every action bound to this key (a key may be in several sets).
+  for (const a of ['up', 'left', 'down', 'right', 'sprint', 'shoot']) {
+    if (keyMatches(event, a)) keys[a] = false;
+  }
+  if (ARROW_ACTIONS[event.code]) keys[ARROW_ACTIONS[event.code]] = false;
+
+  if (event.key === 'Tab' || event.key === 'Shift') scoreboardManager.tabHeld = false;
+}
+
 function onBlurHandler() {
-  keys = noKeys();
+  keys = { up: false, left: false, down: false, right: false, sprint: false, shoot: false };
   if (typeof mouseLMBDown !== 'undefined') mouseLMBDown = false;
   if (typeof scoreboardManager !== 'undefined') scoreboardManager.tabHeld = false;
 }
 
-// Keyboard, gamepad and touch merged: every device drives the same movement.
+// Union of keyboard, gamepad and touch inputs. Every device drives the exact
+// same 8-direction movement below, so movement physics are identical.
 function currentKeys() {
-  const held = { ...keys };
-  const others = [typeof gamepadInput !== 'undefined' && gamepadInput.keys, typeof touchInput !== 'undefined' && touchInput.keys];
-  for (const src of others) {
-    if (src) for (const a in src) if (src[a]) held[a] = true;
+  const k = { ...keys };
+  for (const src of [typeof gamepadInput !== 'undefined' ? gamepadInput.keys : null,
+                     typeof touchInput   !== 'undefined' ? touchInput.keys   : null]) {
+    if (!src) continue;
+    for (const a in src) if (src[a]) k[a] = true;
   }
-  return held;
+  return k;
 }
 
-// Eight directions, checked in this order (diagonals first). Each entry:
-// [needs, x sign, y sign, diagonal?, leg angle].
-const MOVES = [
-  [['up', 'right'], 1, -1, true, 45],
-  [['up', 'left'], -1, -1, true, 135],
-  [['down', 'right'], 1, 1, true, -45],
-  [['down', 'left'], -1, 1, true, -315],
-  [['up'], 0, -1, false, 0],
-  [['left'], -1, 0, false, 90],
-  [['down'], 0, 1, false, 0],
-  [['right'], 1, 0, false, 90],
-];
-
 function keyEvents(dt) {
-  const me = playerManager.mainPlayer;
-  if (!me || me.isRespawning || isUiBlocking()) return;
-  const held = currentKeys();
-  if (held.shoot && me.canShoot) me.shoot();
-  // px/s × dt: the same distance per second at any frame rate.
-  const step = Constants.SPEED * (me.currentWeapon.walkSpeed ?? 1) * dt;
-  const move = MOVES.find(([needs]) => needs.every(k => held[k]));
-  if (!move) return;
-  const [, sx, sy, diagonal, legs] = move;
-  const d = diagonal ? step / 1.414 : step;      // diagonals keep the same speed
-  me.move(sx ? sx * d : null, sy ? sy * d : null, legs);
+  if (!playerManager.mainPlayer || playerManager.mainPlayer.isRespawning) return;
+  if (isUiBlocking()) return;
+  const keys = currentKeys();
+
+  if (keys.shoot && playerManager.mainPlayer.canShoot) {
+    playerManager.mainPlayer.shoot();
+  }
+
+  // Speed in px/s multiplied by dt gives frame-rate-independent px this frame.
+  const weaponMult = playerManager.mainPlayer.currentWeapon.walkSpeed ?? 1;
+  const spd = Constants.SPEED * weaponMult * dt;
+
+  if (keys.up && keys.right) {
+    playerManager.mainPlayer.move(spd / 1.414, -spd / 1.414, 45);
+  } else if (keys.up && keys.left) {
+    playerManager.mainPlayer.move(-spd / 1.414, -spd / 1.414, 135);
+  } else if (keys.down && keys.right) {
+    playerManager.mainPlayer.move(spd / 1.414, spd / 1.414, -45);
+  } else if (keys.down && keys.left) {
+    playerManager.mainPlayer.move(-spd / 1.414, spd / 1.414, -315);
+  } else if (keys.up) {
+    playerManager.mainPlayer.move(null, -spd, 0);
+  } else if (keys.left) {
+    playerManager.mainPlayer.move(-spd, null, 90);
+  } else if (keys.down) {
+    playerManager.mainPlayer.move(null, spd, 0);
+  } else if (keys.right) {
+    playerManager.mainPlayer.move(spd, null, 90);
+  }
 }

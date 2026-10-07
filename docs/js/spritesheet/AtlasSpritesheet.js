@@ -1,123 +1,165 @@
-// A sprite sheet: named animations (fps + frame list) plus either an image
-// with frame rectangles, or a code renderer that draws any animation at a
-// given progress (see render/StickFigure.js, render/Emblems.js).
-//
-//   new AtlasSpritesheet(name, imageUrl, json, opts)
-//     json        object or URL: { frames, animations: [{name, fps, frames, offset?, pinned?}],
-//                 set_origins?, tileAnimations? }; `frames` of an animation may
-//                 be a count (frames 0…n-1) or a list of frame keys
-//     opts.renderer  draw from code; the JSON then only carries timing
-//     opts.image     an already-drawn canvas to use as the sheet
 class AtlasSpritesheet {
-  constructor(name, imageUrl, jsonData, opts = {}) {
+  constructor(name, imageUrl, jsonData) {
     this.spritesheetName = name;
-    this.renderer = opts.renderer || null;
-    this.image = AtlasSpritesheet._sheetImage(imageUrl, opts.image);
-    this.frames = {};
-    this.animationMap = {};      // name → { fps, frames, offset, pinned }
-    this.animationNames = [];
-    this.setOrigins = {};
-    this.tileAnimations = {};
-    this.ready = false;
-    if (jsonData && typeof jsonData === 'object') {
-      this._load(jsonData);
+    this.image = new Image();
+    this.image.decoding = 'async';
+    // Prefer the lossless WebP copy (pixel-identical, ~40% smaller download);
+    // fall back to the original PNG if the browser can't decode it.
+    const webp = imageUrl.replace(/\.png$/, '.webp');
+    if (webp !== imageUrl) {
+      this.image.onerror = () => { this.image.onerror = null; this.image.src = imageUrl; };
+      this.image.src = webp;
     } else {
-      fetch(jsonData).then(r => r.json()).then(d => this._load(d)).catch(err => {
-        this.failed = true;
-        console.error(`[Atlas] failed to load ${name}:`, err);
-      });
+      this.image.src = imageUrl;
     }
-  }
+    this.frames = {};
+    this.animationMap = {};  // name -> { fps, frames: [frameKey, ...], offset?: [x, y] }
+    this.animationNames = []; // Object.keys(animationMap), cached (used every frame)
+    this.setOrigins = {};
+    this.ready = false;
 
-  // A canvas (given or blank) behaves like a loaded image; image files are
-  // fetched as WebP first, falling back to the PNG.
-  static _sheetImage(url, given) {
-    if (given || !url) {
-      const c = given || document.createElement('canvas');
-      c.complete = true;
-      c.naturalWidth = c.width || 1;
-      return c;
-    }
-    const img = new Image();
-    img.decoding = 'async';
-    const webp = url.replace(/\.png$/, '.webp');
-    if (webp !== url) img.onerror = () => { img.onerror = null; img.src = url; };
-    img.src = webp;
-    return img;
-  }
+    const load = (data) => {
+      const rawFrames = data.frames || {};
+      this.frames = rawFrames;
+      for (const anim of (data.animations || [])) {
+        this.animationMap[anim.name] = { fps: anim.fps, frames: anim.frames, offset: anim.offset || null, pinned: anim.pinned || false };
+      }
+      this.animationNames = Object.keys(this.animationMap);
+      this.tileAnimations = data.tileAnimations || {};
+      this.setOrigins = data.set_origins || {};
+      this.ready = true;
+    };
 
-  _load(data) {
-    this.frames = data.frames || {};
-    for (const a of data.animations || []) {
-      const frames = typeof a.frames === 'number' ? [...Array(a.frames).keys()] : a.frames;
-      this.animationMap[a.name] = { fps: a.fps, frames, offset: a.offset || null, pinned: a.pinned || false };
+    if (typeof jsonData === 'object' && jsonData !== null) {
+      // Inline data — synchronous, no fetch needed.
+      load(jsonData);
+    } else {
+      // URL string — fetch asynchronously.
+      fetch(jsonData)
+        .then(r => r.json())
+        .then(load)
+        .catch(err => { this.failed = true; console.error(`[Atlas] failed to load ${name}:`, err); });
     }
-    this.animationNames = Object.keys(this.animationMap);
-    this.tileAnimations = data.tileAnimations || {};
-    this.setOrigins = data.set_origins || {};
-    this.ready = true;
   }
 
   getAnimation(name) {
     return this.animationMap[name] || null;
   }
 
-  // Drawing data of one frame: source rect, origin (pivot) and, for trimmed
-  // frames, where the kept part sits in the untrimmed frame (tx, ty, sw, sh).
-  // Results are cached per animation.
+  // Returns { x, y, w, h, origin, tx, ty, sw, sh } for a given animation frame.
+  // origin is the single {ox, oy} anchor from set_origins (or a sensible default).
+  //
+  // Trimmed sheets (tools/trim-atlases.py) store only the opaque part of each
+  // frame: sw×sh is the original frame size and (tx, ty) where the stored
+  // pixels sat inside it. The origin is shifted to match, so drawing at
+  // -origin with w×h puts every pixel exactly where the untrimmed frame did.
+  // Results are cached: this runs several times per player per frame.
   getFrameData(animName, frameIndex) {
     const anim = this.animationMap[animName];
     if (!anim || !anim.frames.length) return null;
     const i = Math.max(0, frameIndex) % anim.frames.length;
     const cache = anim._fd || (anim._fd = []);
-    if (cache[i] === undefined) cache[i] = this._frameData(animName, anim.frames[i]);
-    return cache[i];
+    if (cache[i] !== undefined) return cache[i];
+    const key = anim.frames[i];
+    const raw = this.frames[key];
+    if (!raw) return (cache[i] = null);
+
+    // Support both {x,y,w,h} and {frame:{x,y,w,h}} formats
+    const f = (raw.frame !== undefined) ? raw.frame : raw;
+    const tx = raw.tx || 0, ty = raw.ty || 0;
+    const sw = raw.sw || f.w, sh = raw.sh || f.h;
+    const so = this.setOrigins[animName] || {};
+    // Single origin — falls back to per-frame baked origin then center-bottom
+    const o = (so.ox != null) ? so : (raw.origin || { ox: Math.round(sw / 2), oy: Math.round(sh * 0.95) });
+    const origin = (tx || ty) ? { ox: o.ox - tx, oy: o.oy - ty } : o;
+
+    return (cache[i] = { x: f.x, y: f.y, w: f.w, h: f.h, origin, tx, ty, sw, sh });
   }
 
-  _frameData(animName, key) {
-    if (this.renderer) return AtlasSpritesheet.NO_FRAME;
+  // Returns tile frame {x,y,w,h} from the map atlas by 3-char tile key (e.g. "0B0").
+  getMapTileFrame(tileKey) {
+    const key = tileKey + '.png';
     const raw = this.frames[key];
     if (!raw) return null;
-    const rect = raw.frame !== undefined ? raw.frame : raw;
-    const tx = raw.tx || 0, ty = raw.ty || 0;
-    const sw = raw.sw || rect.w, sh = raw.sh || rect.h;
-    const set = this.setOrigins[animName] || {};
-    const base = set.ox != null ? set : (raw.origin || { ox: Math.round(sw / 2), oy: Math.round(sh * 0.95) });
-    const origin = tx || ty ? { ox: base.ox - tx, oy: base.oy - ty } : base;
-    return { x: rect.x, y: rect.y, w: rect.w, h: rect.h, origin, tx, ty, sw, sh };
+    return (raw.frame !== undefined) ? raw.frame : raw;
   }
 
-  _rect(key) {
-    const raw = this.frames[key];
-    return raw ? (raw.frame !== undefined ? raw.frame : raw) : null;
-  }
-
-  getMapTileFrame(tileKey) {
-    return this._rect(tileKey + '.png');
-  }
-
-  // Animated map tiles (water) step through their frames on the wall clock.
+  // Like getMapTileFrame but advances through animation frames using a wall-clock
+  // timestamp (milliseconds, as supplied by requestAnimationFrame).
   getAnimatedMapTileFrame(tileKey, nowMs) {
     const anim = this.tileAnimations[tileKey];
-    if (!anim || anim.frames.length <= 1) return this._rect(tileKey + '.png');
-    return this._rect(anim.frames[Math.floor((nowMs / 1000) * anim.fps) % anim.frames.length]);
+    let key;
+    if (anim && anim.frames.length > 1) {
+      const frameIndex = Math.floor((nowMs / 1000) * anim.fps) % anim.frames.length;
+      key = anim.frames[frameIndex];
+    } else {
+      key = tileKey + '.png';
+    }
+    const raw = this.frames[key];
+    if (!raw) return null;
+    return (raw.frame !== undefined) ? raw.frame : raw;
   }
 }
 
-AtlasSpritesheet.NO_FRAME = Object.freeze({ x: 0, y: 0, w: 1, h: 1, origin: { ox: 0, oy: 0 }, tx: 0, ty: 0, sw: 1, sh: 1 });
+// Singleton indicator (spinner) atlas
+const indicatorAtlas = new AtlasSpritesheet(
+  'indicator',
+  'sprites/indicator/spritesheet.png',
+  'sprites/indicator/spritesheet.json'
+);
 
-// ── The game's sheets ────────────────────────────────────────────────────────
-const fromCanvas = (name, build) => {
-  const { canvas, data } = build();
-  return new AtlasSpritesheet(name, null, data, { image: canvas });
-};
+// Singleton player atlas loaded once
+const playerAtlas = new AtlasSpritesheet(
+  'player',
+  'sprites/player/spritesheet.png',
+  'sprites/player/spritesheet.json'
+);
 
-const indicatorAtlas = fromCanvas('indicator', Emblems.buildSpinnerSheet);   // spinners (tinted per player)
-const playerAtlas = new AtlasSpritesheet('player', null, 'data/anims/player.json', { renderer: StickFigure.body });
-const deathAtlas = new AtlasSpritesheet('death', null, 'data/anims/death.json', { renderer: StickFigure.death });
-const pickupAtlas = fromCanvas('pickup', WeaponArt.buildPickupSheet);
-const heartbeatAtlas = new AtlasSpritesheet('heartbeat', null, { animations: Emblems.HEART_ANIMS }, { renderer: Emblems.heart });
-const bloodAtlas = new AtlasSpritesheet('blood', null, { animations: Emblems.BLOOD_ANIMS }, { renderer: Emblems.blood });
-const mapAtlas = new AtlasSpritesheet('map', 'sprites/maps/atlas.png', 'sprites/maps/atlas.json');   // animated water
-const cursorAtlas = fromCanvas('cursor', Emblems.buildCursorSheet);
-const particleAtlas = new AtlasSpritesheet('particles', null, 'data/anims/particles.json', { renderer: StickFigure.particles });
+// Singleton death atlas loaded once
+const deathAtlas = new AtlasSpritesheet(
+  'death',
+  'sprites/death/spritesheet.png',
+  'sprites/death/spritesheet.json'
+);
+
+// Singleton pickup atlas loaded once
+const pickupAtlas = new AtlasSpritesheet(
+  'pickup',
+  'sprites/pickup/spritesheet.png',
+  'sprites/pickup/spritesheet.json'
+);
+
+// Singleton heartbeat atlas (HUD health indicator)
+const heartbeatAtlas = new AtlasSpritesheet(
+  'heartbeat',
+  'sprites/player/heartbeat.png',
+  'sprites/player/heartbeat.json'
+);
+
+// Singleton blood atlas loaded once
+const bloodAtlas = new AtlasSpritesheet(
+  'blood',
+  'sprites/blood/spritesheet.png',
+  'sprites/blood/spritesheet.json'
+);
+
+// Singleton map atlas loaded once
+const mapAtlas = new AtlasSpritesheet(
+  'map',
+  'sprites/maps/atlas.png',
+  'sprites/maps/atlas.json'
+);
+
+// Singleton cursor atlas
+const cursorAtlas = new AtlasSpritesheet(
+  'cursor',
+  'sprites/cursor/spritesheet.png',
+  'sprites/cursor/spritesheet.json'
+);
+
+// Singleton particle atlas — muzzle flash / shoot effect sprites
+const particleAtlas = new AtlasSpritesheet(
+  'particles',
+  'sprites/particles/spritesheet.png',
+  'sprites/particles/spritesheet.json'
+);

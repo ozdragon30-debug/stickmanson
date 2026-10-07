@@ -1,43 +1,34 @@
-// In-game chat. A real (visually hidden) text field holds what is typed, so
-// paste, IME composition, mobile keyboards and caret keys all just work; the
-// canvas draws the visible box and the message history.
-const CHAT = {
-  maxMessages: 10,
-  maxLen: 80,
-  lineH: 18,
-  font: '13px monospace',
-  boxX: 50,           // clear of the ⚙ button in the bottom-left corner
-  boxW: 340,
-  boxH: 24,
-  bottom: 12,
-  showSec: 5,         // fully visible, then fades out over the same time
-};
-
 class ChatManager {
   static getInstance() {
-    return ChatManager.instance || (ChatManager.instance = new ChatManager());
+    if (!ChatManager.instance) {
+      ChatManager.instance = new ChatManager();
+    }
+    return ChatManager.instance;
   }
 
   constructor() {
-    this.messages = [];             // [{ name, text, hue, system, timestamp }]
-    this.maxMessages = CHAT.maxMessages;
-    this.isOpen = false;
-    this._el = this._createField();
-    this._chips = this._createChips();
-  }
+    this.messages  = [];   // [{ name, text, timestamp }]
+    this.maxMessages = 10;
+    this.isOpen    = false;
 
-  _createField() {
-    const el = Object.assign(document.createElement('input'), {
-      type: 'text', maxLength: CHAT.maxLen, autocomplete: 'off', spellcheck: false,
-      className: 'chat-input', tabIndex: -1,
-    });
+    // A real (visually hidden) text field backs the chat line, so paste, IME
+    // composition (e.g. Turkish/CJK input), mobile keyboards and caret
+    // movement all work. The canvas still draws the visible chat box.
+    const el = document.createElement('input');
+    el.type = 'text';
+    el.maxLength = 80;
+    el.autocomplete = 'off';
+    el.spellcheck = false;
     el.setAttribute('aria-label', 'Chat message');
     el.setAttribute('enterkeyhint', 'send');
-    el.addEventListener('keydown', (e) => {
-      e.stopPropagation();                    // the game must not see these keys
+    el.className = 'chat-input';
+    el.tabIndex = -1; // not reachable with Tab while chat is closed
+    el.addEventListener('keydown', e => {
+      e.stopPropagation();
       if (e.key === 'Enter' && !e.isComposing) {
         e.preventDefault();
-        this._send(this.close());
+        const text = this.close();
+        if (typeof submitChat === 'function') submitChat(text);
       } else if (e.key === 'Escape') {
         e.preventDefault();
         this.close();
@@ -46,52 +37,48 @@ class ChatManager {
     el.addEventListener('keyup', e => e.stopPropagation());
     el.addEventListener('blur', () => { if (this.isOpen) this.close(); });
     document.body.appendChild(el);
-    return el;
-  }
+    this._el = el;
 
-  // Touch quick-chat: one tap sends a phrase. pointerdown + preventDefault
-  // keeps the field focused so it doesn't close first.
-  _createChips() {
-    const box = document.createElement('div');
-    box.className = 'quick-chat';
-    box.addEventListener('pointerdown', (e) => {
-      const btn = e.target.closest('button');
-      if (!btn) return;
+    // Quick-chat chips (touch only): one tap sends a phrase.
+    const chips = document.createElement('div');
+    chips.className = 'quick-chat';
+    // pointerdown + preventDefault keeps the text field focused (no blur/close).
+    chips.addEventListener('pointerdown', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
       e.preventDefault();
       this.close();
-      this._send(btn.textContent);
+      if (typeof submitChat === 'function') submitChat(b.textContent);
     });
-    document.body.appendChild(box);
-    return box;
-  }
-
-  _send(text) {
-    if (typeof submitChat === 'function') submitChat(text);
+    document.body.appendChild(chips);
+    this._chips = chips;
   }
 
   _renderChips() {
-    this._chips.replaceChildren(...t('chat.quick').split('|').map((phrase) => {
+    const phrases = t('chat.quick').split('|');
+    this._chips.innerHTML = '';
+    for (const p of phrases) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.textContent = phrase;
-      return b;
-    }));
+      b.textContent = p;
+      this._chips.appendChild(b);
+    }
   }
 
   get input() { return this._el.value; }
 
   open() {
-    const touch = typeof inputMode !== 'undefined' && inputMode.mode === 'touch';
     this.isOpen = true;
     this._el.value = '';
+    const touch = typeof inputMode !== 'undefined' && inputMode.mode === 'touch';
     document.body.classList.toggle('touch-chat', touch);
     if (touch) this._renderChips();
     this._el.placeholder = touch ? '…' : '';
-    if (typeof onBlurHandler === 'function') onBlurHandler();   // let go of held keys
+    if (typeof onBlurHandler === 'function') onBlurHandler(); // release held movement keys
     this._el.focus({ preventScroll: true });
   }
 
-  // Closes the line and returns what was typed (trimmed, maybe empty).
+  // Returns the message text (may be empty), then closes.
   close() {
     const text = this._el.value.trim();
     this.isOpen = false;
@@ -101,7 +88,7 @@ class ChatManager {
     return text;
   }
 
-  // Names muted on this device (lower case), kept in localStorage.
+  // Client-side mute list (persisted): hides chat from those names locally.
   get muted() {
     if (!this._muted) {
       try { this._muted = new Set(JSON.parse(localStorage.getItem('sar_muted') || '[]')); } catch (e) { this._muted = new Set(); }
@@ -112,82 +99,111 @@ class ChatManager {
   setMuted(name, on) {
     const key = String(name).trim().toLowerCase();
     if (!key) return false;
-    this.muted[on ? 'add' : 'delete'](key);
+    if (on) this.muted.add(key); else this.muted.delete(key);
     try { localStorage.setItem('sar_muted', JSON.stringify([...this.muted])); } catch (e) {}
     return true;
   }
 
   addMessage(name, text, hue = null) {
     if (name && this.muted.has(String(name).toLowerCase())) return;
-    const fromServer = name === 'Server' || name === '[Admin]';
-    // The server speaks English: its lines are translated here.
-    if (fromServer && typeof i18n !== 'undefined') {
+    const system = name === 'Server' || name === '[Admin]' || name === '?';
+    // System lines from the (English) server are translated client-side.
+    if ((name === 'Server' || name === '[Admin]') && typeof i18n !== 'undefined') {
       text = i18n.chat(text);
       if (name === 'Server') name = t('chat.server');
     }
-    this.messages.push({ name, text, hue, system: fromServer || name === '?', timestamp: Date.now() });
-    if (this.messages.length > this.maxMessages) this.messages.shift();
+    this.messages.push({ name, text, hue, system, timestamp: Date.now() });
+    if (this.messages.length > this.maxMessages) {
+      this.messages.shift();
+    }
   }
 
   draw(ctx, canvas) {
     if (!this.messages.length && !this.isOpen) return;
+
     ctx.save();
+    const lineH  = 18;
+    const msgFontSize = 13;
+    const inputH = this.isOpen ? 24 : 0;
+    const bottomPad = 12;
+    // Chat input box starts further right to avoid overlapping the gear button in the lower-left corner.
+    const inputX = 50;
+    let x = 50;   // aligned with the input box, clear of the ⚙ button
+    let baseY;
     const touch = document.body.classList.contains('touch-ui');
-    let x = CHAT.boxX, y0;
     if (touch) {
-      // The move stick owns the bottom-left on touch: messages go under the
-      // top toolbar, and typing happens in the on-screen field.
+      // Touch: the move stick owns the bottom-left, so messages go under the
+      // toolbar (top-left); typing happens in the on-screen field anyway.
       hudTransform(ctx, 0, 0);
       const cssPerUnit = (canvas.clientHeight / display.viewH) * (display.uiScale || 1);
       x = 12 / cssPerUnit;
-      y0 = Math.max(0, 106 - canvas.getBoundingClientRect().top) / cssPerUnit + 12;
+      const top = canvas.getBoundingClientRect().top;
+      baseY = Math.max(0, 106 - top) / cssPerUnit + 12;
     } else {
-      hudTransform(ctx, 0, VIEW_H);           // grows from the bottom-left on phones
-      y0 = VIEW_H - CHAT.bottom - (this.isOpen ? CHAT.boxH : 0) - this.messages.length * CHAT.lineH;
+      hudTransform(ctx, 0, VIEW_H); // grows from the bottom-left corner on phones
+      baseY = VIEW_H - bottomPad - inputH - (this.messages.length * lineH);
     }
-    this.messages.forEach((m, i) => this._drawMessage(ctx, m, x, y0 + i * CHAT.lineH));
-    if (this.isOpen && !touch) this._drawInputBox(ctx);
-    ctx.restore();
-  }
 
-  _drawMessage(ctx, msg, x, y) {
-    const age = (Date.now() - msg.timestamp) / 1000;
-    const alpha = this.isOpen ? 1 : Math.max(0, 1 - (age - CHAT.showSec) / CHAT.showSec);
-    if (alpha <= 0) return;
-    const mine = !msg.system && typeof playerManager !== 'undefined' && playerManager.mainPlayer?.name === msg.name;
-    const label = `${mine ? t('hud.you') : msg.name}: `;
-    // Name in the colour of the sender's spinner (the tint shifts hue by ~36°).
-    const nameColor = msg.hue != null ? `hsla(${(msg.hue + 36) % 360},80%,65%,${alpha})` : `rgba(255,255,255,${alpha})`;
-    ctx.font = CHAT.font;
-    ctx.fillStyle = `rgba(0,0,0,${alpha * 0.6})`;
-    ctx.fillText(`${label}${msg.text}`, x + 1, y + 1);
-    ctx.fillStyle = nameColor;
-    ctx.fillText(label, x, y);
-    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-    ctx.fillText(msg.text, x + ctx.measureText(label).width, y);
-  }
+    // Draw message history — fade out older messages when chat is closed.
+    this.messages.forEach((msg, i) => {
+      const y       = baseY + i * lineH;
+      const age     = (Date.now() - msg.timestamp) / 1000; // seconds
+      const alpha   = this.isOpen ? 1 : Math.max(0, 1 - (age - 5) / 5); // visible 5s, fade over 5s
 
-  // Text scrolled so the caret stays in view, plus a blinking caret.
-  _drawInputBox(ctx) {
-    const { boxX: bx, boxW, boxH } = CHAT;
-    const by = VIEW_H - CHAT.bottom - boxH;
-    ctx.fillStyle = 'rgba(0,0,0,0.65)';
-    ctx.fillRect(bx - 4, by, boxW, boxH);
-    ctx.strokeStyle = '#4a6fa5';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(bx - 4, by, boxW, boxH);
-    ctx.font = CHAT.font;
-    ctx.fillStyle = 'white';
-    const text = this.input;
-    const inner = boxW - 10;
-    const caretX = ctx.measureText(text.slice(0, this._el.selectionStart ?? text.length)).width;
-    const scroll = Math.max(0, caretX - inner);
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(bx - 2, by, inner + 6, boxH);
-    ctx.clip();
-    ctx.fillText(text, bx + 2 - scroll, by + 16);
-    if (Math.floor(Date.now() / 500) % 2 === 0) ctx.fillRect(bx + 2 - scroll + caretX, by + 5, 1.5, 14);
+      if (alpha <= 0) return;
+
+      const myId = (typeof socketManager !== 'undefined') ? socketManager.socket?.id : null;
+      const isMe = !msg.system && (typeof playerManager !== 'undefined') && playerManager.mainPlayer?.name === msg.name;
+      const displayName = isMe ? t('hud.you') : msg.name;
+
+      // Derive spinner-matching color from hue (sepia+saturate+hue-rotate produces ~hsl(H+36, 80%, 50%))
+      const nameHue = msg.hue != null ? (msg.hue + 36) % 360 : null;
+      const nameColor = nameHue != null ? `hsla(${nameHue},80%,65%,${alpha})` : `rgba(255,255,255,${alpha})`;
+
+      ctx.font = `${msgFontSize}px monospace`;
+
+      // Shadow for readability
+      ctx.fillStyle = `rgba(0,0,0,${alpha * 0.6})`;
+      ctx.fillText(`${displayName}: ${msg.text}`, x + 1, y + 1);
+
+      // Colored name
+      ctx.fillStyle = nameColor;
+      const nameWidth = ctx.measureText(`${displayName}: `).width;
+      ctx.fillText(`${displayName}: `, x, y);
+
+      // White message text
+      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      ctx.fillText(msg.text, x + nameWidth, y);
+    });
+
+    // Draw input box when open (touch uses the on-screen field at the top).
+    if (this.isOpen && !touch) {
+      const inputY = VIEW_H - bottomPad - inputH;
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.fillRect(inputX - 4, inputY, 340, inputH);
+
+      ctx.strokeStyle = '#4a6fa5';
+      ctx.lineWidth   = 1;
+      ctx.strokeRect(inputX - 4, inputY, 340, inputH);
+
+      // Text (scrolled so the caret stays visible) + blinking caret.
+      ctx.font      = `${msgFontSize}px monospace`;
+      ctx.fillStyle = 'white';
+      const caretIdx = this._el.selectionStart ?? this.input.length;
+      const boxW = 340 - 10;
+      const caretX = ctx.measureText(this.input.slice(0, caretIdx)).width;
+      const scroll = Math.max(0, caretX - boxW);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(inputX - 2, inputY, boxW + 6, inputH);
+      ctx.clip();
+      ctx.fillText(this.input, inputX + 2 - scroll, inputY + 16);
+      if (Math.floor(Date.now() / 500) % 2 === 0) {
+        ctx.fillRect(inputX + 2 - scroll + caretX, inputY + 5, 1.5, 14);
+      }
+      ctx.restore();
+    }
+
     ctx.restore();
   }
 }
