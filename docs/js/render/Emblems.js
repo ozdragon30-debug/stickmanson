@@ -18,7 +18,7 @@ const Emblems = (() => {
   const INK = 'rgba(20,20,22,0.9)';
   function shade(c, r0, r1) {
     const g = c.createRadialGradient(0, 0, r0, 0, 0, r1);
-    g.addColorStop(0, '#6e6e6e'); g.addColorStop(0.55, '#363636'); g.addColorStop(1, '#181818');
+    g.addColorStop(0, '#f2f2f2'); g.addColorStop(0.55, '#b4b4b4'); g.addColorStop(1, '#6a6a6a');
     return g;
   }
   function finish(c, fill, lw = 1.4) {
@@ -78,7 +78,7 @@ const Emblems = (() => {
   // shaded in greys so the player's hue tints them; outlined for contrast.
   function metal(c, r) {
     const g = c.createLinearGradient(-r, -r, r, r);
-    g.addColorStop(0, '#787878'); g.addColorStop(0.4, '#3c3c3c'); g.addColorStop(1, '#161616');
+    g.addColorStop(0, '#f4f4f4'); g.addColorStop(0.45, '#b8b8b8'); g.addColorStop(1, '#5e5e5e');
     return g;
   }
   function done(c, r, lw = 1.3) {
@@ -220,32 +220,47 @@ const Emblems = (() => {
     c.fillStyle = g; c.beginPath(); c.arc(0, 0, r + 6, 0, TAU); c.fill();
   }
 
+  // Swept ribbon arcs (a spinning "trail" behind each motif).
+  function trails(c, n, r, len, w) {
+    for (let k = 0; k < n; k++) {
+      const a = k * TAU / n - Math.PI / 2;
+      c.beginPath(); c.arc(0, 0, r, a - len, a - 0.18);
+      c.lineCap = 'round';
+      c.strokeStyle = INK; c.lineWidth = w + 2.2; c.stroke();
+      c.strokeStyle = 'rgba(225,225,225,0.85)'; c.lineWidth = w; c.stroke();
+    }
+  }
+
   function spinner(c, i) {
-    if (i < 4) {                                       // free starters: plain shapes
-      ring(c, i, [8, 6, 6, 6][i], R - 8, 1.45);
+    if (i < 4) {                                       // free starters: clean classic-feel shapes
+      if (i === 0) { trails(c, 3, R - 10, 1.1, 3.2); ring(c, 3, 3, R - 10, 1.5); }
+      else if (i === 1) { ring(c, 2, 10, R - 6, 1.1); }
+      else if (i === 2) { track(c, R - 12, 1.2, 0.5); ring(c, 7, 4, R - 8, 1.4); }
+      else { ring(c, 4, 5, R - 6, 1.6); beads(c, 5, R * 0.42, 2.4); }
       return;
     }
-    if (i < 28) {                                      // tier 1: one motif orbiting
-      const m = MOTIF_NAMES[(i - 4) % 16], n = i - 4 < 16 ? 6 : 8;
-      orbit(c, m, n, R - 10, 1.3);
+    if (i < 28) {                                      // tier 1: bigger motifs with swept trails
+      const j = i - 4, m = MOTIF_NAMES[j % 16], n = j < 16 ? 3 : 4;
+      trails(c, n, R - 10, n === 3 ? 1.2 : 0.9, 2.2);
+      orbit(c, m, n, R - 10, 1.5);
       return;
     }
-    if (i < 48) {                                      // tier 2: motifs + bead ring + inner counter ring
+    if (i < 48) {                                      // tier 2: geared ring + two motif orbits
       const j = i - 28, m = MOTIF_NAMES[(j * 5 + 3) % 16], m2 = MOTIF_NAMES[(j * 7 + 9) % 16];
-      track(c, R - 6, 1.6, 0.5);
-      beads(c, 12, R - 6, 1.7);
-      orbit(c, m, j % 2 ? 4 : 5, R - 6, 1.0);
+      ring(c, 5, 16, R - 5, 0.55);
+      orbit(c, m, j % 2 ? 3 : 4, R - 5, 1.15);
+      trails(c, 3, R * 0.42, 0.9, 1.6);
       orbit(c, m2, 3, R * 0.42, 0.62, Math.PI / 3);
       return;
     }
-    // tier 3: legendary — halo, ornate double ring, big motifs, core emblem.
+    // tier 3: legendary — halo, comet ring, big motifs, core emblem.
     const j = i - 48, m = MOTIF_NAMES[j], m2 = MOTIF_NAMES[(j + 8) % 16];
     halo(c, R);
-    track(c, R - 3, 2.2, 0.7); track(c, R - 10, 1, 0.4);
-    beads(c, 16, R - 3, 1.5);
-    orbit(c, m, 3, R - 7, 1.35);
-    orbit(c, m2, 6, R * 0.5, 0.55, Math.PI / 6);
-    motif(c, m, 0, 0, 0, 0.75);
+    ring(c, 6, 6, R - 3, 0.7);
+    track(c, R - 12, 1, 0.45);
+    orbit(c, m, 3, R - 6, 1.4, Math.PI / 6);
+    orbit(c, m2, 5, R * 0.48, 0.55);
+    motif(c, m, 0, 0, 0, 0.8);
   }
 
   function buildSpinnerSheet() {
