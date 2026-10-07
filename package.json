@@ -18,7 +18,7 @@
   "license": "CC-BY-NC-SA-4.0",
   "dependencies": {
     "compression": "^1.8.2",
-    "express": "^4.22.3",
+    "express": "^5.2.1",
     "socket.io": "^4.8.4"
   },
   "engines": {
