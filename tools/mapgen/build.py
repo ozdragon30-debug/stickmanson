@@ -230,10 +230,16 @@ THEMES = {
 }
 
 
+OUT_PX = 64   # background pixels per tile in the shipped picture
+
+
 def write_background(spec, seed):
     img = PT.paint_map(spec['_info'], THEMES.get(spec['file'], {}), seed=seed)
     name = spec['file'].replace('.dat', '.webp')
-    Image.fromarray(img).save(os.path.join(ROOT, 'data', 'maps', name), quality=74, method=6)
+    # Painted at PX px/tile, shipped at OUT_PX (keeps the APK small).
+    pic = Image.fromarray(img)
+    pic = pic.resize((round(pic.width * OUT_PX / PT.PX), round(pic.height * OUT_PX / PT.PX)), Image.LANCZOS)
+    pic.save(os.path.join(ROOT, 'data', 'maps', name), quality=74, method=6)
     return name
 
 
@@ -242,7 +248,7 @@ def write_dat(spec, rows, codes, spawns, weapons, bg):
     sp = ' '.join(f'{x * 50} {y * 50}' for x, y in spawns)
     ws = ' '.join(f'{x * 50} {y * 50} {wid} {RESPAWN.get(wid, 20)}' for x, y, wid in weapons)
     text = (f"inf={w} {h} {spec['name']}&tiles=\n{' '.join(codes)} \n&sp= {sp} \n&ws= {ws} \n"
-            f"&rt= 300 \n&ts=0 \n&bg={bg} \n&bgpad={PT.P} \n&bgpx={PT.PX} \n")
+            f"&rt= 300 \n&ts=0 \n&bg={bg} \n&bgpad={PT.P} \n&bgpx={OUT_PX} \n")
     open(os.path.join(ROOT, 'data', 'maps', spec['file']), 'w').write(text)
 
 
