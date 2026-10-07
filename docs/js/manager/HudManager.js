@@ -143,39 +143,70 @@ class HudManager {
     ctx.restore();
   }
 
+  // Stick Clash health panel: heart badge + segmented capsule bar whose
+  // colour follows the health left. Display only.
+  _pill(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+    else ctx.rect(x, y, w, h);
+  }
+
   _drawHealth(ctx, me) {
-    const x = 50, y = 15, w = 100, h = 20;
+    const x = 50, y = 16, w = 104, h = 18, r = h / 2;
     const hp = Math.max(0, Math.min(100, me.health / me.maxHealth() * 100));
     // Trail eases down toward the real value after taking damage.
     this.displayHp = hp > this.displayHp ? hp : this.displayHp + (hp - this.displayHp) * 0.08;
+    const now = performance.now();
+    const low = hp <= 25;
 
-    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-    ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
-    ctx.fillStyle = '#000';
-    ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    // Panel behind badge and bar.
+    ctx.fillStyle = 'rgba(8,12,18,0.62)';
+    this._pill(ctx, 10, 6, x + w - 2, 38, 19);
+    ctx.fill();
+    ctx.strokeStyle = low ? `rgba(255,90,90,${0.45 + 0.35 * Math.sin(now / 120)})` : 'rgba(255,255,255,0.14)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Heart badge.
+    ctx.beginPath(); ctx.arc(30, 25, 15, 0, Math.PI * 2);
+    const bg = ctx.createRadialGradient(27, 21, 2, 30, 25, 15);
+    bg.addColorStop(0, '#3a4452'); bg.addColorStop(1, '#151a22');
+    ctx.fillStyle = bg; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 1.2; ctx.stroke();
+
+    // Bar track, damage trail, health fill.
+    ctx.save();
+    this._pill(ctx, x, y, w, h, r);
+    ctx.fillStyle = '#0b0f14'; ctx.fill();
+    ctx.clip();
+    ctx.fillStyle = 'rgba(255,240,220,0.6)';
     ctx.fillRect(x, y, this.displayHp / 100 * w, h);
+    const [c0, c1] = hp > 60 ? ['#7dea6a', '#2f9a3a'] : hp > 25 ? ['#ffd45a', '#d07a12'] : ['#ff6b5e', '#a8121a'];
     const grad = ctx.createLinearGradient(0, y, 0, y + h);
-    const low = hp <= 20;
-    const pulse = low ? 0.65 + 0.35 * Math.sin(performance.now() / 120) : 1;
-    grad.addColorStop(0, low ? `rgba(255,70,70,${pulse})` : '#ff3b3b');
-    grad.addColorStop(1, low ? `rgba(150,0,0,${pulse})` : '#b30000');
+    grad.addColorStop(0, c0); grad.addColorStop(1, c1);
+    ctx.globalAlpha = low ? 0.7 + 0.3 * Math.sin(now / 120) : 1;
     ctx.fillStyle = grad;
     ctx.fillRect(x, y, hp / 100 * w, h);
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x - 0.5, y - 0.5, w + 1, h + 1);
+    ctx.globalAlpha = 1;
+    // Gloss and 10 segments.
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.fillRect(x, y + 2, w, h * 0.3);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    for (let k = 1; k < 10; k++) ctx.fillRect(Math.round(x + k * w / 10), y, 1, h);
+    ctx.restore();
+    this._pill(ctx, x - 0.5, y - 0.5, w + 1, h + 1, r);
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1; ctx.stroke();
 
     ctx.font = 'bold 12px ui-monospace, monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(0,0,0,0.7)';
     const hpText = Math.max(0, Math.ceil(me.health));
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
     ctx.fillText(hpText, x + w / 2 + 1, y + h / 2 + 1);
     ctx.fillStyle = '#fff';
     ctx.fillText(hpText, x + w / 2, y + h / 2);
     ctx.textBaseline = 'alphabetic';
-    this._drawCoins(ctx, x, y + h + 16);
+    this._drawCoins(ctx, x - 34, y + h + 26);
 
     me.healthbarHeart.drawCentered(ctx);
   }
