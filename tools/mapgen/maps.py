@@ -75,7 +75,7 @@ MAPS = [
              '###############',
          ]),
     dict(file='stormchannel.dat', name='Storm Channel', mirror='h',
-         floors=dict(A='concrete', B='grate'), walls=dict(A='concrete', B='metal'),
+         floors=dict(A='dirt', B='grate'), walls=dict(A='concrete', B='metal'),
          rows=[
              '###############',
              '#S........#...',
@@ -123,7 +123,7 @@ MAPS = [
              '###############',
          ]),
     dict(file='orbitstation.dat', name='Orbit Station', mirror='hv',
-         floors=dict(A='metal', B='grate'), walls=dict(A='metal'),
+         floors=dict(A='alien', B='grate'), walls=dict(A='metal'),
          rows=[
              'xxxxxxxxxxxxxxx',
              'x#####xxxxxxxxx',
@@ -140,7 +140,7 @@ MAPS = [
              'xxxxxxxxx##.###',
          ]),
     dict(file='biolab.dat', name='Bio Lab', mirror='h',
-         floors=dict(A='labtile', B='metal'), walls=dict(A='concrete', B='metal'),
+         floors=dict(A='labtile', B='alien'), walls=dict(A='concrete', B='metal'),
          rows=[
              '###############',
              '#S....#.......',
@@ -163,7 +163,7 @@ MAPS = [
              '###############',
          ]),
     dict(file='containerport.dat', name='Container Port', mirror='h',
-         floors=dict(A='concrete', B='asphalt'), walls=dict(A='concrete', B='container_blue', C='container_red'),
+         floors=dict(A='dirt', B='asphalt'), walls=dict(A='concrete', B='container_blue', C='container_red'),
          rows=[
              '###############',
              '#S...........',
@@ -183,7 +183,7 @@ MAPS = [
              '###############',
          ]),
     dict(file='thepitarena.dat', name='The Pit Arena', mirror='hv',
-         floors=dict(A='stone', B='sand'), walls=dict(A='stone'),
+         floors=dict(A='stone', B='dirt'), walls=dict(A='stone'),
          rows=[
              '###############',
              '#S..........o.',
@@ -252,7 +252,7 @@ MAPS = [
              '###############',
          ]),
     dict(file='sandbase.dat', name='Sand Base', mirror='h',
-         floors=dict(A='sand', B='concrete'), walls=dict(A='concrete'),
+         floors=dict(A='dirt', B='concrete'), walls=dict(A='concrete'),
          rows=[
              '###############',
              '#S............',

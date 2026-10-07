@@ -1,22 +1,18 @@
 # Changelog
 
-## Back to the classic version, as Stick Clash
+## Stick Clash: classic characters and gameplay, our own everything else
 
-The game is the classic version again (original characters, weapons,
-spinners, sounds, maps and engine, with the touch controls, full screen,
-smoothness work and the ×1.15 damage), plus:
+Characters, weapons, gameplay (engine, bots, damage ×1.15) and sounds are the
+classic ones. Our own:
 
-- the name **Stick Clash** and its logo;
-- the 15 painted Stick Clash maps, next to the classic maps (menu group
-  "Stick Clash"), with their own water atlas;
-- coins, the spinner shop (the classic spinners, 4 free, the rest bought,
-  each with a small perk), pets with small perks, and the VIP groundwork;
-  short rounds (e.g. `!next`) pay no coins and a win needs a strict lead.
-
-Everything newer than that classic version (code-drawn art, new sounds,
-the engine rewrite, bot changes, the sledgehammer redesign) stays in git
-history; any build can still be reinstalled from the APK release.
-
+- **Maps:** only the 15 Stick Clash maps (tools/mapgen), restyled closer to
+  the classic arena look without copying it: warm orange arena dirt, purple
+  alien ground, studded concrete barriers, planks and scrap lying around,
+  livelier colours. The classic maps and map tiles are removed.
+- **Spinners, cursors, blood and HUD heart:** code-drawn (render/Emblems.js).
+- **Name and logo:** Stick Clash.
+- **Coins, spinner shop, pets, VIP groundwork** (short rounds pay no coins,
+  a win needs a strict lead).
 
 ## 2026 modernisation
 

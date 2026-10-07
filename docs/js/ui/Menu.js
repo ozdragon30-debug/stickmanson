@@ -107,10 +107,10 @@ class Menu {
 
   // Offline only: pick the map for the next round (or keep the random rotation).
   _buildMapPicker() {
-    const groups = { clash: [], '': [], 'feature/': [], 'ballistick/': [] };
+    const groups = { clash: [] };
     for (const f of BotManager.OFFLINE_MAPS) {
       if (f === 'debug.dat') continue;
-      const g = BotManager.CLASH_MAPS.includes(f) ? 'clash' : f.startsWith('feature/') ? 'feature/' : f.startsWith('ballistick/') ? 'ballistick/' : '';
+      const g = 'clash';
       groups[g].push(f);
     }
     const sel = this.mapSelect;

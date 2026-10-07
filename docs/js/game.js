@@ -34,9 +34,7 @@ function parsedTiles() {
   return map._parsed;
 }
 
-// Stick Clash maps use their own small water atlas (tile keys "W…");
-// the classic maps use the big classic atlas.
-const atlasFor = tileType => (tileType[0] === 'W' && waterAtlas.ready ? waterAtlas : mapAtlas);
+const atlasFor = () => mapAtlas;
 
 function isAnimatedTile(tileType) {
   const a = atlasFor(tileType).tileAnimations[tileType];
@@ -508,8 +506,6 @@ settingsManager.onChange((key, value) => {
     i18n.setLanguage(value);
     if (menu._ready) menu.playBtn.textContent = t('menu.play');
     menu._renderRecentRooms();
-    const groups = document.querySelectorAll('#menu-map-select optgroup');
-    if (groups[2]) groups[2].label = t('menu.map.featured');
     if (settingsManager.isOpen()) settingsManager._refresh();
   }
 });

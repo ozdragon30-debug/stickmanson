@@ -498,7 +498,7 @@ class Player {
     const f = indicatorAtlas.getFrameData(animName, frameIndex);
     if (!f) return;
 
-    const scale = 0.8;
+    const scale = 0.66;   // snug around the player
     const dw = f.w * scale;
     const dh = f.h * scale;
 

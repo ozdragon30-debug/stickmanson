@@ -1,16 +1,24 @@
 class AtlasSpritesheet {
-  constructor(name, imageUrl, jsonData) {
+  // opts.renderer: draw frames from code (render/Emblems.js); the JSON then
+  //   only holds animation timing.  opts.image: an already-drawn canvas.
+  constructor(name, imageUrl, jsonData, opts = {}) {
     this.spritesheetName = name;
-    this.image = new Image();
-    this.image.decoding = 'async';
-    // Prefer the lossless WebP copy (pixel-identical, ~40% smaller download);
-    // fall back to the original PNG if the browser can't decode it.
-    const webp = imageUrl.replace(/\.png$/, '.webp');
-    if (webp !== imageUrl) {
-      this.image.onerror = () => { this.image.onerror = null; this.image.src = imageUrl; };
-      this.image.src = webp;
+    this.renderer = opts.renderer || null;
+    if (opts.image || !imageUrl) {
+      this.image = opts.image || document.createElement('canvas');
+      this.image.complete = true;
+      this.image.naturalWidth = this.image.width || 1;
     } else {
-      this.image.src = imageUrl;
+      this.image = new Image();
+      this.image.decoding = 'async';
+      // Prefer the WebP copy; fall back to the PNG if the browser can't decode it.
+      const webp = imageUrl.replace(/\.png$/, '.webp');
+      if (webp !== imageUrl) {
+        this.image.onerror = () => { this.image.onerror = null; this.image.src = imageUrl; };
+        this.image.src = webp;
+      } else {
+        this.image.src = imageUrl;
+      }
     }
     this.frames = {};
     this.animationMap = {};  // name -> { fps, frames: [frameKey, ...], offset?: [x, y] }
@@ -22,7 +30,8 @@ class AtlasSpritesheet {
       const rawFrames = data.frames || {};
       this.frames = rawFrames;
       for (const anim of (data.animations || [])) {
-        this.animationMap[anim.name] = { fps: anim.fps, frames: anim.frames, offset: anim.offset || null, pinned: anim.pinned || false };
+        const frames = typeof anim.frames === 'number' ? [...Array(anim.frames).keys()] : anim.frames;
+        this.animationMap[anim.name] = { fps: anim.fps, frames, offset: anim.offset || null, pinned: anim.pinned || false };
       }
       this.animationNames = Object.keys(this.animationMap);
       this.tileAnimations = data.tileAnimations || {};
@@ -61,6 +70,7 @@ class AtlasSpritesheet {
     const cache = anim._fd || (anim._fd = []);
     if (cache[i] !== undefined) return cache[i];
     const key = anim.frames[i];
+    if (this.renderer) return (cache[i] = AtlasSpritesheet.NO_FRAME);
     const raw = this.frames[key];
     if (!raw) return (cache[i] = null);
 
@@ -102,11 +112,13 @@ class AtlasSpritesheet {
 }
 
 // Singleton indicator (spinner) atlas
-const indicatorAtlas = new AtlasSpritesheet(
-  'indicator',
-  'sprites/indicator/spritesheet.png',
-  'sprites/indicator/spritesheet.json'
-);
+AtlasSpritesheet.NO_FRAME = Object.freeze({ x: 0, y: 0, w: 1, h: 1, origin: { ox: 0, oy: 0 }, tx: 0, ty: 0, sw: 1, sh: 1 });
+
+// Stick Clash's own spinners (64, tinted per player), cursors, blood and heart.
+const indicatorAtlas = (() => {
+  const { canvas, data } = Emblems.buildSpinnerSheet();
+  return new AtlasSpritesheet('indicator', null, data, { image: canvas });
+})();
 
 // Singleton player atlas loaded once
 const playerAtlas = new AtlasSpritesheet(
@@ -130,35 +142,20 @@ const pickupAtlas = new AtlasSpritesheet(
 );
 
 // Singleton heartbeat atlas (HUD health indicator)
-const heartbeatAtlas = new AtlasSpritesheet(
-  'heartbeat',
-  'sprites/player/heartbeat.png',
-  'sprites/player/heartbeat.json'
-);
+const heartbeatAtlas = new AtlasSpritesheet('heartbeat', null, { animations: Emblems.HEART_ANIMS }, { renderer: Emblems.heart });
 
 // Singleton blood atlas loaded once
-const bloodAtlas = new AtlasSpritesheet(
-  'blood',
-  'sprites/blood/spritesheet.png',
-  'sprites/blood/spritesheet.json'
-);
+const bloodAtlas = new AtlasSpritesheet('blood', null, { animations: Emblems.BLOOD_ANIMS }, { renderer: Emblems.blood });
 
 // Singleton map atlas loaded once
-// Water for the painted Stick Clash maps.
-const waterAtlas = new AtlasSpritesheet('water', 'sprites/maps/water.png', 'sprites/maps/water.json');
+// Map tiles: only the animated water of the painted Stick Clash maps (the
+// rest of each map is its background picture).
+const mapAtlas = new AtlasSpritesheet('map', 'sprites/maps/water.png', 'sprites/maps/water.json');
 
-const mapAtlas = new AtlasSpritesheet(
-  'map',
-  'sprites/maps/atlas.png',
-  'sprites/maps/atlas.json'
-);
-
-// Singleton cursor atlas
-const cursorAtlas = new AtlasSpritesheet(
-  'cursor',
-  'sprites/cursor/spritesheet.png',
-  'sprites/cursor/spritesheet.json'
-);
+const cursorAtlas = (() => {
+  const { canvas, data } = Emblems.buildCursorSheet();
+  return new AtlasSpritesheet('cursor', null, data, { image: canvas });
+})();
 
 // Singleton particle atlas — muzzle flash / shoot effect sprites
 const particleAtlas = new AtlasSpritesheet(

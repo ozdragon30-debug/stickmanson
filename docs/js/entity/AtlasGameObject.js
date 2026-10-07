@@ -102,9 +102,35 @@ class AtlasGameObject {
     return ib.lookup(anim.frames[this.frameIndex], k);
   }
 
+  // Code-drawn sheets (Emblems: blood, heart): progress 0 → 1 through the
+  // animation, smooth between frames. Read-only.
+  _progress() {
+    const anim = this.atlas.getAnimation(this.animName);
+    const n = anim?.frames.length;
+    if (!n) return 0;
+    if (this.repeatTimes !== -1 && this.repeatTimes <= 0) return 1;
+    if (this.frameIndex < 0) return 0;
+    const between = Math.min(1, Math.max(0, (performance.now() - this.lastUpdated) * (anim.fps || 12) / 1000));
+    if (this.repeatTimes === 1) {
+      const last = this.frameIndex === n - 1;
+      return Math.min(1, (this.frameIndex + (last ? 0 : between)) / Math.max(1, n - 1));
+    }
+    return Math.min(1, (this.frameIndex + between) / n);
+  }
+
+  _render(ctx, rotation, ox = 0, oy = 0) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(rotation);
+    if (ox || oy) ctx.translate(ox, oy);
+    this.atlas.renderer.draw(ctx, this.animName, this._progress());
+    ctx.restore();
+  }
+
   // Draw anchoring the sprite's origin point at (this.x, this.y).
   draw(ctx) {
     if (!this.isVisible) return;
+    if (this.atlas.renderer) return this._render(ctx, this.rotation);
     const sub = this._inbetween();
     let img = this.atlas.image, f;
     if (sub && sub.img) {
@@ -129,6 +155,7 @@ class AtlasGameObject {
   // Draw the frame centered on (this.x, this.y) — used for effects like blood.
   drawCentered(ctx) {
     if (!this.isVisible) return;
+    if (this.atlas.renderer) return this._render(ctx, 0);
     const f = this.atlas.getFrameData(this.animName, Math.max(0, this.frameIndex));
     if (!f) return;
     // Centred on the original (untrimmed) frame size.
@@ -142,6 +169,7 @@ class AtlasGameObject {
   // offsetX/offsetY are in local (pre-rotation) space: +X = right, -Y = forward when rotation=0.
   drawCenteredRotated(ctx, rotation, offsetX = 0, offsetY = 0) {
     if (!this.isVisible) return;
+    if (this.atlas.renderer) return this._render(ctx, rotation, offsetX, offsetY);
     const f = this.atlas.getFrameData(this.animName, Math.max(0, this.frameIndex));
     if (!f) return;
     ctx.save();

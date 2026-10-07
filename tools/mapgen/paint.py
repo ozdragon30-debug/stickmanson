@@ -93,8 +93,8 @@ def mat_sidewalk(n, h, w, X, Y):
 
 def mat_sand(n, h, w, X, Y):
     v = n.fbm(h, w, 160, 3)
-    img = np.stack([204 + v * 7, 174 + v * 7, 122 + v * 5], -1)
-    img += n.value(h, w, 1.5)[..., None] * 9                     # grain
+    img = np.stack([214 + v * 9, 150 + v * 9, 78 + v * 6], -1)
+    img += n.value(h, w, 1.5)[..., None] * 10                    # grain
     peb = n.value(h, w, 2.2) > 0.86
     img[peb] -= rgb(40, 38, 30)
     return img
@@ -113,9 +113,27 @@ def mat_grass(n, h, w, X, Y):
 
 def mat_dirt(n, h, w, X, Y):
     v = n.fbm(h, w, 70, 3)
-    img = np.stack([118 + v * 9, 88 + v * 8, 60 + v * 6], -1)
+    img = np.stack([170 + v * 24, 104 + v * 17, 56 + v * 10], -1)   # orange-brown arena dirt
+    img += n.value(h, w, 1.6)[..., None] * 16
+    img += n.fbm(h, w, 8, 2)[..., None] * rgb(14, 10, 6)
+    img[n.value(h, w, 2.4) > 0.84] -= rgb(52, 36, 18)
+    blot = cv2.GaussianBlur((n.fbm(h, w, 40, 3) > 0.42).astype(np.float32), (0, 0), 1.0)
+    tint(img, (120, 72, 36), blot * 0.35)                         # darker packed patches
+    return img
+
+
+def mat_alien(n, h, w, X, Y):
+    """Purple alien rock with small craters."""
+    v = n.fbm(h, w, 60, 4)
+    img = np.stack([112 + v * 26, 62 + v * 16, 152 + v * 26], -1)
     img += n.value(h, w, 1.6)[..., None] * 12
-    img[n.value(h, w, 2.4) > 0.84] -= rgb(36, 30, 22)
+    img += n.fbm(h, w, 10, 2)[..., None] * rgb(16, 10, 18)
+    for k in range(int(h * w / 9000)):
+        cx, cy = n.r.randint(0, w), n.r.randint(0, h)
+        r = n.r.randint(5, 16)
+        cv2.circle(img, (cx, cy), r, (78, 40, 112), -1, cv2.LINE_AA)
+        cv2.circle(img, (cx - r // 4, cy - r // 4), max(2, r - 3), (134, 84, 176), -1, cv2.LINE_AA)
+        cv2.circle(img, (cx, cy), r, (70, 30, 100), 1, cv2.LINE_AA)
     return img
 
 
@@ -246,11 +264,11 @@ MATERIALS = {
     'asphalt': mat_asphalt, 'concrete': mat_concrete, 'sidewalk': mat_sidewalk, 'sand': mat_sand,
     'grass': mat_grass, 'dirt': mat_dirt, 'gravel': mat_gravel, 'metal': mat_metal,
     'carpet_red': mat_carpet((136, 40, 42)), 'carpet_blue': mat_carpet((46, 64, 118)),
-    'labtile': mat_labtile, 'wood': mat_wood, 'stone': mat_stone, 'grate': mat_grate, 'track': mat_track,
+    'labtile': mat_labtile, 'alien': mat_alien, 'wood': mat_wood, 'stone': mat_stone, 'grate': mat_grate, 'track': mat_track,
     'asphalt_v': mat_road_line('v'), 'asphalt_h': mat_road_line('h'),
     'cross_v': mat_crossing('v'), 'cross_h': mat_crossing('h'),
 }
-NATURAL = {'grass', 'dirt', 'sand', 'gravel'}
+NATURAL = {'grass', 'dirt', 'sand', 'gravel', 'alien'}
 OUTDOOR = {'asphalt', 'concrete', 'sidewalk', 'sand', 'grass', 'dirt', 'gravel', 'asphalt_v', 'asphalt_h', 'cross_v', 'cross_h', 'track', 'stone'}
 
 
@@ -284,7 +302,13 @@ def wall_texture(kind, base, n, h, w, X, Y):
         img += tone[..., None] * rgb(1, 0.5, 0.4)
         img[mortar] = rgb(110, 100, 92)
     elif kind == 'slab':
+        # Concrete barrier blocks with metal studs (the classic arena look).
         img[(Y % 40) < 2] *= 0.8
+        img[(X % 40) < 2] *= 0.85
+        stud = ((X % 20 - 10) ** 2 + (Y % 40 - 20) ** 2) < 10
+        img[stud] = rgb(70, 74, 80)
+        hi = ((X % 20 - 9) ** 2 + (Y % 40 - 19) ** 2) < 3
+        img[hi] = rgb(190, 196, 204)
     elif kind == 'panel':
         pn = PX / 2
         img[((X % pn) < 3) | ((Y % pn) < 3)] = rgb(60, 66, 74)
@@ -729,7 +753,12 @@ def paint_map(cells, theme, seed=1):
     # Colour grade.
     g = np.array(theme.get('grade', (1, 1, 1)), np.float32)
     canvas *= g
-    canvas = (canvas - 128) * theme.get('contrast', 1.06) + 128
+    canvas = (canvas - 128) * theme.get('contrast', 1.1) + 128
+    # Livelier colours, like the classic arena maps.
+    sat = theme.get('saturation', 1.12)
+    hsv = cv2.cvtColor(np.clip(canvas, 0, 255).astype(np.uint8), cv2.COLOR_RGB2HSV).astype(np.float32)
+    hsv[..., 1] = np.clip(hsv[..., 1] * sat, 0, 255)
+    canvas = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2RGB).astype(np.float32)
 
     # Surroundings outside the map: darkened.
     out = np.ones((H, W), np.float32)
@@ -852,6 +881,22 @@ def decal_layer(canvas, n, rnd, grid, theme, H, W):
         q = PX // 2
         sx_, sy_ = x * PX + rnd.choice((0, q)), y * PX + rnd.choice((0, q))
         canvas[sy_ + 3:sy_ + q - 3, sx_ + 3:sx_ + q - 3] *= rnd.uniform(0.72, 0.88)
+    # Wooden planks and junk lying around (classic arena clutter).
+    outdoor_cells = [(x, y) for x, y in floor_cells if grid[y][x].get('floor') in OUTDOOR or grid[y][x].get('mat') in OUTDOOR]
+    for _ in range(int(len(outdoor_cells) * theme.get('clutter', 0.05))):
+        x, y = rnd.choice(outdoor_cells)
+        cxp, cyp = x * PX + rnd.random() * PX, y * PX + rnd.random() * PX
+        if rnd.random() < 0.6:   # plank
+            L, Wd, a = rnd.uniform(22, 46), rnd.uniform(6, 10), rnd.uniform(0, math.pi)
+            box = cv2.boxPoints(((cxp, cyp), (L, Wd), math.degrees(a))).astype(np.int32)
+            cv2.fillPoly(canvas, [box + 3], (40, 30, 22), cv2.LINE_AA)
+            cv2.fillPoly(canvas, [box], (rnd.randint(190, 220), rnd.randint(160, 180), rnd.randint(110, 130)), cv2.LINE_AA)
+            cv2.polylines(canvas, [box], True, (90, 66, 40), 1, cv2.LINE_AA)
+        else:                    # metal scrap / shell casings
+            for _ in range(rnd.randint(2, 5)):
+                px_, py_ = int(cxp + rnd.uniform(-12, 12)), int(cyp + rnd.uniform(-12, 12))
+                col = (210, 170, 70) if rnd.random() < 0.5 else (150, 152, 158)
+                cv2.rectangle(canvas, (px_, py_), (px_ + rnd.randint(2, 5), py_ + 2), col, -1)
     # Leaves / litter specks.
     cols = theme.get('specks', [(46, 42, 38), (70, 64, 56), (96, 90, 80)])
     for _ in range(int(area * 0.35)):

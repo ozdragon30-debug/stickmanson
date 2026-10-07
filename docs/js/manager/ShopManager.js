@@ -14,7 +14,7 @@
 
 class ShopManager {
   static STARTERS = 4;
-  static COUNT = 58;   // the classic spinner set
+  static COUNT = 64;
   static TIERS = [
     null,
     { price: 60,  hp: 4,  atk: 0.03, armor: 0.03 },
@@ -97,7 +97,7 @@ class ShopManager {
   static perk(i) {
     i = ((i % ShopManager.COUNT) + ShopManager.COUNT) % ShopManager.COUNT;
     if (i < ShopManager.STARTERS) return { tier: 0, stat: null, value: 0, price: 0 };
-    const tier = i < 26 ? 1 : i < 44 ? 2 : 3;
+    const tier = i < 28 ? 1 : i < 48 ? 2 : 3;
     const stat = ShopManager.STATS[i % 3];
     const T = ShopManager.TIERS[tier];
     return { tier, stat, value: T[stat], price: T.price };

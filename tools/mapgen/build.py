@@ -211,18 +211,18 @@ def write_atlas():
 
 
 THEMES = {
-    'asphaltstreets.dat': dict(puddles=True, graffiti=0.35, outside='asphalt', outdecor=['tree', 'car_red', 'car_white', 'dumpster', 'bush'], outdensity=0.25),
+    'asphaltstreets.dat': dict(puddles=True, graffiti=0.5, outside='asphalt', outdecor=['tree', 'car_red', 'car_white', 'dumpster', 'bush'], outdensity=0.25),
     'officefloor.dat': dict(lamps=10, dirt=(60, 52, 48), grade=(1.02, 1.0, 0.98)),
-    'stormchannel.dat': dict(puddles=True, graffiti=0.3, grade=(0.95, 1.0, 1.02), outside='concrete', outdecor=['bush', 'crate', 'barrel_blue', 'tree'], outdensity=0.2),
-    'trailerpark.dat': dict(dirt=(110, 84, 54), grade=(1.05, 1.0, 0.92), outside='dirt', outdecor=['tree', 'tree', 'bush', 'rock']),
+    'stormchannel.dat': dict(puddles=True, graffiti=0.3, grade=(0.95, 1.0, 1.02), outside='dirt', outdecor=['bush', 'crate', 'barrel_blue', 'tree'], outdensity=0.2),
+    'trailerpark.dat': dict(dirt=(110, 84, 54), grade=(1.05, 1.0, 0.92), clutter=0.08, outside='dirt', outdecor=['tree', 'tree', 'bush', 'rock']),
     'orbitstation.dat': dict(void='space', lamps=8, grade=(0.95, 0.98, 1.06)),
     'biolab.dat': dict(lamps=10, dirt=(70, 76, 70), grade=(0.97, 1.02, 1.03)),
-    'containerport.dat': dict(puddles=True, graffiti=0.2, outside='asphalt', outdecor=['crate', 'barrel_blue', 'barrel_red'], outdensity=0.18),
-    'thepitarena.dat': dict(dirt=(90, 70, 50), grade=(1.04, 1.0, 0.93), outside='sand', outdecor=['rock', 'rock', 'bush'], outdensity=0.3),
+    'containerport.dat': dict(puddles=True, graffiti=0.2, clutter=0.08, outside='dirt', outdecor=['crate', 'barrel_blue', 'barrel_red'], outdensity=0.18),
+    'thepitarena.dat': dict(dirt=(90, 70, 50), grade=(1.04, 1.0, 0.93), outside='dirt', outdecor=['rock', 'rock', 'bush'], outdensity=0.3),
     'hedgemaze.dat': dict(dirt=(60, 70, 40), outside='grass', outdecor=['tree', 'tree', 'bush', 'rock'], outdensity=0.55),
     'shipyard.dat': dict(puddles=True, grade=(0.97, 1.0, 1.03)),
     'foundry.dat': dict(lamps=8, dirt=(60, 50, 40), grade=(1.05, 0.98, 0.92)),
-    'sandbase.dat': dict(dirt=(130, 100, 64), grade=(1.06, 1.0, 0.9), outside='sand', outdecor=['rock', 'bush', 'barrel_yellow'], outdensity=0.25),
+    'sandbase.dat': dict(dirt=(130, 100, 64), grade=(1.06, 1.0, 0.9), outside='dirt', outdecor=['rock', 'bush', 'barrel_yellow'], outdensity=0.25),
     'stonekeep.dat': dict(dirt=(70, 66, 50), grade=(1.0, 1.0, 0.96), outside='grass', outdecor=['tree', 'tree', 'bush', 'rock'], outdensity=0.5),
     'rooftops.dat': dict(void='street', puddles=True, graffiti=0.2),
     'metroline.dat': dict(lamps=12, dirt=(54, 52, 50), graffiti=0.25),
@@ -256,7 +256,7 @@ def main():
     only = sys.argv[1:]
     registry = Registry()
     built = []
-    for spec in MAPS:   # the classic debug map stays as it is
+    for spec in MAPS + [DEBUG_MAP]:
         if only and spec['file'] not in only: continue
         rows, codes, spawns, weapons = build_map(spec, registry)
         built.append((spec, rows, codes, spawns, weapons))
