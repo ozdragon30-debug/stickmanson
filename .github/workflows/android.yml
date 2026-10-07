@@ -77,7 +77,6 @@ jobs:
           if [ -n "$OLD_APK" ]; then
             cp android/app/build/outputs/apk/debug/app-debug.apk "$OLD_APK"
             echo "MAIN_APK=$OLD_APK" >> "$GITHUB_ENV"
-            echo "COPY_APK=$OLD_APK" >> "$GITHUB_ENV"
           else
             cp android/app/build/outputs/apk/debug/app-debug.apk StickClash.apk
             cp StickClash.apk "StickClash-${GITHUB_SHA::7}.apk"
