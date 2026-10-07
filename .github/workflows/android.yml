@@ -30,6 +30,8 @@ jobs:
         if: ${{ github.event.inputs.ref != '' && github.event.inputs.ref != null }}
         run: |
           REF='${{ github.event.inputs.ref }}'
+          # Replace (not overlay) the web files and tools with that version's.
+          rm -rf docs tools
           git checkout "$REF" -- docs tools capacitor.config.json
           SHORT=$(git rev-parse --short=7 "$REF")
           # Own app id and name, so it installs next to the current game.
