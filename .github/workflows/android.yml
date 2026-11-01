@@ -83,7 +83,7 @@ jobs:
             echo "MAIN_APK=StickClash.apk" >> "$GITHUB_ENV"
             echo "COPY_APK=StickClash-${GITHUB_SHA::7}.apk" >> "$GITHUB_ENV"
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: StickClash-apk
           path: ${{ env.MAIN_APK }}
